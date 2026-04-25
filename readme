@@ -1,0 +1,9 @@
+Projekt FitFrdge für Strukturierte programmierung SoSe26 
+https://flask.palletsprojects.com/en/stable/installation/
+Run
+
+flask --app flaskr run --debug
+for testing
+
+$ flask --app flaskr init-db
+Initialize the database
