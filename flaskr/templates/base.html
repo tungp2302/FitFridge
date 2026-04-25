@@ -3,6 +3,10 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <nav>
   <h1>FitFridge</h1>
+    <ul id="mainnav">
+    <li><a href="{{url_for('fridge.viewFridge')}}">Fridge</a>
+    <li><a href="{{url_for('blog.index')}}">Main</a>
+  </ul>
   <ul>
     {% if g.user %}
       <li><span>{{ g.user['username'] }}</span>
