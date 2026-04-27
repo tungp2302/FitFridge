@@ -21,24 +21,35 @@ h1 {
 
 a {
     color: #2fa787;
+    text-decoration: none;
 }
 
-hr {
-    border: none;
-    border-top: 1px solid rgb(32, 32, 32);
-}
 
 nav {
     background: rgb(32, 32, 32);
     display: flex;
-    align-items: center;
-    padding: 0 0.5rem;
+    flex-direction: row;
+    align-items: start;
+    padding: 0;
+}
+
+#usermenu,
+#menuleft{
+    display: flex;
+    flex-direction: row;
+}
+
+#menuleft a,
+#usermenu a
+{
+    padding: 0.5rem;
 }
 
 nav h1 {
     flex: auto;
-    margin: 0.5rem;
+    margin: 0rem;
 }
+
 
 nav h1 a {
     text-decoration: none;
@@ -48,19 +59,21 @@ nav h1 a {
 nav ul {
     display: flex;
     list-style: none;
+    justify-content: center;
     margin: 0;
     padding: 0;
 }
 
 nav ul li a,
-nav ul li span,
 header .action {
-    display: block;
+    display: flex;
     padding: 0.5rem;
 }
 
-#mainnav{
-    align-items: flex-start;
+nav ul li span{
+    display: flex;
+    padding: 0.5rem;
+    
 }
 
 .content {
