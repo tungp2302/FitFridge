@@ -32,7 +32,7 @@ def close_db(e=None):       # closes existing connection
 
 @click.command('init-db')
 def init_db_command():
-    """Clear the existing data and create new tables."""
+    """Vorhandene Daten loeschen und neue Tabellen anlegen."""
     init_db()
     click.echo('Initialized the database.')
 

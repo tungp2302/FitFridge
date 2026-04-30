@@ -7,3 +7,32 @@ for testing
 
 $ flask --app flaskr init-db
 Initialize the database
+
+
+Dokumentation: 30.04.26 Tung
+
+FitFridge Skelett mit separaten frontend, backend, API/DB.
+
+## Struktur
+- `flaskr/frontend`: routes, templates, static assets
+- `flaskr/backend`: domain models, services, utilities
+- `flaskr/api_db`: database und external API Integration
+- `tests`: test areas für jeden layer
+
+Übernommene Sachen:
+fridge.py und auth.py zu routes.py
+blog.py gerade keine Anbindung
+
+Legacy/Altstruktur:
+- Alte Root-Dateien wurden nach flaskr/legacy verschoben.
+- Enthalten: auth.py, blog.py, db.py, fridge.py, schema.sql, templates/, static/
+
+Flaskimportmeldung durch Python Umgebung in VS Code: Flask nicht verfügbar im aktiven Interpreter
+schneller fix: 
+    virtuelle Umgebung anlegen: python -m venv .venv
+    ..venv\Scripts\Activate.ps1
+    pip install flask click werkzeug
+    In VS Code den Interpreter auf .venv umstellen:
+        Command Palette → Python: Select Interpreter → .venv auswählen
+    Pylance neu laden:
+        Command Palette → Developer: Reload Window
