@@ -17,3 +17,28 @@ def viewFridge():
         ' ORDER BY created DESC'
     ).fetchall()
     return render_template('fridge/viewFridge.html', posts=posts)
+
+@bp.route('/addfood', methods=('GET', 'POST'))
+@login_required
+def addfood():
+    if request.method == 'POST':
+        title = request.form['title']
+        body = request.form['body']
+        error = None
+
+        if not title:
+            error = 'Title is required.'
+
+        if error is not None:
+            flash(error)
+        else:
+            db = get_db()
+            db.execute(
+                'INSERT INTO post (title, body, author_id)'
+                ' VALUES (?, ?, ?)',
+                (title, body, g.user['id'])
+            )
+            db.commit()
+            return redirect(url_for('fridge/addfood.html'))
+
+    return render_template('fridge/addfood.html')

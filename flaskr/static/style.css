@@ -12,11 +12,16 @@ body {
     background: rgb(73, 72, 72);
 }
 
-h1 {
+nav h1 {
     font-family: sans-serif;
     font-style: arial;
     color: #2fa787;
-    margin: 1rem 0;
+    text-shadow:
+    1px 1px 2px rgb(82, 143, 88),
+    0 0 0.3em #cae6f6,
+    0 0 0.1em #cae6f6;
+    font-size: 2rem;
+    padding: 0.1rem;
 }
 
 a {
@@ -24,56 +29,44 @@ a {
     text-decoration: none;
 }
 
+#menubar{
+    display: flex;
+    justify-content: space-between;
+}
+
+#usermenu, #menuleft{
+    display: flex;
+    align-self: center;
+}
 
 nav {
     background: rgb(32, 32, 32);
-    display: flex;
-    flex-direction: row;
-    align-items: start;
-    padding: 0;
-}
-
-#usermenu,
-#menuleft{
-    display: flex;
-    flex-direction: row;
-}
-
-#menuleft a,
-#usermenu a
-{
-    padding: 0.5rem;
-}
-
-nav h1 {
-    flex: auto;
-    margin: 0rem;
-}
-
-
-nav h1 a {
-    text-decoration: none;
-    padding: 0.25rem 0.5rem;
-}
-
-nav ul {
-    display: flex;
-    list-style: none;
+    display: flex; 
+    flex-direction: column;
     justify-content: center;
-    margin: 0;
-    padding: 0;
 }
 
-nav ul li a,
+#logo{
+    display: flex;
+    justify-content: space-evenly;
+}
+
+nav a {
+  padding: 0.4rem 0.6rem;
+  text-decoration: none;
+  text-align: center;
+  font-size: 1.2em;
+}
+
+nav a:hover {
+  background-color: #2fa787d0;
+  color: white;
+  transition-duration: 100ms;
+}
+
 header .action {
     display: flex;
     padding: 0.5rem;
-}
-
-nav ul li span{
-    display: flex;
-    padding: 0.5rem;
-    
 }
 
 .content {
