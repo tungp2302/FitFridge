@@ -1,0 +1,1 @@
+"""Externe Integrationen fuer FitFridge."""

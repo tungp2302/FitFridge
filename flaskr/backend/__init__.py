@@ -1,0 +1,1 @@
+"""Backend-Paket fuer FitFridge."""
