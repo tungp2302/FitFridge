@@ -1,10 +1,22 @@
+"""
+Datenmodell für ein Produkt aus der Open Food Facts Datenbank.
+
+Diese Datei definiert die Klasse `Product`, die einen Lebensmittel-Typ
+repräsentiert (z.B. "Nutella von Ferrero"). Konkrete Packungen mit
+Restmenge im Kühlschrank werden in fridge_item.py modelliert.
+"""
+
 class Product:
     """
-    Bauplan für die Open Food Facts Datenbank die Macros, Marke und so
-    Das ist nur für das generelle Produkt. Die kühlschrankprodukte sind im ,,fridge_item.py"
+    Bauplan für ein Produkt aus der Open Food Facts Datenbank.
 
-    Beispiel ohne der API:
+    Enthält die festen Eigenschaften eines Lebensmittels: Name, Marke,
+    Barcode und Nährwerte pro 100g. Diese Daten ändern sich nicht.
 
+    Eine konkrete Packung mit veränderlicher Restmenge im Kühlschrank
+    wird durch die Klasse FridgeItem modelliert.
+
+    Beispiel (Daten ohne API):
         nutella = Product(
             name="Nutella",
             brand="Ferrero",
@@ -17,8 +29,21 @@ class Product:
     """
 
     
-    def __init__(self, name, brand, barcode, kcal_per_100g, protein_per_100g, fat_per_100g, carbs_per_100g):
-        """Erstellt ein neues Produkt"""
+    def __init__(self, name, brand, barcode,
+                kcal_per_100g, protein_per_100g,
+                fat_per_100g, carbs_per_100g):
+        """
+        Erstellt ein neues Product.
+
+        Parameter:
+            name (str): Produktname, z.B. "Nutella"
+            brand (str): Marke, z.B. "Ferrero"
+            barcode (str): Barcode als String (auch wenn nur Zahlen drin sind)
+            kcal_per_100g (float): Kalorien pro 100g des Produkts
+            protein_per_100g (float): Eiweiß in Gramm pro 100g
+            fat_per_100g (float): Fett in Gramm pro 100g
+            carbs_per_100g (float): Kohlenhydrate in Gramm pro 100g
+        """
         self.name = name
         self.brand = brand
         self.barcode = barcode
@@ -29,7 +54,10 @@ class Product:
 
 
     def show(self):
-        """Zeigt den Namen des Produktes und die Macros pro 100g an"""    
+        """
+        Gibt die Produktinformationen formatiert auf der Konsole aus.
+        Wird hauptsächlich für Tests und Debugging benutzt.
+        """    
         print(self.name + " (" + self.brand + ")")
         print(" Kalorien: " + str(self.kcal_per_100g) + " kcal/100g")
         print(" Protein:  " + str(self.protein_per_100g) + " g/100g")
