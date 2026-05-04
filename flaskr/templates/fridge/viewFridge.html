@@ -15,9 +15,10 @@
           <h1>{{ product['name'] }}</h1>
           <div class="about">kcal(100g): {{ product['kcal_per_100g'] }} Proteine(100g) {{ product['protein_per_100g'] }}</div>
         </div>
+      </header>
     </article>
     {% if not loop.last %}
       <hr>
-    {% endif %}
+  {% endif %}
   {% endfor %}
 {% endblock %}

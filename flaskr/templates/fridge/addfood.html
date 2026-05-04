@@ -9,9 +9,9 @@
     <label for="product_id">Product ID</label>
     <input name="product_id" id="title" value="{{ request.form['product_id'] }}" required>
     <label for="amount">Amount</label>
-    <input name="amount" id="title">{{ request.form['amount'] }}</input>
+    <input type="number" name="amount" id="title" value="{{ request.form['amount'] }}" required>
     <label for="unit">Unit</label>
-    <input name="unit" id="title">{{ request.form['unit'] }}</input>
+    <input type="number" name="unit" id="title" value="{{ request.form['unit'] }}" required>
     <input type="submit" value="Save">
   </form>
 {% endblock %}

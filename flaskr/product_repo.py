@@ -133,14 +133,13 @@ def create_product(name, brand, barcode, kcal_per_100g,
                    protein_per_100g, fat_per_100g, carbs_per_100g):
     """Ein neues Produkt anlegen (z.B. von OpenFoodFacts API)."""
     db = get_db()
-    cursor = db.execute(
+    db.execute(
         "INSERT INTO product (name, brand, barcode,"
         " kcal_per_100g, protein_per_100g, fat_per_100g, carbs_per_100g)"
         " VALUES (?, ?, ?, ?, ?, ?, ?)",
         (name, brand, barcode, kcal_per_100g, protein_per_100g, fat_per_100g, carbs_per_100g),
     )
     db.commit()
-    return cursor.lastrowid
 
 
 def list_all():

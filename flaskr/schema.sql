@@ -20,9 +20,9 @@ CREATE TABLE post (
 
 CREATE TABLE product (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    product TEXT NOT NULL,
+    name TEXT NOT NULL,
     brand TEXT NOT NULL,
-    barcode TEXT UNIQUE NOT NULL,
+    barcode INTEGER UNIQUE NOT NULL,
     kcal_per_100g REAL NOT NULL,
     protein_per_100g REAL NOT NULL,
     fat_per_100g REAL NOT NULL,
