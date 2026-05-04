@@ -1,5 +1,7 @@
 DROP TABLE IF EXISTS user;
 DROP TABLE IF EXISTS post;
+DROP TABLE IF EXISTS fridge_item;
+DROP TABLE IF EXISTS product;
 
 CREATE TABLE user (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -14,4 +16,25 @@ CREATE TABLE post (
   title TEXT NOT NULL,
   body TEXT NOT NULL,
   FOREIGN KEY (author_id) REFERENCES user (id)
+);
+
+CREATE TABLE product (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product TEXT NOT NULL,
+    brand TEXT NOT NULL,
+    barcode TEXT UNIQUE NOT NULL,
+    kcal_per_100g REAL NOT NULL,
+    protein_per_100g REAL NOT NULL,
+    fat_per_100g REAL NOT NULL,
+    carbs_per_100g REAL NOT NULL,
+    created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE fridge_item (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    current_amount REAL NOT NULL,
+    unit TEXT NOT NULL,
+    created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES product (id)
 );
