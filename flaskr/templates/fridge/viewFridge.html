@@ -15,11 +15,6 @@
           <h1>{{ product['name'] }}</h1>
           <div class="about">kcal(100g): {{ product['kcal_per_100g'] }} Proteine(100g) {{ product['protein_per_100g'] }}</div>
         </div>
-        {% if g.user['id'] == post['author_id'] %}
-          <a class="action" href="{{ url_for('blog.update', id=post['id']) }}">Edit</a>
-        {% endif %}
-      </header>
-      <p class="body">{{ post['body'] }}</p>
     </article>
     {% if not loop.last %}
       <hr>
