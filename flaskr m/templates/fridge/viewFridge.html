@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Fridge{% endblock %}</h1>
+  {% if g.user %}
+    <a class="action" href="{{ url_for('fridge.addfood') }}">Add Food</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  {% for product in products %}
+    <article class="post">
+      <header>
+        <div>
+          <h1>{{ product['name'] }}</h1>
+          <div class="about">kcal(100g): {{ product['kcal_per_100g'] }} Proteine(100g) {{ product['protein_per_100g'] }}</div>
+        </div>
+      </header>
+    </article>
+    {% if not loop.last %}
+      <hr>
+  {% endif %}
+  {% endfor %}
+{% endblock %}
