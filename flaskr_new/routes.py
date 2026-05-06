@@ -55,21 +55,28 @@ def product_detail(item_id):
     if post is None:
         abort(404, f"Item id {item_id} doesn't exist.")
 
-    if g.user["id"] != post["author_id"]:
-        abort(403)
-
     if request.method == "POST":
-        title = request.form["title"]
-        body = request.form["body"]
+        name = request.form.get("name")
+        brand = request.form.get("brand")
+        barcode = request.form.get("barcode")
+        current_amount = request.form.get("current_amount")
+        unit = request.form.get("unit")
         error = None
 
-        if not title:
-            error = "Title is required."
+        if not name:
+            error = "Name is required."
 
         if error is not None:
             flash(error)
         else:
-            update_dashboard_item(item_id, title, body)
+            # update amount and optional product metadata
+            update_dashboard_item(
+                item_id,
+                current_amount=current_amount,
+                unit=unit,
+                name=name,
+                brand=brand,
+            )
             return redirect(url_for("frontend.dashboard"))
 
     return render_template("fridge/product_detail.html", post=post)
@@ -79,17 +86,20 @@ def product_detail(item_id):
 @login_required
 def add_product():
     if request.method == "POST":
-        title = request.form["title"]
-        body = request.form["body"]
+        name = request.form.get("name")
+        brand = request.form.get("brand")
+        barcode = request.form.get("barcode")
+        current_amount = request.form.get("current_amount")
+        unit = request.form.get("unit") or "g"
         error = None
 
-        if not title:
-            error = "Title is required."
+        if not name:
+            error = "Name is required."
 
         if error is not None:
             flash(error)
         else:
-            create_dashboard_item(title, body, g.user["id"])
+            create_dashboard_item(name, brand, barcode, current_amount or 100.0, unit, g.user["id"])
             return redirect(url_for("frontend.dashboard"))
 
     return render_template("fridge/add_product.html")
@@ -102,9 +112,6 @@ def delete_product(item_id):
 
     if post is None:
         abort(404, f"Item id {item_id} doesn't exist.")
-
-    if g.user["id"] != post["author_id"]:
-        abort(403)
 
     delete_dashboard_item(item_id)
     return redirect(url_for("frontend.dashboard"))

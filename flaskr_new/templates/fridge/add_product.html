@@ -6,10 +6,21 @@
 
 {% block content %}
   <form method="post">
-    <label for="title">Title</label>
-    <input name="title" id="title" value="{{ request.form.get('title', '') }}" required>
-    <label for="body">Body</label>
-    <textarea name="body" id="body">{{ request.form.get('body', '') }}</textarea>
+    <label for="name">Name</label>
+    <input name="name" id="name" value="{{ request.form.get('name', '') }}" required>
+
+    <label for="brand">Brand</label>
+    <input name="brand" id="brand" value="{{ request.form.get('brand', '') }}">
+
+    <label for="barcode">Barcode</label>
+    <input name="barcode" id="barcode" value="{{ request.form.get('barcode', '') }}">
+
+    <label for="current_amount">Amount</label>
+    <input name="current_amount" id="current_amount" value="{{ request.form.get('current_amount', '100') }}">
+
+    <label for="unit">Unit</label>
+    <input name="unit" id="unit" value="{{ request.form.get('unit', 'g') }}">
+
     <input type="submit" value="Save">
   </form>
 {% endblock %}
