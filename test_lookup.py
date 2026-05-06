@@ -2,10 +2,10 @@
 from pathlib import Path
 import sys
 
-# ensure repo root is on sys.path so `flaskr` package imports work when run from project root
+# ensure repo root is on sys.path so the flat package imports work when run from project root
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from flaskr.api_db.external import openfoodfacts_client as ofc
+from flaskr_new import openfoodfacts_client as ofc
 
 
 def print_result(r):

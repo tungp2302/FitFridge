@@ -1,39 +1,12 @@
-import importlib
-import importlib.util
 import json
-import sys
-from pathlib import Path
 
 import pytest
 
-
-def _load_flat_package():
-    """Load the space-named package folder as importable module flaskr_new."""
-    repo_root = Path(__file__).resolve().parents[2]
-    package_dir = repo_root / "flaskr new"
-
-    if "flaskr_new" in sys.modules:
-        return sys.modules["flaskr_new"]
-
-    spec = importlib.util.spec_from_file_location(
-        "flaskr_new",
-        package_dir / "__init__.py",
-        submodule_search_locations=[str(package_dir)],
-    )
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["flaskr_new"] = module
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
-
-
 @pytest.fixture(scope="session")
 def flat_modules():
-    pkg = _load_flat_package()
-    db = importlib.import_module("flaskr_new.db")
-    fridge_repo = importlib.import_module("flaskr_new.fridge_repo")
-    product_repo = importlib.import_module("flaskr_new.product_repo")
-    ofc = importlib.import_module("flaskr_new.openfoodfacts_client")
+    import flaskr_new as pkg
+    from flaskr_new import db, fridge_repo, product_repo, openfoodfacts_client as ofc
+
     return pkg, db, fridge_repo, product_repo, ofc
 
 
