@@ -4,10 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from flaskr import create_app
-from flaskr.api_db import db
-from flaskr.api_db.external import openfoodfacts_client as ofc
-from flaskr.api_db.repositories import fridge_repo, product_repo
+from flaskr_new import create_app
+from flaskr_new import db, openfoodfacts_client as ofc, fridge_repo, product_repo
 
 
 @pytest.fixture()

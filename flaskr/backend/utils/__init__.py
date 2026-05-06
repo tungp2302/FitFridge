@@ -1,1 +1,0 @@
-"""Backend-Hilfsfunktionen fuer FitFridge."""

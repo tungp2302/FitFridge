@@ -1,1 +1,0 @@
-"""Repository-Schicht fuer FitFridge."""
