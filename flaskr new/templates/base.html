@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}FitFridge{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('frontend.static', filename='style.css') }}">
+</head>
+<body>
+  <nav>
+    <h1>FitFridge</h1>
+    <div id="menuleft">
+      <a href="{{ url_for('frontend.dashboard') }}">Fridge</a>
+      <a href="{{ url_for('frontend.add_product') }}">Add Food</a>
+    </div>
+    <div id="usermenu">
+      {% if g.user %}
+        <a href="{{ url_for('frontend.logout') }}">Log Out</a>
+        <span>{{ g.user['username'] }}</span>
+      {% else %}
+        <a href="{{ url_for('frontend.register') }}">Register</a>
+        <a href="{{ url_for('frontend.login') }}">Log In</a>
+      {% endif %}
+    </div>
+  </nav>
+  <section class="content">
+    <header>
+      {% block header %}{% endblock %}
+    </header>
+    {% for message in get_flashed_messages() %}
+      <div class="flash">{{ message }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </section>
+</body>
+</html>

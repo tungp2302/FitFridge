@@ -11,7 +11,7 @@ from typing import Optional, Tuple, Dict
 from urllib.parse import quote
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from . import product_repo
+
 try:
     import certifi
 except ModuleNotFoundError:  # pragma: no cover - depends on local environment
@@ -165,70 +165,6 @@ def search_product(barcode: str, user_agent: str = DEFAULT_USER_AGENT, use_stagi
         "raw_quantity": product.get("quantity"),
         "raw_product": product,  # optional: kompletten Roh-Datensatz für Debug/erweiterte Verwendung
     }
-
-    return result
-
-def search_product_add_db(barcode: str, user_agent: str = DEFAULT_USER_AGENT, use_staging: bool = False) -> Optional[Dict]:
-    """
-    Holt ein Produkt von Open Food Facts via Barcode.
-
-    Returns:
-      dict mit Schluesseln:
-        name, brand, barcode,
-        kcal_per_100g, protein_per_100g, fat_per_100g, carbs_per_100g,
-        total_amount (optional), unit (optional), raw_quantity (raw field)
-      oder None, wenn nicht gefunden.
-    """
-    if not barcode:
-        raise ValueError("barcode is required")
-
-    url = OFF_STAGING_API_URL.format(barcode=barcode) if use_staging else OFF_API_URL.format(barcode=barcode)
-    req = Request(
-        url,
-        headers={
-            "User-Agent": user_agent,
-            "Accept": "application/json",
-        },
-    )
-    https_context = _make_ssl_context()
-
-    try:
-        with urlopen(req, timeout=10, context=https_context) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-    except HTTPError as e:
-        if e.code == 404:
-            return None
-        raise RuntimeError(f"Open Food Facts request failed: {e}") from e
-    except URLError as e:
-        raise RuntimeError(f"Open Food Facts request failed: {e}") from e
-
-    if payload.get("status") != 1:
-        return None
-
-    product = payload.get("product", {}) or {}
-    nutriments = product.get("nutriments", {}) or {}
-
-    # parse total amount if available
-    total_amount, unit = _parse_total_quantity(product)
-
-    kcal = _kcal_from_nutriments(nutriments)
-    result = {
-        "name": _first_string(product.get("product_name"), product.get("generic_name")),
-        "brand": _first_string(product.get("brands"), product.get("brand_owner")),
-        "barcode": _first_string(product.get("code"), barcode),
-        "kcal_per_100g": float(kcal),
-        "protein_per_100g": _float_value(nutriments.get("proteins_100g")),
-        "fat_per_100g": _float_value(nutriments.get("fat_100g")),
-        "carbs_per_100g": _float_value(nutriments.get("carbohydrates_100g")),
-        "sugar_per_100g": _float_value(nutriments.get("sugars_100g")),
-        "total_amount": total_amount,
-        "unit": unit,
-        "raw_quantity": product.get("quantity"),
-        "raw_product": product,  # optional: kompletten Roh-Datensatz für Debug/erweiterte Verwendung
-    }
-
-    product_repo.create_product(result["name"], result["brand"], result["barcode"], result["kcal_per_100g"], result["protein_per_100g"], result["fat_per_100g"], result["carbs_per_100g"])
-
 
     return result
 
