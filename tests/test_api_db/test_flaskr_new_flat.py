@@ -138,3 +138,33 @@ def test_flat_openfoodfacts_parsing(monkeypatch, flat_modules):
     assert result["fat_per_100g"] == 30.9
     assert result["carbs_per_100g"] == 57.5
     assert result["sugar_per_100g"] == 56.3
+
+
+def test_flat_create_dashboard_item_uses_off_data(app_context, flat_modules, monkeypatch):
+    _, _, fridge_repo, product_repo, _ = flat_modules
+    from flaskr_new import fridge_service
+
+    monkeypatch.setattr(
+        fridge_service,
+        "lookup_product",
+        lambda query: {
+            "name": "Nutella",
+            "brand": "Ferrero",
+            "barcode": "3017620422003",
+            "kcal_per_100g": 539.0,
+            "protein_per_100g": 6.3,
+            "fat_per_100g": 30.9,
+            "carbs_per_100g": 57.5,
+            "total_amount": 400.0,
+            "unit": "g",
+        },
+    )
+
+    item_id = fridge_service.create_dashboard_item("nutella")
+    item = fridge_repo.get_item(item_id)
+    product = product_repo.get_by_barcode("3017620422003")
+
+    assert item["current_amount"] == 400.0
+    assert item["unit"] == "g"
+    assert item["name"] == "Nutella"
+    assert product["kcal_per_100g"] == 539.0

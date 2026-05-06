@@ -19,7 +19,14 @@
           <a class="action" href="{{ url_for('frontend.product_detail', item_id=post['id']) }}">Edit</a>
         {% endif %}
       </header>
-      <p class="body">{{ post['current_amount'] }} {{ post['unit'] }}</p>
+      <p class="body">
+        <strong>Amount:</strong> {{ post['current_amount'] }} {{ post['unit'] }}<br>
+        <strong>Total Nutrition:</strong>
+        {{ post['total_kcal'] }} kcal •
+        {{ post['total_protein'] }}g protein •
+        {{ post['total_fat'] }}g fat •
+        {{ post['total_carbs'] }}g carbs
+      </p>
     </article>
     {% if not loop.last %}
       <hr>

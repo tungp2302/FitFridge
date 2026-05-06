@@ -6,20 +6,15 @@
 
 {% block content %}
   <form method="post">
-    <label for="name">Name</label>
-    <input name="name" id="name" value="{{ request.form.get('name', '') }}" required>
-
-    <label for="brand">Brand</label>
-    <input name="brand" id="brand" value="{{ request.form.get('brand', '') }}">
-
-    <label for="barcode">Barcode</label>
-    <input name="barcode" id="barcode" value="{{ request.form.get('barcode', '') }}">
-
-    <label for="current_amount">Amount</label>
-    <input name="current_amount" id="current_amount" value="{{ request.form.get('current_amount', '100') }}">
-
-    <label for="unit">Unit</label>
-    <input name="unit" id="unit" value="{{ request.form.get('unit', 'g') }}">
+    <label for="query">Barcode or product name</label>
+    <input
+      name="query"
+      id="query"
+      value="{{ request.form.get('query', '') }}"
+      placeholder="e.g. 3017620422003 or Nutella"
+      required
+    >
+    <p class="body">Nutrition values and package amount are fetched automatically from OpenFoodFacts.</p>
 
     <input type="submit" value="Save">
   </form>

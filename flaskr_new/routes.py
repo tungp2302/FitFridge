@@ -8,6 +8,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from .db import get_db
 from .fridge_service import (
+    calculate_total_nutrition,
     create_dashboard_item,
     delete_dashboard_item,
     get_dashboard_item,
@@ -44,7 +45,14 @@ def load_logged_in_user():
 @bp.route("/")
 def dashboard():
     posts = list_dashboard_items()
-    return render_template("fridge/dashboard.html", posts=posts)
+    # Calculate total nutrition for each item based on current_amount
+    posts_with_nutrition = []
+    for post in posts:
+        post_dict = dict(post)
+        nutrition = calculate_total_nutrition(post_dict)
+        post_dict.update(nutrition)
+        posts_with_nutrition.append(post_dict)
+    return render_template("fridge/dashboard.html", posts=posts_with_nutrition)
 
 
 @bp.route("/fridge/<int:item_id>", methods=("GET", "POST"))
@@ -54,6 +62,11 @@ def product_detail(item_id):
 
     if post is None:
         abort(404, f"Item id {item_id} doesn't exist.")
+
+    # Calculate total nutrition based on current_amount
+    post = dict(post)
+    nutrition = calculate_total_nutrition(post)
+    post.update(nutrition)
 
     if request.method == "POST":
         name = request.form.get("name")
@@ -86,21 +99,22 @@ def product_detail(item_id):
 @login_required
 def add_product():
     if request.method == "POST":
-        name = request.form.get("name")
-        brand = request.form.get("brand")
-        barcode = request.form.get("barcode")
-        current_amount = request.form.get("current_amount")
-        unit = request.form.get("unit") or "g"
+        query = request.form.get("query", "").strip()
         error = None
 
-        if not name:
-            error = "Name is required."
+        if not query:
+            error = "Barcode or product name is required."
 
         if error is not None:
             flash(error)
         else:
-            create_dashboard_item(name, brand, barcode, current_amount or 100.0, unit, g.user["id"])
-            return redirect(url_for("frontend.dashboard"))
+            try:
+                create_dashboard_item(query, g.user["id"])
+                return redirect(url_for("frontend.dashboard"))
+            except ValueError as exc:
+                flash(str(exc))
+            except RuntimeError:
+                flash("OpenFoodFacts lookup failed. Please try again.")
 
     return render_template("fridge/add_product.html")
 
