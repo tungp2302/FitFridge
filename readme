@@ -8,20 +8,19 @@ for testing
 $ flask --app flaskr init-db
 Initialize the database
 
+//
+Tutorial zum testen:
+1. Im Projektordner das Terminal öffnen.
 
-Dokumentation: 30.04.26 Tung
-
-FitFridge Skelett mit dem flat package `flaskr_new`.
-
-## Struktur
-- `flaskr_new`: app factory, routes, db, repositories, services, models, templates, static assets
-- `tests`: test areas für jeden layer
-
-Run
-
+2. Befehle ausführen
+cd "Pfad für FitFridge" bei mir z.b. also cd C:\Users\Tungp\Documents\GitHub\FitFridge
+flask --app flaskr_new init-db
 flask --app flaskr_new run --debug
 
-for testing
+3. Im browser öffnen
+http://127.0.0.1:5000
+
+//
 
 $ flask --app flaskr_new init-db
 Initialize the database
