@@ -10,12 +10,13 @@ Initialize the database
 
 //
 Tutorial zum testen:
-1. Im Projektordner das Terminal öffnen.
-
+1. Im Projektordner das Terminal öffnen. (ist schon)
+Umgebung erstellen:  python3 -m venv .venv
+Umgebung aktivieren: source .venv/bin/activate
+Dependencies installieren: pip install flask click werkzeug pytest certifi
 2. Befehle ausführen
-cd "Pfad für FitFridge" bei mir z.b. also cd C:\Users\Tungp\Documents\GitHub\FitFridge
-flask --app flaskr_new init-db
-flask --app flaskr_new run --debug
+Datenbank initialisieren: flask --app flaskr_new init-db
+dev Server starten: flask --app flaskr_new run --debug
 
 3. Im browser öffnen
 http://127.0.0.1:5000
