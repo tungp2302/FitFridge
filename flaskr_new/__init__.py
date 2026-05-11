@@ -1,4 +1,5 @@
 import os
+import os
 
 from flask import Flask
 
@@ -22,8 +23,5 @@ def create_app(test_config=None):
 
     from .routes import bp as frontend_bp
     app.register_blueprint(frontend_bp)
-
-    from .api import bp as api_bp
-    app.register_blueprint(api_bp)
 
     return app
