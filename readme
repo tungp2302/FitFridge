@@ -23,8 +23,23 @@ http://127.0.0.1:5000
 
 //
 
-$ flask --app flaskr_new init-db
-Initialize the database
+
+For tests nachdem in der Umgebung:
+1: dependencies: pip install -r requirements-dev.txt
+# ensure runtime libs
+pip install flask werkzeug click certifi
+pytest install: python3 -m pip install -r requirements-dev.txt
+2: DB initialisieren: $ flask --app flaskr_new init-db
+3: Tests: 
+# single test file
+python -m pytest tests/test_api_db/test_api_db.py -q
+
+# endpoint tests
+python -m pytest tests/test_api_db/test_api_endpoint.py -q
+
+# all tests
+python -m pytest -q
+
 
 Flask import problem in VS Code:
 Flask not available in the active interpreter.
