@@ -2,7 +2,7 @@
 
 from . import fridge_repo, product_repo
 from .openfoodfacts_client import lookup_product
-
+from flaskr_new.nutrition_service import calculate_for_amount
 
 def list_dashboard_items():
     return fridge_repo.list_items()
@@ -55,8 +55,15 @@ def update_dashboard_item(item_id, current_amount=None, unit=None, name=None, br
 
     # update product metadata if provided
     if name is not None or brand is not None:
-        # fridge_repo.update_item will find the linked product and update it
-        updated += fridge_repo.update_item(item_id, name or "", brand or "")
+        # Find linked product and update its metadata via product_repo
+        item = fridge_repo.get_item(item_id)
+        if not item:
+            raise ValueError("No fridge item found for id")
+        product_id = item["product_id"]
+        # Use existing values as fallback if name/brand not provided
+        current_name = item.get("name") or ""
+        current_brand = item.get("brand") or ""
+        updated += product_repo.update_product(product_id, name or current_name, brand or current_brand)
 
     return updated
 
@@ -66,25 +73,30 @@ def delete_dashboard_item(item_id):
 
 
 def calculate_total_nutrition(item):
-    """Calculate total nutrition values for the actual fridge amount.
-    
-    Takes a fridge item (with current_amount, unit, and per-100g nutrition values)
-    and returns a dict with total_kcal, total_protein, total_fat, total_carbs
-    based on the current amount. Assumes unit is 'g' (grams).
     """
-    if item["unit"] != "g":
-        # For non-gram units, return zero nutrition (could add conversion logic later)
-        return {
-            "total_kcal": 0.0,
-            "total_protein": 0.0,
-            "total_fat": 0.0,
-            "total_carbs": 0.0,
-        }
-    
-    multiplier = item["current_amount"] / 100.0
+    Thin wrapper: nutzt nutrition_service.calculate_for_amount und
+    mapped das Ergebnis zu den legacy-Routen-Keys.
+    Erwartetes item: enthält current_amount, unit und die per-100g-Felder.
+    Defensive Defaults werden benutzt, falls Felder fehlen.
+    """
+    # Defensive reads, fallbacks zu 0 / leerer Einheit falls nötig
+    amount = item.get("current_amount")
+    unit = item.get("unit")
+
+    product_nutrients = {
+        "kcal_per_100g": item.get("kcal_per_100g", 0.0),
+        "protein_per_100g": item.get("protein_per_100g", 0.0),
+        "fat_per_100g": item.get("fat_per_100g", 0.0),
+        "carbs_per_100g": item.get("carbs_per_100g", 0.0),
+    }
+
+    # Delegation an Raams Funktion (handle edge-cases dort)
+    calc = calculate_for_amount(product_nutrients, amount, unit)
+
+    # Mappe auf die bisherigen Keys, die routes.py erwartet
     return {
-        "total_kcal": round(item["kcal_per_100g"] * multiplier, 1),
-        "total_protein": round(item["protein_per_100g"] * multiplier, 1),
-        "total_fat": round(item["fat_per_100g"] * multiplier, 1),
-        "total_carbs": round(item["carbs_per_100g"] * multiplier, 1),
+        "total_kcal": calc.get("kcal", 0.0),
+        "total_protein": calc.get("protein", 0.0),
+        "total_fat": calc.get("fat", 0.0),
+        "total_carbs": calc.get("carbs", 0.0),
     }

@@ -44,3 +44,14 @@ def list_all():
         " kcal_per_100g, protein_per_100g, fat_per_100g, carbs_per_100g"
         " FROM product ORDER BY name"
     ).fetchall()
+
+
+def update_product(product_id, name, brand):
+    """Update name and brand for an existing product."""
+    db = get_db()
+    cursor = db.execute(
+        "UPDATE product SET name = ?, brand = ? WHERE id = ?",
+        (name, brand, product_id),
+    )
+    db.commit()
+    return cursor.rowcount
