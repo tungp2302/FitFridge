@@ -9,10 +9,12 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from .db import get_db
 from .fridge_service import (
     calculate_total_nutrition,
+    consume_amount,
     create_dashboard_item,
     delete_dashboard_item,
     get_dashboard_item,
     list_dashboard_items,
+    refill_amount,
     update_dashboard_item,
 )
 
@@ -130,6 +132,62 @@ def delete_product(item_id):
     delete_dashboard_item(item_id)
     return redirect(url_for("frontend.dashboard"))
 
+@bp.route("/fridge/<int:item_id>/consume", methods=("POST",))
+@login_required
+def consume_product(item_id):
+    """Verbraucht eine bestimmte Menge eines Fridge-Items.
+
+    Erwartet im Formular ein Feld 'amount' mit der verbrauchten Menge.
+    Leitet danach zur Detail-Seite zurück mit einer Erfolgs- oder
+    Fehlermeldung.
+    """
+    # Menge aus dem Formular holen
+    amount_raw = request.form.get("amount", "").strip()
+
+    # Edge Case: Leere Eingabe
+    if not amount_raw:
+        flash("Bitte gib eine Menge an.")
+        return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+    # Edge Case: Keine gültige Zahl
+    try:
+        amount = float(amount_raw)
+    except ValueError:
+        flash(f"'{amount_raw}' ist keine gültige Zahl.")
+        return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+    # Service aufrufen
+    result = consume_amount(item_id, amount)
+
+    # Nachricht an User
+    flash(result["message"])
+
+    return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+
+@bp.route("/fridge/<int:item_id>/refill", methods=("POST",))
+@login_required
+def refill_product(item_id):
+    """Füllt eine bestimmte Menge zu einem Fridge-Item hinzu.
+
+    Erwartet im Formular ein Feld 'amount' mit der hinzugefügten Menge.
+    """
+    amount_raw = request.form.get("amount", "").strip()
+
+    if not amount_raw:
+        flash("Bitte gib eine Menge an.")
+        return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+    try:
+        amount = float(amount_raw)
+    except ValueError:
+        flash(f"'{amount_raw}' ist keine gültige Zahl.")
+        return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+    result = refill_amount(item_id, amount)
+    flash(result["message"])
+
+    return redirect(url_for("frontend.product_detail", item_id=item_id))
 
 @bp.route("/auth/register", methods=("GET", "POST"))
 def register():

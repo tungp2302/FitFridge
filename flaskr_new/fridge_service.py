@@ -100,3 +100,102 @@ def calculate_total_nutrition(item):
         "total_fat": calc.get("fat", 0.0),
         "total_carbs": calc.get("carbs", 0.0),
     }
+
+def consume_amount(item_id, amount):
+    """
+    Reduziert die Restmenge eines Fridge-Items um die verbrauchte Menge.
+
+    Wird aufgerufen, wenn ein User sagt: "Ich habe X verbraucht".
+    Wenn die zu verbrauchende Menge größer ist als der aktuelle Bestand,
+    wird die Menge auf 0 gesetzt (statt negativ zu werden).
+
+    Beispiel:
+        Item hat current_amount = 480
+        consume_amount(item_id, 30)
+        → neuer Bestand: 450
+
+    Parameter:
+        item_id (int): ID des Fridge-Items in der Datenbank
+        amount (float): Menge, die verbraucht wurde
+
+    Returns:
+        dict: {"success": bool, "new_amount": float, "message": str}
+              success=False bei ungültigen Eingaben oder unbekanntem Item.
+    """
+    # Edge Case 1: Ungültige Menge
+    if amount is None or amount <= 0:
+        return {
+            "success": False,
+            "new_amount": 0.0,
+            "message": "Menge muss größer als 0 sein.",
+        }
+
+    # Edge Case 2: Item existiert nicht
+    item = fridge_repo.get_item(item_id)
+    if item is None:
+        return {
+            "success": False,
+            "new_amount": 0.0,
+            "message": f"Produkt mit ID {item_id} nicht im Kühlschrank gefunden.",
+        }
+
+    # Neue Menge berechnen, nicht unter 0 gehen
+    current = float(item["current_amount"])
+    new_amount = max(0.0, current - float(amount))
+
+    # In DB speichern
+    fridge_repo.update_amount(item_id, new_amount)
+
+    return {
+        "success": True,
+        "new_amount": new_amount,
+        "message": f"{amount} {item['unit']} {item['name']} verbraucht. Rest: {new_amount} {item['unit']}.",
+    }
+
+
+def refill_amount(item_id, amount):
+    """
+    Erhöht die Restmenge eines Fridge-Items (z.B. neue Packung gekauft).
+
+    Beispiel:
+        Item hat current_amount = 50
+        refill_amount(item_id, 500)
+        → neuer Bestand: 550
+
+    Parameter:
+        item_id (int): ID des Fridge-Items in der Datenbank
+        amount (float): Menge, die hinzugefügt wird
+
+    Returns:
+        dict: {"success": bool, "new_amount": float, "message": str}
+    """
+    # Edge Case 1: Ungültige Menge
+    if amount is None or amount <= 0:
+        return {
+            "success": False,
+            "new_amount": 0.0,
+            "message": "Menge muss größer als 0 sein.",
+        }
+
+    # Edge Case 2: Item existiert nicht
+    item = fridge_repo.get_item(item_id)
+    if item is None:
+        return {
+            "success": False,
+            "new_amount": 0.0,
+            "message": f"Produkt mit ID {item_id} nicht im Kühlschrank gefunden.",
+        }
+
+    # Neue Menge berechnen
+    current = float(item["current_amount"])
+    new_amount = current + float(amount)
+
+    # In DB speichern
+    fridge_repo.update_amount(item_id, new_amount)
+
+    return {
+        "success": True,
+        "new_amount": new_amount,
+        "message": f"{amount} {item['unit']} {item['name']} aufgefüllt. Neuer Stand: {new_amount} {item['unit']}.",
+    }
+
