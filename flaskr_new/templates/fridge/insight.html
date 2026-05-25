@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>ASaAI Insight</h1>
+{% endblock %}
+
+<style>
+  /* Truncate the insight visually until expanded */
+  #insight-full { max-height: 12.5rem; overflow: hidden; transition: max-height 280ms ease; }
+  .insight-expanded #insight-full { max-height: 2000px; }
+  /* Ensure visible text styling */
+  #insight-full { color: #e6eef6; line-height: 1.65; font-size: 1rem; }
+  #insight-full h3, #insight-full p { color: inherit; }
+</style>
+
+<script>
+(function(){
+  function init(){
+    const container = document.querySelector('.post > div');
+    if(!container) return;
+    const btn = container.querySelector('#insight-toggle');
+    if(!btn) return;
+    // ensure initial state (not expanded)
+    container.classList.remove('insight-expanded');
+    btn.textContent = 'Mehr anzeigen';
+    btn.addEventListener('click', function(){
+      const isExpanded = container.classList.toggle('insight-expanded');
+      btn.textContent = isExpanded ? 'Weniger anzeigen' : 'Mehr anzeigen';
+      const full = container.querySelector('#insight-full');
+      if(isExpanded && full) full.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+
+{% block content %}
+  <section>
+    <p style="font-size:0.95em;color:#ddd;">Quelle: {{ source }}</p>
+    <article class="post">
+      <div style="background:#08101a; color:#e6eef6; padding:1rem 1.25rem; border-radius:10px; line-height:1.65; font-size:1rem;">
+        {# Full cleaned insight HTML; initially visually truncated by CSS #}
+        {%- set clean = insight.replace('**','').replace('* ','').replace('- ','') -%}
+        {%- set full_formatted = clean.replace('\n\n', '</p><p>').replace('\n', '<br>') -%}
+        <div id="insight-full">{{- full_formatted | safe -}}</div>
+        <details id="insight-debug-raw" style="margin-top:.75rem;color:#cfcfcf;background:#021; padding:.6rem;border-radius:6px;">
+          <summary style="cursor:pointer;color:#9aa;">Raw insight (debug)</summary>
+          <pre style="white-space:pre-wrap; margin-top:.5rem; color:#e6eef6;">{{ full_formatted }}</pre>
+        </details>
+        <div style="margin-top:.5rem;">
+          <button id="insight-toggle" type="button" style="background:#0b84ff;color:#fff;border:none;padding:.4rem .6rem;border-radius:6px;cursor:pointer;">Mehr anzeigen</button>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Zugaenge / Auffuellungen</h2>
+    {% if addition_history %}
+      <ul>
+        {% for e in addition_history %}
+          <li>{{ e.timestamp }} — {{ e.event_type }} {{ e.amount }} {{ e.unit }} (product_id={{ e.product_id }})</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>Keine Zugaenge in den letzten 30 Tagen.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Aktueller Bestand</h2>
+    {% if fridge_items %}
+      <ul>
+        {% for i in fridge_items %}
+          <li>{{ i.name }} — {{ i.current_amount }} {{ i.unit }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>Keine Items im Fridge.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Verbrauch</h2>
+    <p>Verbrauch wird separat analysiert, z. B. ueber ein Meal- oder Kalorientracker-Modul, das einzelne Mahlzeiten erfasst und dann vom Bestand abzieht.</p>
+    {% if consumption_events %}
+      <p>Es gibt aktuell {{ consumption_events|length }} Verbrauchsereignisse im Log, die noch nicht in einer eigenen Verbrauchs-Analyse ausgewertet werden.</p>
+    {% endif %}
+  </section>
+{% endblock %}

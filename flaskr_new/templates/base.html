@@ -12,6 +12,10 @@
     <div id="menuleft">
       <a href="{{ url_for('frontend.dashboard') }}">Fridge</a>
       <a href="{{ url_for('frontend.add_product') }}">Add Food</a>
+      <a href="{{ url_for('frontend.meal_tracker') }}">Meal Tracker</a>
+      {% if g.user %}
+        <a href="{{ url_for('frontend.asaai_insight') }}">ASaAI Insight</a>
+      {% endif %}
     </div>
     <div id="usermenu">
       {% if g.user %}

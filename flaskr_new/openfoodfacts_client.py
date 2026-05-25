@@ -224,7 +224,70 @@ def lookup_product(query: str, user_agent: str = DEFAULT_USER_AGENT, use_staging
         return None
 
     match = re.search(r"/product/(\d{4,})/", body)
-    if not match:
-        return None
+    if match:
+        return search_product(match.group(1), user_agent=user_agent, use_staging=use_staging)
 
-    return search_product(match.group(1), user_agent=user_agent, use_staging=use_staging)
+    # as a fallback return None
+    return None
+
+
+def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_staging: bool = False, limit: int = 10) -> Optional[list]:
+    """
+    Search OpenFoodFacts for multiple products matching `query`.
+
+    Returns a list of product dicts (same shape as `search_product` returns)
+    or an empty list if nothing found.
+    """
+    if not query:
+        raise ValueError("query is required")
+
+    base_url = OFF_STAGING_API_URL.rsplit("/api/v2/product/{barcode}.json", 1)[0] if use_staging else OFF_API_URL.rsplit("/api/v2/product/{barcode}.json", 1)[0]
+    # Request JSON results (json=1)
+    search_url = (
+        f"{base_url}/cgi/search.pl?"
+        f"search_terms={quote(query)}&search_simple=1&action=process&json=1"
+    )
+
+    request = Request(
+        search_url,
+        headers={
+            "User-Agent": user_agent,
+            "Accept": "application/json",
+        },
+    )
+
+    https_context = _make_ssl_context()
+
+    body = None
+    try:
+        with urlopen(request, timeout=10, context=https_context) as response:
+            body = response.read().decode("utf-8")
+    except Exception:
+        return []
+
+    if not body:
+        return []
+
+    try:
+        payload = json.loads(body)
+    except Exception:
+        return []
+
+    products = payload.get("products") or []
+    results = []
+    seen = set()
+    for prod in products:
+        code = prod.get("code") or prod.get("_id")
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        try:
+            full = search_product(code, user_agent=user_agent, use_staging=use_staging)
+        except Exception:
+            full = None
+        if full:
+            results.append(full)
+        if len(results) >= limit:
+            break
+
+    return results

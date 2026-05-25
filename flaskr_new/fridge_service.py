@@ -1,6 +1,7 @@
 """Fachlogik fuer den Fridge-Bereich von FitFridge."""
 
 from . import fridge_repo, product_repo
+from .consumption_log_repo import log_consume, log_refill
 from .openfoodfacts_client import lookup_product
 from flaskr_new.nutrition_service import calculate_for_amount
 
@@ -50,19 +51,44 @@ def create_dashboard_item(query, author_id=None):
 def update_dashboard_item(item_id, current_amount=None, unit=None, name=None, brand=None):
     """Update fridge item amount and optionally product metadata."""
     updated = 0
+
+    current_item = None
+    if current_amount is not None or unit is not None or name is not None or brand is not None:
+        current_item = fridge_repo.get_item(item_id)
+        if current_item is None:
+            raise ValueError("No fridge item found for id")
+        current_item = dict(current_item)
+
     if current_amount is not None:
-        updated += fridge_repo.update_amount(item_id, float(current_amount))
+        previous_amount = float(current_item["current_amount"]) if current_item else 0.0
+        new_amount = float(current_amount)
+        updated += fridge_repo.update_amount(item_id, new_amount)
+
+        delta = new_amount - previous_amount
+        item_unit = unit or (current_item["unit"] if current_item else None) or "g"
+
+        if delta < 0:
+            log_consume(
+                current_item["product_id"],
+                abs(delta),
+                item_unit,
+                note="update_dashboard_item consume delta",
+            )
+        elif delta > 0:
+            log_refill(
+                current_item["product_id"],
+                delta,
+                item_unit,
+                note="update_dashboard_item refill delta",
+            )
 
     # update product metadata if provided
     if name is not None or brand is not None:
         # Find linked product and update its metadata via product_repo
-        item = fridge_repo.get_item(item_id)
-        if not item:
-            raise ValueError("No fridge item found for id")
-        product_id = item["product_id"]
+        product_id = current_item["product_id"]
         # Use existing values as fallback if name/brand not provided
-        current_name = item.get("name") or ""
-        current_brand = item.get("brand") or ""
+        current_name = current_item.get("name") or ""
+        current_brand = current_item.get("brand") or ""
         updated += product_repo.update_product(product_id, name or current_name, brand or current_brand)
 
     return updated

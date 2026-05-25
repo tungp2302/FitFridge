@@ -21,6 +21,10 @@ def create_app(test_config=None):
     from . import db
     db.init_app(app)
 
+    from .meal_tracker_repo import ensure_schema as ensure_meal_tracker_schema
+    with app.app_context():
+        ensure_meal_tracker_schema()
+
     from .routes import bp as frontend_bp
     app.register_blueprint(frontend_bp)
 

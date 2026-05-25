@@ -5,7 +5,7 @@
 {% endblock %}
 
 {% block content %}
-  <form method="post">
+  <form method="post" id="add-product-form">
     <label for="query">Barcode or product name</label>
     <input
       name="query"
@@ -14,8 +14,84 @@
       placeholder="e.g. 3017620422003 or Nutella"
       required
     >
+    <div id="search-results" class="search-results" style="display:none; max-height:220px; overflow:auto; border:1px solid #ddd; margin-top:.5rem;"></div>
     <p class="body">Nutrition values and package amount are fetched automatically from OpenFoodFacts.</p>
-
-    <input type="submit" value="Save">
+    <div style="display:flex; gap:.5rem; align-items:center; margin-top:.5rem;">
+      <input type="submit" id="save-btn" value="Save">
+      <button type="button" id="create-anyway" style="display:none;">Create anyway</button>
+    </div>
   </form>
+
+  <script>
+    (function(){
+      const input = document.getElementById('query');
+      const results = document.getElementById('search-results');
+      const form = document.getElementById('add-product-form');
+      const createAnyway = document.getElementById('create-anyway');
+      let lastItems = [];
+
+      function render(items){
+        lastItems = items || [];
+        if(!items || items.length === 0){ results.style.display='none'; results.innerHTML=''; createAnyway.style.display='inline-block'; return; }
+        createAnyway.style.display='inline-block';
+        results.style.display='block';
+        results.innerHTML = items.map((i, idx) => `
+          <div class="search-item" data-idx="${idx}" style="padding:.5rem; border-bottom:1px solid #f0f0f0; cursor:pointer;">
+            <strong>${i.name || '(no name)'}</strong> — <span class="muted">${i.brand || ''}</span><br>
+            <small>Barcode: ${i.barcode || ''} · ${i.kcal_per_100g || ''} kcal/100g</small>
+          </div>
+        `).join('');
+        Array.from(results.querySelectorAll('.search-item')).forEach((el) => {
+          el.addEventListener('click', ()=>{
+            const idx = Number(el.getAttribute('data-idx'));
+            const item = lastItems[idx];
+            // populate query with the barcode (preferred) then submit
+            input.value = item.barcode || item.name || input.value;
+            form.submit();
+          });
+        });
+      }
+
+      // on typing: live search (but do not auto-submit)
+      let timer = null;
+      input.addEventListener('input', ()=>{
+        const q = input.value.trim();
+        if(timer) clearTimeout(timer);
+        if(q.length < 2){ results.style.display='none'; results.innerHTML=''; createAnyway.style.display='none'; return; }
+        timer = setTimeout(()=>{
+          fetch(`/api/products/search?q=${encodeURIComponent(q)}`)
+            .then(r=>r.json())
+            .then(render)
+            .catch(()=>{ results.style.display='none'; createAnyway.style.display='inline-block'; });
+        }, 250);
+      });
+
+      // intercept submit: fetch matches first and show them instead of immediate create
+      form.addEventListener('submit', (ev)=>{
+        ev.preventDefault();
+        const q = input.value.trim();
+        if(!q){ return; }
+        fetch(`/api/products/search?q=${encodeURIComponent(q)}`)
+          .then(r=>r.json())
+          .then(items=>{
+            if(!items || items.length === 0){
+              // no matches -> proceed to create using current query
+              form.submit();
+              return;
+            }
+            // show matches for selection
+            render(items);
+          })
+          .catch(()=>{
+            // on error, allow creation
+            form.submit();
+          });
+      });
+
+      // 'Create anyway' button: submit form using current query
+      createAnyway.addEventListener('click', ()=>{
+        form.submit();
+      });
+    })();
+  </script>
 {% endblock %}

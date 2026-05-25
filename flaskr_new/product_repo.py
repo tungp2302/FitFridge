@@ -46,6 +46,15 @@ def list_all():
     ).fetchall()
 
 
+def search_by_name(query: str, limit: int = 10):
+    """Search local products by name (case-insensitive, simple LIKE)."""
+    q = f"%{query}%"
+    return get_db().execute(
+        "SELECT id, name, brand, barcode, kcal_per_100g, protein_per_100g, fat_per_100g, carbs_per_100g FROM product WHERE name LIKE ? OR brand LIKE ? ORDER BY name LIMIT ?",
+        (q, q, limit),
+    ).fetchall()
+
+
 def update_product(product_id, name, brand):
     """Update name and brand for an existing product."""
     db = get_db()
