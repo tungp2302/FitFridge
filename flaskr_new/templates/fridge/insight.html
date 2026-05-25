@@ -44,10 +44,6 @@
         {%- set clean = insight.replace('**','').replace('* ','').replace('- ','') -%}
         {%- set full_formatted = clean.replace('\n\n', '</p><p>').replace('\n', '<br>') -%}
         <div id="insight-full">{{- full_formatted | safe -}}</div>
-        <details id="insight-debug-raw" style="margin-top:.75rem;color:#cfcfcf;background:#021; padding:.6rem;border-radius:6px;">
-          <summary style="cursor:pointer;color:#9aa;">Raw insight (debug)</summary>
-          <pre style="white-space:pre-wrap; margin-top:.5rem; color:#e6eef6;">{{ full_formatted }}</pre>
-        </details>
         <div style="margin-top:.5rem;">
           <button id="insight-toggle" type="button" style="background:#0b84ff;color:#fff;border:none;padding:.4rem .6rem;border-radius:6px;cursor:pointer;">Mehr anzeigen</button>
         </div>
