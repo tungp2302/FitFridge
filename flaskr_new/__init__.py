@@ -1,5 +1,4 @@
 import os
-import os
 
 from flask import Flask
 
@@ -20,6 +19,9 @@ def create_app(test_config=None):
 
     from . import db
     db.init_app(app)
+
+    from .asaai import routes_asaai
+    app.register_blueprint(routes_asaai.asaai_bp)
 
     from .meal_tracker_repo import ensure_schema as ensure_meal_tracker_schema
     with app.app_context():

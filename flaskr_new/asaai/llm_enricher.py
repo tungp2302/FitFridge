@@ -20,6 +20,11 @@ from typing import Optional
 
 from .ollama_client import generate_from_ollama
 
+from .macro_calculator import (
+    calculate_recipe_macros,
+    rank_by_daily_goal,
+)
+
 
 def build_enricher_prompt(matches, fridge_items, daily_goal=None):
     """Baut den Prompt für das LLM aus Matcher-Resultaten.
@@ -151,3 +156,157 @@ def enrich_recipes_with_llm(
         "original_matches": top_matches,
         "prompt_used": prompt,
     }
+
+def enrich_with_full_pipeline(
+    matches,
+    fridge_items,
+    daily_goal=None,
+    top_n=5,
+    model=None,
+    base_url=None,
+    timeout=120,
+):
+    """Komplette KI-Pipeline: Macros berechnen → Ranking → LLM-Re-Ranking.
+
+    Das ist die "all-in-one" Funktion, die alle ASaAI-Bausteine verbindet.
+    
+    Pipeline:
+    1. Macros pro Rezept berechnen (OpenFoodFacts + nutrition_service)
+    2. Rezepte nach Daily Goal ranken (Protein/kcal-Passung)
+    3. Top N ans LLM schicken für finale Re-Ranking + Erklärungen
+    
+    Beispiel:
+        matches = find_recipes_matching_fridge(fridge)
+        result = enrich_with_full_pipeline(
+            matches=matches,
+            fridge_items=fridge,
+            daily_goal={"protein": 30, "kcal": 600},
+            top_n=5,
+        )
+    
+    Parameter:
+        matches (list): Resultate von find_recipes_matching_fridge()
+        fridge_items (list): Kühlschrank-Items
+        daily_goal (dict): Verbleibendes Tagesziel
+        top_n (int): Wie viele Top-Matches an LLM (default 5)
+        model, base_url, timeout: Ollama-Konfiguration
+    
+    Returns:
+        dict: {
+            "llm_recommendation": str,
+            "enriched_matches": list (mit Macros + Goal-Score),
+            "pipeline_stats": dict (Statistik über Phasen)
+        }
+    """
+    import time
+    
+    # Edge Case: Keine Matches
+    if not matches:
+        return {
+            "llm_recommendation": "Keine Rezepte gefunden.",
+            "enriched_matches": [],
+            "pipeline_stats": {"total_matches": 0},
+        }
+    
+    # Phase 1: Macros pro Rezept berechnen
+    print("  [Pipeline] Phase 1: Berechne Macros pro Rezept...")
+    start = time.time()
+    
+    enriched_matches = []
+    for i, match in enumerate(matches[:top_n], 1):
+        print(f"    Verarbeite Rezept {i}/{min(top_n, len(matches))}: {match['recipe']['name']}")
+        macros = calculate_recipe_macros(match["recipe"])
+        match["macros"] = macros
+        enriched_matches.append(match)
+    
+    phase1_time = round(time.time() - start, 1)
+    
+    # Phase 2: Nach Daily Goal ranken
+    print("  [Pipeline] Phase 2: Ranking nach Daily Goal...")
+    if daily_goal:
+        enriched_matches = rank_by_daily_goal(enriched_matches, daily_goal)
+    
+    # Phase 3: LLM-Re-Ranking mit allem Kontext
+    print("  [Pipeline] Phase 3: LLM-Re-Ranking mit Macros...")
+    start = time.time()
+    
+    prompt = build_full_pipeline_prompt(enriched_matches, fridge_items, daily_goal)
+    
+    try:
+        llm_response = generate_from_ollama(
+            prompt=prompt,
+            model=model,
+            base_url=base_url,
+            timeout=timeout,
+            num_predict=600,
+        )
+    except Exception as e:
+        return {
+            "llm_recommendation": f"LLM nicht verfügbar: {e}",
+            "enriched_matches": enriched_matches,
+            "pipeline_stats": {
+                "total_matches": len(matches),
+                "macros_calculated": len(enriched_matches),
+                "phase1_seconds": phase1_time,
+                "llm_failed": True,
+            },
+        }
+    
+    phase3_time = round(time.time() - start, 1)
+    
+    return {
+        "llm_recommendation": llm_response,
+        "enriched_matches": enriched_matches,
+        "pipeline_stats": {
+            "total_matches": len(matches),
+            "macros_calculated": len(enriched_matches),
+            "phase1_seconds": phase1_time,
+            "phase3_seconds": phase3_time,
+        },
+    }
+
+
+def build_full_pipeline_prompt(enriched_matches, fridge_items, daily_goal=None):
+    """Baut den Prompt für die volle Pipeline mit Macros.
+    
+    Anders als build_enricher_prompt: enthält jetzt auch die berechneten
+    Nährwerte pro Rezept, damit das LLM besser bewerten kann.
+    """
+    payload = {
+        "fridge_items": [item.get("name", "") for item in fridge_items],
+        "daily_goal_remaining": daily_goal or {},
+        "matches": [
+            {
+                "name": m["recipe"]["name"],
+                "match_score": m["match_score"],
+                "goal_score": m.get("goal_score", 0),
+                "macros": m.get("macros", {}),
+                "available_ingredients": m["available"],
+                "missing_ingredients": m["missing"],
+            }
+            for m in enriched_matches
+        ],
+    }
+    
+    return (
+        "Du bist ein lokaler Rezept-Berater für die FitFridge-App. "
+        "Antworte auf Deutsch, knapp und präzise.\n\n"
+        "Du erhältst Rezept-Kandidaten mit:\n"
+        "- match_score: Anteil verfügbarer Zutaten (0-1)\n"
+        "- goal_score: Wie gut das Rezept zum Tagesziel passt (0-1, oder negativ bei Überschreitung)\n"
+        "- macros: Berechnete Nährwerte des Rezepts (kcal, protein, fat, carbs)\n"
+        "- available/missing_ingredients: Was da ist und was fehlt\n\n"
+        "Wähle die 3 besten Rezepte aus und erkläre warum. Berücksichtige:\n"
+        "- Verbleibendes Tagesziel (Protein-Lücke füllen, kcal-Limit einhalten)\n"
+        "- Anzahl fehlender Zutaten (weniger = besser)\n"
+        "- Nährwert-Passung\n\n"
+        "Format pro Empfehlung:\n\n"
+        "1. <Rezeptname>\n"
+        "   Macros: <kcal> kcal, <protein>g Protein, <fat>g Fett, <carbs>g Carbs\n"
+        "   Warum: <1-2 Sätze, beziehe dich auf Tagesziel falls relevant>\n"
+        "   Substitution für fehlende Zutaten: <Vorschlag>\n\n"
+        "2. ... (gleich)\n\n"
+        "3. ... (gleich)\n\n"
+        "Antworte nur mit den drei Empfehlungen.\n\n"
+        f"Daten:\n{json.dumps(payload, ensure_ascii=False, indent=2, default=str)}"
+    )
