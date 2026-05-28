@@ -18,6 +18,11 @@ from .. import fridge_repo
 from .recipe_matcher import find_recipes_matching_fridge
 from .llm_enricher import enrich_with_full_pipeline
 from .nutrition_insights import generate_nutrition_insight
+from .consumption_forecast import (
+    calculate_days_until_empty,
+    average_daily_consumption,
+    generate_forecast_insight,
+)
 
 
 asaai_bp = Blueprint("asaai", __name__, url_prefix="/asaai")
@@ -140,5 +145,63 @@ def nutrition_insight():
         fridge_items=items,
         daily_goal=daily_goal,
     )
+
+    return jsonify(result)
+
+@asaai_bp.route("/forecast", methods=("GET",))
+def consumption_forecast():
+    """Liefert Verbrauchsprognose für alle Kühlschrank-Items.
+
+    Nutzt consumption_log um zu berechnen, wann jedes Item leer ist.
+    LLM erklärt die Prognose in natürlicher Sprache.
+
+    Returns:
+        JSON mit forecasts und insight_text
+    """
+    try:
+        items = fridge_repo.list_items()
+    except Exception as e:
+        return jsonify({
+            "error": f"Kühlschrank konnte nicht geladen werden: {e}",
+            "forecasts": [],
+        }), 500
+
+    if not items:
+        return jsonify({
+            "insight_text": "Dein Kühlschrank ist leer.",
+            "forecasts": [],
+        })
+
+    # Berechnung pro Item
+    forecasts = []
+    for item in items:
+        item_dict = dict(item)
+        product_id = item_dict.get("product_id")
+        current_amount = float(item_dict.get("current_amount", 0))
+
+        # Versuche Verbrauchshistorie zu holen (falls Tungs Repo das hat)
+        try:
+            from flaskr_new.consumption_log_repo import get_consumption_for_product
+            history = get_consumption_for_product(product_id)
+        except Exception:
+            # Fallback: leere Historie wenn Repo-Funktion nicht existiert
+            history = []
+
+        daily_rate = average_daily_consumption(history)
+        days_until_empty = calculate_days_until_empty(current_amount, daily_rate)
+
+        forecasts.append({
+            "name": item_dict.get("name", "Unbekannt"),
+            "current_amount": current_amount,
+            "unit": item_dict.get("unit", "g"),
+            "daily_consumption": daily_rate,
+            "days_until_empty": days_until_empty,
+        })
+
+    # Sortiere nach „wann leer" (am dringendsten zuerst)
+    forecasts.sort(key=lambda f: f["days_until_empty"])
+
+    # LLM-Erklärung generieren
+    result = generate_forecast_insight(forecasts)
 
     return jsonify(result)
