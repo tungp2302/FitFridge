@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
+from .shopping_advisor import generate_shopping_list
 from .. import fridge_repo
 from .recipe_matcher import find_recipes_matching_fridge
 from .llm_enricher import enrich_with_full_pipeline
@@ -203,5 +204,39 @@ def consumption_forecast():
 
     # LLM-Erklärung generieren
     result = generate_forecast_insight(forecasts)
+
+    return jsonify(result)
+
+@asaai_bp.route("/shopping/list", methods=("GET",))
+def shopping_list():
+    """Liefert KI-basierte Einkaufsliste.
+
+    Analysiert Kühlschrank-Bestand und Verbrauchshistorie.
+    LLM priorisiert und erklärt Empfehlungen.
+
+    Returns:
+        JSON mit shopping_list_text und low_stock_items
+    """
+    try:
+        items = fridge_repo.list_items()
+    except Exception as e:
+        return jsonify({
+            "error": f"Kühlschrank konnte nicht geladen werden: {e}",
+            "shopping_list_text": "",
+        }), 500
+
+    # Verbrauchshistorie holen (falls Tungs Repo das hat)
+    history = []
+    try:
+        from flaskr_new.consumption_log_repo import list_consumption_log
+        history = list_consumption_log()
+    except Exception:
+        # Fallback: leere Historie
+        pass
+
+    result = generate_shopping_list(
+        fridge_items=items,
+        consumption_history=history,
+    )
 
     return jsonify(result)
