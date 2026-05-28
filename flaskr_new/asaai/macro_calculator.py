@@ -22,6 +22,7 @@ from typing import Optional, Tuple
 
 from ..openfoodfacts_client import lookup_product
 from ..nutrition_service import calculate_for_amount
+from .ingredient_macros import lookup_ingredient
 
 
 # Cache für OpenFoodFacts-Lookups (vermeidet doppelte API-Calls)
@@ -178,15 +179,22 @@ def calculate_ingredient_macros(name: str, measure: str) -> dict:
         return _empty_macros()
 
     # Schritt 2: Zutat in OpenFoodFacts nachschlagen (mit Cache)
+    # Schritt 2: Zutat nachschlagen
     name_lower = name.strip().lower()
-    if name_lower in _INGREDIENT_CACHE:
-        product_data = _INGREDIENT_CACHE[name_lower]
-    else:
-        try:
-            product_data = lookup_product(name_lower)
-        except Exception:
-            product_data = None
-        _INGREDIENT_CACHE[name_lower] = product_data
+
+    # 2a: Erst in kuratierter DB (genauer!)
+    product_data = lookup_ingredient(name_lower)
+
+    # 2b: Falls nicht gefunden, OpenFoodFacts als Fallback (mit Cache)
+    if product_data is None:
+        if name_lower in _INGREDIENT_CACHE:
+            product_data = _INGREDIENT_CACHE[name_lower]
+        else:
+            try:
+                product_data = lookup_product(name_lower)
+            except Exception:
+                product_data = None
+            _INGREDIENT_CACHE[name_lower] = product_data
 
     # Edge Case: Zutat nicht gefunden
     if product_data is None:
