@@ -415,3 +415,98 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("frontend.dashboard"))
+
+@bp.route("/fridge/<int:item_id>/consume", methods=("POST",))
+@login_required
+def consume_product(item_id):
+    """Verbraucht eine Menge eines Fridge-Items.
+
+    Validiert robust:
+    - amount muss vorhanden sein
+    - amount muss eine Zahl sein
+    - amount muss > 0 sein
+    - amount muss <= 10000 sein (Tippfehler-Schutz)
+    """
+    amount_raw = request.form.get("amount", "").strip()
+
+    # Validierung 1: Leere Eingabe
+    if not amount_raw:
+        flash("Bitte gib eine Menge an.", "error")
+        return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+    # Validierung 2: Komma durch Punkt ersetzen (deutsche Eingabe)
+    amount_raw = amount_raw.replace(",", ".")
+
+    # Validierung 3: Muss eine Zahl sein
+    try:
+        amount = float(amount_raw)
+    except ValueError:
+        flash(f"'{amount_raw}' ist keine gültige Zahl.", "error")
+        return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+    # Validierung 4: Muss positiv sein
+    if amount <= 0:
+        flash("Die Menge muss größer als 0 sein.", "error")
+        return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+    # Validierung 5: Plausibilitäts-Check (Tippfehler-Schutz)
+    if amount > 10000:
+        flash(
+            f"Die Menge {amount} scheint sehr hoch. "
+            "Bitte prüfe deine Eingabe (max. 10000).",
+            "warning"
+        )
+        return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+    # Alles ok → Service aufrufen
+    result = consume_amount(item_id, amount)
+
+    if result["success"]:
+        flash(result["message"], "success")
+    else:
+        flash(result["message"], "error")
+
+    return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+
+@bp.route("/fridge/<int:item_id>/refill", methods=("POST",))
+@login_required
+def refill_product(item_id):
+    """Füllt eine Menge zu einem Fridge-Item hinzu.
+
+    Validiert gleich wie consume_product.
+    """
+    amount_raw = request.form.get("amount", "").strip()
+
+    if not amount_raw:
+        flash("Bitte gib eine Menge an.", "error")
+        return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+    amount_raw = amount_raw.replace(",", ".")
+
+    try:
+        amount = float(amount_raw)
+    except ValueError:
+        flash(f"'{amount_raw}' ist keine gültige Zahl.", "error")
+        return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+    if amount <= 0:
+        flash("Die Menge muss größer als 0 sein.", "error")
+        return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+    if amount > 10000:
+        flash(
+            f"Die Menge {amount} scheint sehr hoch. "
+            "Bitte prüfe deine Eingabe (max. 10000).",
+            "warning"
+        )
+        return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+    result = refill_amount(item_id, amount)
+
+    if result["success"]:
+        flash(result["message"], "success")
+    else:
+        flash(result["message"], "error")
+
+    return redirect(url_for("frontend.product_detail", item_id=item_id))

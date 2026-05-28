@@ -17,6 +17,7 @@ from flask import Blueprint, jsonify, request
 from .. import fridge_repo
 from .recipe_matcher import find_recipes_matching_fridge
 from .llm_enricher import enrich_with_full_pipeline
+from .nutrition_insights import generate_nutrition_insight
 
 
 asaai_bp = Blueprint("asaai", __name__, url_prefix="/asaai")
@@ -111,3 +112,33 @@ def match_only():
         "matches": matches[:5],  # nur Top 5 zurückgeben
         "total_found": len(matches),
     })
+
+@asaai_bp.route("/insights/nutrition", methods=("GET", "POST"))
+def nutrition_insight():
+    """Liefert KI-basierte Ernährungs-Insights für den Kühlschrank.
+
+    GET: Standard-Analyse ohne Tagesziel
+    POST: Body mit optional daily_goal {"protein": 120, "kcal": 2000}
+
+    Returns:
+        JSON mit insight_text und analysis
+    """
+    daily_goal = None
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        daily_goal = data.get("daily_goal")
+
+    try:
+        items = fridge_repo.list_items()
+    except Exception as e:
+        return jsonify({
+            "error": f"Kühlschrank konnte nicht geladen werden: {e}",
+            "insight_text": "",
+        }), 500
+
+    result = generate_nutrition_insight(
+        fridge_items=items,
+        daily_goal=daily_goal,
+    )
+
+    return jsonify(result)
