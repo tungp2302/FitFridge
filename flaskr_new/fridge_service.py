@@ -97,6 +97,116 @@ def update_dashboard_item(item_id, current_amount=None, unit=None, name=None, br
 def delete_dashboard_item(item_id):
     return fridge_repo.delete_item(item_id)
 
+def consume_amount(item_id, amount):
+    """Reduziert die Restmenge eines Fridge-Items.
+
+    Bei Erfolg wird zusätzlich Tungs consumption_log aktualisiert.
+
+    Edge Cases:
+    - amount <= 0 oder None: success=False
+    - Item existiert nicht: success=False
+    - Mehr verbrauchen als vorhanden: Bestand wird auf 0.0 begrenzt
+
+    Parameter:
+        item_id (int): ID des Fridge-Items
+        amount (float): Verbrauchte Menge
+
+    Returns:
+        dict: {"success": bool, "new_amount": float, "message": str}
+    """
+    if amount is None or amount <= 0:
+        return {
+            "success": False,
+            "new_amount": 0.0,
+            "message": "Menge muss größer als 0 sein.",
+        }
+
+    item = fridge_repo.get_item(item_id)
+    if item is None:
+        return {
+            "success": False,
+            "new_amount": 0.0,
+            "message": f"Produkt mit ID {item_id} nicht im Kühlschrank gefunden.",
+        }
+
+    item_dict = dict(item)
+    current = float(item_dict["current_amount"])
+    new_amount = max(0.0, current - float(amount))
+
+    fridge_repo.update_amount(item_id, new_amount)
+
+    # Tungs consumption_log mit füttern
+    try:
+        log_consume(
+            item_dict["product_id"],
+            float(amount),
+            item_dict["unit"],
+            note="consume_amount direkt",
+        )
+    except Exception:
+        # Falls Logging fehlschlägt, soll trotzdem die Hauptaktion erfolgreich sein
+        pass
+
+    return {
+        "success": True,
+        "new_amount": new_amount,
+        "message": f"{amount} {item_dict['unit']} {item_dict['name']} verbraucht. Rest: {new_amount} {item_dict['unit']}.",
+    }
+
+
+def refill_amount(item_id, amount):
+    """Erhöht die Restmenge eines Fridge-Items.
+
+    Bei Erfolg wird zusätzlich Tungs consumption_log aktualisiert.
+
+    Edge Cases:
+    - amount <= 0 oder None: success=False
+    - Item existiert nicht: success=False
+
+    Parameter:
+        item_id (int): ID des Fridge-Items
+        amount (float): Hinzugefügte Menge
+
+    Returns:
+        dict: {"success": bool, "new_amount": float, "message": str}
+    """
+    if amount is None or amount <= 0:
+        return {
+            "success": False,
+            "new_amount": 0.0,
+            "message": "Menge muss größer als 0 sein.",
+        }
+
+    item = fridge_repo.get_item(item_id)
+    if item is None:
+        return {
+            "success": False,
+            "new_amount": 0.0,
+            "message": f"Produkt mit ID {item_id} nicht im Kühlschrank gefunden.",
+        }
+
+    item_dict = dict(item)
+    current = float(item_dict["current_amount"])
+    new_amount = current + float(amount)
+
+    fridge_repo.update_amount(item_id, new_amount)
+
+    # Tungs consumption_log mit füttern
+    try:
+        log_refill(
+            item_dict["product_id"],
+            float(amount),
+            item_dict["unit"],
+            note="refill_amount direkt",
+        )
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "new_amount": new_amount,
+        "message": f"{amount} {item_dict['unit']} {item_dict['name']} aufgefüllt. Neuer Stand: {new_amount} {item_dict['unit']}.",
+    }
 
 def calculate_total_nutrition(item):
     """
