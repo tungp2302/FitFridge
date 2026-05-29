@@ -60,7 +60,10 @@ def load_logged_in_user():
 
 @bp.route("/")
 def dashboard():
-    posts = list_dashboard_items()
+    if g.user is None:
+        posts = []
+    else:
+        posts = list_dashboard_items(g.user["id"])
     # Calculate total nutrition for each item based on current_amount
     posts_with_nutrition = []
     for post in posts:
@@ -88,7 +91,7 @@ def _build_insight_fallback(consumption_history, fridge_items):
 @bp.route("/asaai/insight")
 @login_required
 def asaai_insight():
-    fridge_items = [dict(item) for item in list_dashboard_items()]
+    fridge_items = [dict(item) for item in list_dashboard_items(g.user["id"])]
     recent_events = get_recent_events(days=30, limit=50)
     addition_history = [entry for entry in recent_events if entry.get("event_type") == "refill"]
     consumption_events = [entry for entry in recent_events if entry.get("event_type") == "consume"]
@@ -183,7 +186,7 @@ def meal_tracker():
                         selected_fridge_item_id = fridge_item["id"]
                         unit = fridge_item["unit"]
                 elif barcode:
-                    selected_product, fridge_item = resolve_product_from_barcode(barcode)
+                    selected_product, fridge_item = resolve_product_from_barcode(barcode, g.user["id"])
                     if selected_product is None:
                         flash_message = "Barcode konnte keinem Produkt zugeordnet werden."
                     else:
@@ -214,7 +217,7 @@ def meal_tracker():
     recent_meals = get_recent_meals(g.user["id"], days=1)
     consumed = get_today_totals(g.user["id"])
     summary = build_daily_summary(settings, consumed)
-    fridge_items = [dict(item) for item in list_dashboard_items()]
+    fridge_items = [dict(item) for item in list_dashboard_items(g.user["id"])]
 
     if flash_message:
         flash(flash_message)
@@ -240,7 +243,7 @@ def meal_tracker():
 @bp.route("/fridge/<int:item_id>", methods=("GET", "POST"))
 @login_required
 def product_detail(item_id):
-    post = get_dashboard_item(item_id)
+    post = get_dashboard_item(item_id, g.user["id"])
 
     if post is None:
         abort(404, f"Item id {item_id} doesn't exist.")
@@ -271,6 +274,7 @@ def product_detail(item_id):
                 unit=unit,
                 name=name,
                 brand=brand,
+                user_id=g.user["id"],
             )
             return redirect(url_for("frontend.dashboard"))
 
@@ -346,7 +350,7 @@ def api_products_search():
 @bp.route("/fridge/<int:item_id>/delete", methods=("POST",))
 @login_required
 def delete_product(item_id):
-    post = get_dashboard_item(item_id)
+    post = get_dashboard_item(item_id, g.user["id"])
 
     if post is None:
         abort(404, f"Item id {item_id} doesn't exist.")
@@ -459,7 +463,7 @@ def consume_product(item_id):
         return redirect(url_for("frontend.product_detail", item_id=item_id))
 
     # Alles ok → Service aufrufen
-    result = consume_amount(item_id, amount)
+    result = consume_amount(item_id, amount, user_id=g.user["id"])
 
     if result["success"]:
         flash(result["message"], "success")
@@ -502,7 +506,7 @@ def refill_product(item_id):
         )
         return redirect(url_for("frontend.product_detail", item_id=item_id))
 
-    result = refill_amount(item_id, amount)
+    result = refill_amount(item_id, amount, user_id=g.user["id"])
 
     if result["success"]:
         flash(result["message"], "success")

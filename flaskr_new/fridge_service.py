@@ -5,12 +5,12 @@ from .consumption_log_repo import log_consume, log_refill
 from .openfoodfacts_client import lookup_product
 from flaskr_new.nutrition_service import calculate_for_amount
 
-def list_dashboard_items():
-    return fridge_repo.list_items()
+def list_dashboard_items(user_id=None):
+    return fridge_repo.list_items(user_id=user_id)
 
 
-def get_dashboard_item(item_id):
-    return fridge_repo.get_item(item_id)
+def get_dashboard_item(item_id, user_id=None):
+    return fridge_repo.get_item(item_id, user_id=user_id)
 
 
 def create_dashboard_item(query, author_id=None):
@@ -45,16 +45,24 @@ def create_dashboard_item(query, author_id=None):
 
     current_amount = float(product_data.get("total_amount") or 100.0)
     unit = product_data.get("unit") or "g"
-    return fridge_repo.add_item(product_id, current_amount, unit)
+    return fridge_repo.add_item(product_id, current_amount, unit, user_id=author_id)
 
 
-def update_dashboard_item(item_id, current_amount=None, unit=None, name=None, brand=None):
+def _get_item_for_user(item_id, user_id=None):
+    if user_id is None:
+        return fridge_repo.get_item(item_id)
+    item = fridge_repo.get_item(item_id, user_id=user_id)
+    if item is not None:
+        return item
+    return fridge_repo.get_item(item_id)
+
+def update_dashboard_item(item_id, current_amount=None, unit=None, name=None, brand=None, user_id=None):
     """Update fridge item amount and optionally product metadata."""
     updated = 0
 
     current_item = None
     if current_amount is not None or unit is not None or name is not None or brand is not None:
-        current_item = fridge_repo.get_item(item_id)
+        current_item = _get_item_for_user(item_id, user_id=user_id)
         if current_item is None:
             raise ValueError("No fridge item found for id")
         current_item = dict(current_item)
@@ -97,7 +105,7 @@ def update_dashboard_item(item_id, current_amount=None, unit=None, name=None, br
 def delete_dashboard_item(item_id):
     return fridge_repo.delete_item(item_id)
 
-def consume_amount(item_id, amount):
+def consume_amount(item_id, amount, user_id=None):
     """Reduziert die Restmenge eines Fridge-Items.
 
     Bei Erfolg wird zusätzlich Tungs consumption_log aktualisiert.
@@ -121,7 +129,7 @@ def consume_amount(item_id, amount):
             "message": "Menge muss größer als 0 sein.",
         }
 
-    item = fridge_repo.get_item(item_id)
+    item = _get_item_for_user(item_id, user_id=user_id)
     if item is None:
         return {
             "success": False,
@@ -154,7 +162,7 @@ def consume_amount(item_id, amount):
     }
 
 
-def refill_amount(item_id, amount):
+def refill_amount(item_id, amount, user_id=None):
     """Erhöht die Restmenge eines Fridge-Items.
 
     Bei Erfolg wird zusätzlich Tungs consumption_log aktualisiert.
@@ -177,7 +185,7 @@ def refill_amount(item_id, amount):
             "message": "Menge muss größer als 0 sein.",
         }
 
-    item = fridge_repo.get_item(item_id)
+    item = _get_item_for_user(item_id, user_id=user_id)
     if item is None:
         return {
             "success": False,

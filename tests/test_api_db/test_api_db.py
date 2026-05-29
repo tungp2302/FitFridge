@@ -133,6 +133,99 @@ def test_openfoodfacts_parsing(monkeypatch):
     assert result["sugar_per_100g"] == 56.3
 
 
+def test_lookup_product_prefers_primary_food_over_processed(monkeypatch):
+    raw_chicken = {
+        "name": "Chicken thigh",
+        "brand": "",
+        "barcode": "111",
+        "kcal_per_100g": 209.0,
+        "protein_per_100g": 26.0,
+        "fat_per_100g": 11.0,
+        "carbs_per_100g": 0.0,
+        "raw_product": {"ingredients_text_en": "chicken thigh"},
+    }
+    processed = {
+        "name": "Chicken & Chorizo Rice Pot",
+        "brand": "Ready Meals Co",
+        "barcode": "222",
+        "kcal_per_100g": 180.0,
+        "protein_per_100g": 10.0,
+        "fat_per_100g": 8.0,
+        "carbs_per_100g": 15.0,
+        "raw_product": {"ingredients_text_en": "chicken, chorizo, rice, seasoning"},
+    }
+
+    monkeypatch.setattr(ofc, "search_products", lambda query, **kwargs: [processed, raw_chicken])
+
+    result = ofc.lookup_product("chicken thigh")
+
+    assert result["name"] == "Chicken thigh"
+    assert result["barcode"] == "111"
+
+
+def test_lookup_product_prefers_raw_banana_over_snack(monkeypatch):
+    processed = {
+        "name": "Banana chips",
+        "brand": "Sunny Bites",
+        "barcode": "222",
+        "kcal_per_100g": 528.0,
+        "protein_per_100g": 2.0,
+        "fat_per_100g": 34.0,
+        "carbs_per_100g": 55.0,
+        "raw_product": {"ingredients_text_en": "banana, coconut oil, sugar"},
+    }
+
+    monkeypatch.setattr(ofc, "search_products", lambda query, **kwargs: [processed])
+
+    result = ofc.lookup_product("banana")
+
+    assert result["name"] == "Banana"
+    assert result["barcode"] == "ingredient:banana"
+    assert result["protein_per_100g"] == 1.1
+
+
+def test_freestyle_recipe_endpoint_returns_recipe(app, monkeypatch):
+    from flaskr_new.asaai import routes_asaai
+
+    monkeypatch.setattr(
+        routes_asaai,
+        "_current_fridge_items",
+        lambda: [
+            {"name": "Chicken thigh", "current_amount": 400},
+            {"name": "Rice", "current_amount": 250},
+            {"name": "Broccoli", "current_amount": 200},
+        ],
+    )
+    monkeypatch.setattr(
+        routes_asaai,
+        "generate_freestyle_recipe",
+        lambda fridge_items, daily_goal=None, **kwargs: {
+            "recipe": {
+                "title": "Chicken thigh rice bowl",
+                "why_this_works": "High protein, uses current fridge items.",
+                "ingredients": ["Chicken thigh", "Rice", "Broccoli", "Salt", "Pepper"],
+                "instructions": ["Cook rice.", "Sear chicken thigh.", "Steam broccoli and assemble."],
+                "estimated_macros": {"kcal": 720, "protein": 62, "fat": 18, "carbs": 58},
+                "used_fridge_items": ["Chicken thigh", "Rice", "Broccoli"],
+                "pantry_assumptions": ["Salt", "Pepper"],
+            },
+            "prompt_used": "prompt",
+            "raw_response": "{}",
+        },
+    )
+
+    client = app.test_client()
+    response = client.post(
+        "/asaai/recipes/freestyle",
+        json={"daily_goal": {"protein": 60, "kcal": 800}},
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["recipe"]["title"] == "Chicken thigh rice bowl"
+    assert "Chicken thigh" in payload["recipe"]["used_fridge_items"]
+
+
 def test_create_dashboard_item_uses_off_data(app_context, monkeypatch):
     monkeypatch.setattr(
         fridge_service,

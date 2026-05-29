@@ -1,6 +1,7 @@
 DROP TABLE IF EXISTS fridge_item;
 DROP TABLE IF EXISTS meal_tracker_entry;
 DROP TABLE IF EXISTS meal_tracker_settings;
+DROP TABLE IF EXISTS consumption_log;
 DROP TABLE IF EXISTS product;
 DROP TABLE IF EXISTS user;
 
@@ -36,10 +37,12 @@ CREATE TABLE product (
 
 CREATE TABLE fridge_item (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
     product_id INTEGER NOT NULL,
     current_amount REAL NOT NULL,
     unit TEXT NOT NULL,
     created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user (id),
     FOREIGN KEY (product_id) REFERENCES product (id)
 );
 

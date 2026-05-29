@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}ASaAI Hub{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <h1>ASaAI — Quick Demo Hub</h1>
+  <p>One-click access to AI features. No URLs to type.</p>
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:1rem;">
+    <button id="btn-match" class="btn">Recipe Matcher</button>
+    <button id="btn-suggest" class="btn">Suggest Recipes</button>
+    <button id="btn-nutrition" class="btn">Nutrition Insight</button>
+    <button id="btn-forecast" class="btn">Consumption Forecast</button>
+    <button id="btn-shopping" class="btn">Shopping Advisor</button>
+    <a class="link-button" href="{{ url_for('asaai.planner_ui') }}">Meal Planner</a>
+    <button id="btn-all" class="btn">Run All</button>
+  </div>
+
+  <div id="results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;">
+    <div id="card-match" class="card"><h3>Recipe Matches</h3><div class="card-body" id="out-match">(click Recipe Matcher)</div></div>
+    <div id="card-suggest" class="card"><h3>Suggestions</h3><div class="card-body" id="out-suggest">(click Suggest Recipes)</div></div>
+    <div id="card-nutrition" class="card"><h3>Nutrition</h3><div class="card-body" id="out-nutrition">(click Nutrition Insight)</div></div>
+    <div id="card-forecast" class="card"><h3>Forecast</h3><div class="card-body" id="out-forecast">(click Consumption Forecast)</div></div>
+    <div id="card-shopping" class="card"><h3>Shopping</h3><div class="card-body" id="out-shopping">(click Shopping Advisor)</div></div>
+  </div>
+</div>
+
+<style>
+  .card{background:#f5f5f5;padding:10px;border-radius:6px;border:1px solid #ddd}
+  .card h3{margin:0 0 .5rem 0}
+  .card-body{background:white;padding:8px;border-radius:4px;min-height:64px;white-space:pre-wrap;overflow:auto}
+  button.btn{background:#2b8b7a;color:white;border:none;padding:8px 12px;border-radius:4px;cursor:pointer}
+  button.btn:active{transform:translateY(1px)}
+</style>
+
+<script>
+function setBusy(id, busy){
+  const btn = document.getElementById(id);
+  if(!btn) return;
+  btn.disabled = busy;
+  btn.textContent = busy ? 'Loading...' : btn.dataset.label;
+}
+
+function formatInfinity(value){
+  return value === Infinity || value === 'Infinity' ? 'unbegrenzt' : value;
+}
+
+function summarizeForecast(forecasts){
+  if(!Array.isArray(forecasts) || forecasts.length === 0) return 'Keine Forecast-Daten verfügbar.';
+  return forecasts.map(item => {
+    const days = formatInfinity(item.days_until_empty);
+    return `${item.name} — ${days} Tage bis leer`;
+  }).join('\n');
+}
+
+async function fetchMatch(){
+  const el = document.getElementById('out-match');
+  setBusy('btn-match', true);
+  el.textContent = 'Loading...';
+  try{
+    const r = await fetch('/asaai/recipes/match-only');
+    const j = await r.json();
+    if(j.matches && j.matches.length){
+      el.textContent = j.matches.slice(0,5).map(m=>`${m.recipe.name} — score ${Math.round((m.match_score||0)*100)/100}\nMissing: ${ (m.missing||[]).slice(0,5).join(', ') }`).join('\n\n');
+    } else el.textContent = 'No matches found.';
+  }catch(e){ el.textContent = 'Fehler beim Laden: '+e }
+  finally{ setBusy('btn-match', false); }
+}
+
+async function fetchSuggest(){
+  const el = document.getElementById('out-suggest');
+  setBusy('btn-suggest', true);
+  el.textContent = 'Loading...';
+  try{
+    const r = await fetch('/asaai/recipes/suggest', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({daily_goal:{protein:30,kcal:2000}})});
+    const j = await r.json();
+    el.textContent = (j.enriched_matches && j.enriched_matches.length) ? j.enriched_matches.slice(0,3).map(x=>`${x.recipe.name} — ${x.recipe.area} — ${x.macros?('kcal '+x.macros.kcal):''}`).join('\n') : (j.llm_recommendation || JSON.stringify(j));
+  }catch(e){ el.textContent = 'Fehler beim Laden: '+e }
+  finally{ setBusy('btn-suggest', false); }
+}
+
+async function fetchNutrition(){
+  const el = document.getElementById('out-nutrition');
+  setBusy('btn-nutrition', true);
+  el.textContent = 'Loading...';
+  try{
+    const r = await fetch('/asaai/insights/nutrition');
+    const j = await r.json();
+    el.textContent = j.insight_text || JSON.stringify(j.analysis||j);
+  }catch(e){ el.textContent = 'Fehler beim Laden: '+e }
+  finally{ setBusy('btn-nutrition', false); }
+}
+
+async function fetchForecast(){
+  const el = document.getElementById('out-forecast');
+  setBusy('btn-forecast', true);
+  el.textContent = 'Loading...';
+  try{
+    const r = await fetch('/asaai/forecast');
+    const j = await r.json();
+    el.textContent = j.insight_text || summarizeForecast(j.forecasts || []);
+  }catch(e){ el.textContent = 'Fehler beim Laden: '+e }
+  finally{ setBusy('btn-forecast', false); }
+}
+
+async function fetchShopping(){
+  const el = document.getElementById('out-shopping');
+  setBusy('btn-shopping', true);
+  el.textContent = 'Loading...';
+  try{
+    const r = await fetch('/asaai/shopping/list');
+    const j = await r.json();
+    el.textContent = j.shopping_list_text || JSON.stringify(j.low_stock_items||j);
+  }catch(e){ el.textContent = 'Fehler beim Laden: '+e }
+  finally{ setBusy('btn-shopping', false); }
+}
+
+['btn-match','btn-suggest','btn-nutrition','btn-forecast','btn-shopping','btn-all'].forEach(id => {
+  const btn = document.getElementById(id);
+  if(btn) btn.dataset.label = btn.textContent;
+});
+
+document.getElementById('btn-match').addEventListener('click',fetchMatch);
+document.getElementById('btn-suggest').addEventListener('click',fetchSuggest);
+document.getElementById('btn-nutrition').addEventListener('click',fetchNutrition);
+document.getElementById('btn-forecast').addEventListener('click',fetchForecast);
+document.getElementById('btn-shopping').addEventListener('click',fetchShopping);
+document.getElementById('btn-all').addEventListener('click', async ()=>{ await Promise.all([fetchMatch(),fetchSuggest(),fetchNutrition(),fetchForecast(),fetchShopping()]); });
+</script>
+
+{% endblock %}

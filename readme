@@ -69,3 +69,8 @@ Ollama smoke test:
      curl http://127.0.0.1:11434/api/tags
 
 FitFridge uses only the local Ollama backend for ASaAI now.
+
+Demo data:
+    python scripts/seed_demo.py
+    Login: demo / demo
+    Opens a repeatable fridge with sample products, meal entries, and forecast data.

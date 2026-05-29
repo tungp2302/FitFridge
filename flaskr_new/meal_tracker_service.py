@@ -88,7 +88,7 @@ def build_daily_summary(settings: Dict, consumed: Dict) -> Dict:
     }
 
 
-def resolve_product_from_barcode(barcode: str):
+def resolve_product_from_barcode(barcode: str, user_id: int | None = None):
     """Resolve a product by barcode and return product row + fridge item if available."""
     barcode = (barcode or "").strip()
     if not barcode:
@@ -111,7 +111,10 @@ def resolve_product_from_barcode(barcode: str):
         product = product_repo.get_by_id(product_id)
 
     fridge_item = None
-    for item in fridge_repo.list_items():
+    fridge_items = fridge_repo.list_items(user_id=user_id)
+    if not fridge_items and user_id is not None:
+        fridge_items = fridge_repo.list_items()
+    for item in fridge_items:
         if item["product_id"] == product["id"]:
             fridge_item = dict(item)
             break
@@ -140,11 +143,19 @@ def log_meal_from_product(user_id: int, product: Dict, amount: float, unit: str,
 
     deducted = False
     if fridge_item_id is not None:
-        fridge_item = fridge_repo.get_item(fridge_item_id)
+        fridge_item = fridge_repo.get_item(fridge_item_id, user_id=user_id)
+        if fridge_item is None:
+            fridge_item = fridge_repo.get_item(fridge_item_id)
         if fridge_item is not None:
+            fridge_item_dict = dict(fridge_item)
             current_amount = float(fridge_item["current_amount"])
             remaining_amount = max(0.0, round(current_amount - float(amount), 1))
-            update_dashboard_item(fridge_item_id, current_amount=remaining_amount, unit=fridge_item["unit"])
+            update_dashboard_item(
+                fridge_item_id,
+                current_amount=remaining_amount,
+                unit=fridge_item["unit"],
+                user_id=user_id if fridge_item_dict.get("user_id") is not None else None,
+            )
             deducted = True
 
     return {

@@ -5,22 +5,25 @@
 {% endblock %}
 
 {% block content %}
-  <form method="post" id="add-product-form">
-    <label for="query">Barcode or product name</label>
-    <input
-      name="query"
-      id="query"
-      value="{{ request.form.get('query', '') }}"
-      placeholder="e.g. 3017620422003 or Nutella"
-      required
-    >
-    <div id="search-results" class="search-results" style="display:none; max-height:220px; overflow:auto; border:1px solid #ddd; margin-top:.5rem;"></div>
-    <p class="body">Nutrition values and package amount are fetched automatically from OpenFoodFacts.</p>
-    <div style="display:flex; gap:.5rem; align-items:center; margin-top:.5rem;">
-      <input type="submit" id="save-btn" value="Save">
-      <button type="button" id="create-anyway" style="display:none;">Create anyway</button>
-    </div>
-  </form>
+  <div class="page-card" style="max-width:760px;">
+    <form method="post" id="add-product-form">
+      <label for="query">Barcode or product name</label>
+      <input
+        name="query"
+        id="query"
+        value="{{ request.form.get('query', '') }}"
+        placeholder="e.g. 3017620422003 or Nutella"
+        required
+      >
+      <div id="search-results" class="search-results" style="display:none; max-height:220px; overflow:auto; border:1px solid #e5e7eb; margin-top:.5rem; border-radius:12px; background:#fff;"></div>
+      <p class="muted">Nutrition values and package amount are fetched automatically from OpenFoodFacts.</p>
+      <div style="display:flex; gap:.75rem; align-items:center; margin-top:.5rem; flex-wrap:wrap;">
+        <input type="submit" id="save-btn" value="Save">
+        <button type="button" id="create-anyway" class="secondary" style="display:none;">Create anyway</button>
+      </div>
+      <div id="add-loading" class="muted" style="display:none; margin-top:.75rem;">Adding food to your fridge...</div>
+    </form>
+  </div>
 
   <script>
     (function(){
@@ -28,7 +31,15 @@
       const results = document.getElementById('search-results');
       const form = document.getElementById('add-product-form');
       const createAnyway = document.getElementById('create-anyway');
+      const saveBtn = document.getElementById('save-btn');
+      const loading = document.getElementById('add-loading');
       let lastItems = [];
+
+      function setLoadingState(active){
+        saveBtn.disabled = active;
+        saveBtn.value = active ? 'Adding...' : 'Save';
+        loading.style.display = active ? 'block' : 'none';
+      }
 
       function render(items){
         lastItems = items || [];
@@ -71,6 +82,7 @@
         ev.preventDefault();
         const q = input.value.trim();
         if(!q){ return; }
+        setLoadingState(true);
         fetch(`/api/products/search?q=${encodeURIComponent(q)}`)
           .then(r=>r.json())
           .then(items=>{
@@ -80,6 +92,7 @@
               return;
             }
             // show matches for selection
+            setLoadingState(false);
             render(items);
           })
           .catch(()=>{
@@ -90,6 +103,7 @@
 
       // 'Create anyway' button: submit form using current query
       createAnyway.addEventListener('click', ()=>{
+        setLoadingState(true);
         form.submit();
       });
     })();

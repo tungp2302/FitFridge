@@ -12,12 +12,12 @@ Diese Routes nutzen die komplette ASaAI-Pipeline:
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, render_template, g
 
 from .shopping_advisor import generate_shopping_list
 from .. import fridge_repo
 from .recipe_matcher import find_recipes_matching_fridge
-from .llm_enricher import enrich_with_full_pipeline
+from .llm_enricher import enrich_with_full_pipeline, generate_freestyle_recipe
 from .nutrition_insights import generate_nutrition_insight
 from .consumption_forecast import (
     calculate_days_until_empty,
@@ -27,6 +27,16 @@ from .consumption_forecast import (
 
 
 asaai_bp = Blueprint("asaai", __name__, url_prefix="/asaai")
+
+
+def _current_fridge_items():
+    user = getattr(g, "user", None)
+    if user is None:
+        return []
+    try:
+        return [dict(item) for item in fridge_repo.list_items(user["id"])]
+    except Exception:
+        return []
 
 
 @asaai_bp.route("/recipes/suggest", methods=("GET", "POST"))
@@ -50,7 +60,7 @@ def suggest_recipes():
 
     # Kühlschrank-Items aus DB holen
     try:
-        items = fridge_repo.list_items()
+        items = _current_fridge_items()
     except Exception as e:
         return jsonify({
             "error": f"Kühlschrank konnte nicht geladen werden: {e}",
@@ -67,15 +77,13 @@ def suggest_recipes():
         })
 
     # Items in das richtige Format für Recipe Matcher bringen
-    fridge_items = [
-    {"name": item["name"], "amount": item["current_amount"]}
-    for item in items
-    ]
+    fridge_items = [{"name": item["name"], "amount": item["current_amount"]} for item in items]
 
     # Phase 0: Recipe Matcher
     matches = find_recipes_matching_fridge(
         fridge_items,
         max_recipes_per_ingredient=3,
+        daily_goal=daily_goal,
     )
 
     # Phase 1-3: Volle Pipeline
@@ -97,7 +105,7 @@ def match_only():
     Liefert nur deterministische Resultate.
     """
     try:
-        items = fridge_repo.list_items()
+        items = _current_fridge_items()
     except Exception as e:
         return jsonify({"error": str(e), "matches": []}), 500
 
@@ -119,6 +127,45 @@ def match_only():
         "total_found": len(matches),
     })
 
+
+@asaai_bp.route("/recipes/freestyle", methods=("POST",))
+def freestyle_recipe():
+    """Generate one realistic recipe directly from fridge contents."""
+    daily_goal = None
+    data = request.get_json(silent=True) or {}
+    if isinstance(data, dict):
+        daily_goal = data.get("daily_goal")
+
+    try:
+        items = _current_fridge_items()
+    except Exception as e:
+        return jsonify({
+            "error": f"Kühlschrank konnte nicht geladen werden: {e}",
+            "recipe": None,
+        }), 500
+
+    if not items:
+        return jsonify({
+            "recipe": {
+                "title": "Dein Kühlschrank ist leer",
+                "why_this_works": "Lege erst Lebensmittel in den Kühlschrank, dann kann ich ein Rezept freestyle'n.",
+                "ingredients": [],
+                "instructions": ["Add ingredients first."],
+                "estimated_macros": {"kcal": 0, "protein": 0, "fat": 0, "carbs": 0},
+                "used_fridge_items": [],
+                "pantry_assumptions": [],
+            },
+            "prompt_used": "",
+            "raw_response": "",
+        })
+
+    fridge_items = [{"name": item["name"], "amount": item["current_amount"]} for item in items]
+    result = generate_freestyle_recipe(
+        fridge_items=fridge_items,
+        daily_goal=daily_goal,
+    )
+    return jsonify(result)
+
 @asaai_bp.route("/insights/nutrition", methods=("GET", "POST"))
 def nutrition_insight():
     """Liefert KI-basierte Ernährungs-Insights für den Kühlschrank.
@@ -135,7 +182,7 @@ def nutrition_insight():
         daily_goal = data.get("daily_goal")
 
     try:
-        items = fridge_repo.list_items()
+        items = _current_fridge_items()
     except Exception as e:
         return jsonify({
             "error": f"Kühlschrank konnte nicht geladen werden: {e}",
@@ -160,7 +207,7 @@ def consumption_forecast():
         JSON mit forecasts und insight_text
     """
     try:
-        items = fridge_repo.list_items()
+        items = _current_fridge_items()
     except Exception as e:
         return jsonify({
             "error": f"Kühlschrank konnte nicht geladen werden: {e}",
@@ -218,7 +265,7 @@ def shopping_list():
         JSON mit shopping_list_text und low_stock_items
     """
     try:
-        items = fridge_repo.list_items()
+        items = _current_fridge_items()
     except Exception as e:
         return jsonify({
             "error": f"Kühlschrank konnte nicht geladen werden: {e}",
@@ -240,3 +287,39 @@ def shopping_list():
     )
 
     return jsonify(result)
+
+
+# --- Simple UI routes for browser demo (minimal wrappers) ---
+@asaai_bp.route('/hub')
+def hub_ui():
+    return render_template('asaai/hub.html')
+
+
+@asaai_bp.route('/ui/recipes')
+def recipes_ui():
+    return render_template('asaai/recipes.html')
+
+
+@asaai_bp.route('/ui/suggest')
+def suggest_ui():
+    return render_template('asaai/suggest.html')
+
+
+@asaai_bp.route('/ui/nutrition')
+def nutrition_ui():
+    return render_template('asaai/nutrition.html')
+
+
+@asaai_bp.route('/ui/forecast')
+def forecast_ui():
+    return render_template('asaai/forecast.html')
+
+
+@asaai_bp.route('/ui/shopping')
+def shopping_ui():
+    return render_template('asaai/shopping.html')
+
+
+@asaai_bp.route('/ui/planner')
+def planner_ui():
+    return render_template('asaai/planner.html')

@@ -11,6 +11,7 @@ Hauptfunktionen:
 from __future__ import annotations
 
 import json
+import math
 from typing import Optional
 
 from .ollama_client import generate_from_ollama
@@ -126,7 +127,15 @@ def generate_forecast_insight(
     except Exception as e:
         insight_text = f"LLM nicht verfügbar: {e}"
 
+    safe_forecasts = []
+    for forecast in forecasts:
+        sanitized = dict(forecast)
+        days_until_empty = sanitized.get("days_until_empty")
+        if isinstance(days_until_empty, (int, float)) and math.isinf(days_until_empty):
+            sanitized["days_until_empty"] = "unbegrenzt"
+        safe_forecasts.append(sanitized)
+
     return {
         "insight_text": insight_text,
-        "forecasts": forecasts,
+        "forecasts": safe_forecasts,
     }

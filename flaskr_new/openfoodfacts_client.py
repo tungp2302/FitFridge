@@ -12,6 +12,8 @@ from urllib.parse import quote
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from .ollama_client import generate_from_ollama
+
 try:
     import certifi
 except ModuleNotFoundError:  # pragma: no cover - depends on local environment
@@ -21,6 +23,95 @@ OFF_API_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
 OFF_STAGING_API_URL = "https://world.openfoodfacts.net/api/v2/product/{barcode}.json"
 
 DEFAULT_USER_AGENT = "FitFridge/1.0 (university project; contact: you@example.com)"
+
+
+PROCESSED_FOOD_KEYWORDS = {
+    "chorizo",
+    "sausage",
+    "salami",
+    "pepperoni",
+    "burger",
+    "nugget",
+    "patty",
+    "snack",
+    "cookie",
+    "biscuit",
+    "cake",
+    "chocolate",
+    "cereal",
+    "bar",
+    "drink",
+    "soda",
+    "juice",
+    "sauce",
+    "ready meal",
+    "instant",
+    "microwave",
+    "processed",
+    "mix",
+}
+
+
+PRIMARY_FOOD_KEYWORDS = {
+    "banana",
+    "apple",
+    "orange",
+    "grape",
+    "pear",
+    "berry",
+    "berries",
+    "fruit",
+    "vegetable",
+    "veg",
+    "chicken",
+    "beef",
+    "pork",
+    "turkey",
+    "fish",
+    "salmon",
+    "tuna",
+    "shrimp",
+    "broccoli",
+    "carrot",
+    "onion",
+    "garlic",
+    "potato",
+    "rice",
+    "pasta",
+    "egg",
+    "lentil",
+    "beans",
+    "tomato",
+    "cucumber",
+    "spinach",
+}
+
+
+GERMAN_FOOD_ALIASES = {
+    "banane": "banana",
+    "hahnchen": "chicken",
+    "haehnchen": "chicken",
+    "hahnchenschenkel": "chicken thigh",
+    "haehnchenschenkel": "chicken thigh",
+    "huhn": "chicken",
+    "huhnerbrust": "chicken breast",
+    "rindfleisch": "beef",
+    "rind": "beef",
+    "schweinefleisch": "pork",
+    "reis": "rice",
+    "zwiebel": "onion",
+    "zwiebeln": "onion",
+    "knoblauch": "garlic",
+    "kartoffel": "potato",
+    "kartoffeln": "potatoes",
+    "brokkoli": "broccoli",
+    "tomate": "tomato",
+    "tomaten": "tomatoes",
+    "gurke": "cucumber",
+    "karotte": "carrot",
+    "eier": "eggs",
+    "ei": "egg",
+}
 
 
 def _first_string(*values: Optional[str]) -> str:
@@ -37,6 +128,176 @@ def _float_value(value, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _normalize_text(value: str) -> str:
+    text = str(value or "").lower().strip()
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    return " ".join(text.split())
+
+
+def _normalize_query_key(query: str) -> str:
+    normalized = _normalize_text(query)
+    if not normalized:
+        return ""
+
+    mapped = GERMAN_FOOD_ALIASES.get(normalized)
+    if mapped:
+        return mapped
+
+    tokens = normalized.split()
+    if tokens:
+        mapped_tokens = [GERMAN_FOOD_ALIASES.get(token, token) for token in tokens]
+        joined = " ".join(mapped_tokens).strip()
+        if joined:
+            return joined
+
+    return normalized
+
+
+def _is_primary_food_query(query: str) -> bool:
+    normalized = _normalize_query_key(query)
+    if not normalized:
+        return False
+    from .asaai.ingredient_macros import lookup_ingredient
+
+    if lookup_ingredient(normalized) is not None:
+        return True
+    return any(keyword in normalized for keyword in PRIMARY_FOOD_KEYWORDS)
+
+
+def _ingredient_display_name(query: str) -> str:
+    normalized = _normalize_query_key(query)
+    if not normalized:
+        return ""
+    return " ".join(part.capitalize() for part in normalized.split())
+
+
+def _build_generic_ingredient_product(query: str) -> Optional[Dict]:
+    from .asaai.ingredient_macros import lookup_ingredient
+
+    normalized = _normalize_query_key(query)
+    if not normalized:
+        return None
+
+    nutrients = lookup_ingredient(normalized)
+    if nutrients is None:
+        return None
+
+    return {
+        "name": _ingredient_display_name(normalized),
+        "brand": "",
+        "barcode": f"ingredient:{normalized}",
+        "kcal_per_100g": float(nutrients.get("kcal_per_100g", 0.0)),
+        "protein_per_100g": float(nutrients.get("protein_per_100g", 0.0)),
+        "fat_per_100g": float(nutrients.get("fat_per_100g", 0.0)),
+        "carbs_per_100g": float(nutrients.get("carbs_per_100g", 0.0)),
+        "sugar_per_100g": 0.0,
+        "total_amount": 100.0,
+        "unit": "g",
+        "raw_quantity": "100 g",
+        "raw_product": {"ingredient_source": True, "query": normalized},
+    }
+
+
+def _build_ai_ingredient_product(query: str) -> Optional[Dict]:
+    """Generate a single AI ingredient entry for primary-food queries."""
+    normalized = _normalize_query_key(query)
+    if not normalized:
+        return None
+
+    generic = _build_generic_ingredient_product(normalized)
+    if generic is None:
+        return None
+
+    prompt = (
+        "Du bist ein Produkt-Assistent für FitFridge. "
+        "Erzeuge aus dem Suchbegriff eine kurze, klare Bezeichnung für eine rohe Lebensmittel-Zutat. "
+        "Antworte als JSON mit den Feldern name und brand. "
+        "name soll nur der Lebensmittelname sein, brand soll kurz 'AI Ingredient' sein. "
+        f"Suchbegriff: {query}\n"
+        f"Normierter Lebensmittelname: {generic['name']}"
+    )
+
+    ai_name = generic["name"]
+    ai_brand = "AI Ingredient"
+
+    try:
+        response = generate_from_ollama(prompt, timeout=20, num_predict=80)
+        data = json.loads(response.strip())
+        if isinstance(data, dict):
+            name = str(data.get("name") or "").strip()
+            brand = str(data.get("brand") or "").strip()
+            if name:
+                ai_name = name
+            if brand:
+                ai_brand = brand
+    except Exception:
+        pass
+
+    generic["name"] = ai_name
+    generic["brand"] = ai_brand
+    generic["barcode"] = f"ai:{normalized}"
+    generic["raw_product"] = {
+        "ingredient_source": True,
+        "ai_generated": True,
+        "query": normalized,
+    }
+    return generic
+
+
+def _score_off_product(query: str, product: dict) -> float:
+    """Prefer raw ingredients over branded/processed products for food queries."""
+    normalized_query = _normalize_text(query)
+    name = _normalize_text(product.get("name", ""))
+    brand = _normalize_text(product.get("brand", ""))
+    raw = product.get("raw_product") or {}
+
+    score = 0.0
+
+    if normalized_query and normalized_query == name:
+        score += 60
+    elif normalized_query and normalized_query in name:
+        score += 35
+    elif name and any(token in name for token in normalized_query.split()):
+        score += 15
+
+    if _is_primary_food_query(normalized_query):
+        if any(keyword in name for keyword in PRIMARY_FOOD_KEYWORDS):
+            score += 20
+        if brand:
+            score -= 5
+        ingredients_text = _normalize_text(
+            raw.get("ingredients_text_en")
+            or raw.get("ingredients_text")
+            or raw.get("categories")
+            or ""
+        )
+        if any(keyword in ingredients_text for keyword in PROCESSED_FOOD_KEYWORDS):
+            score -= 25
+        if any(keyword in name for keyword in PROCESSED_FOOD_KEYWORDS):
+            score -= 35
+    else:
+        if any(keyword in name for keyword in PROCESSED_FOOD_KEYWORDS):
+            score -= 10
+
+    # Prefer generic items with no obvious brand when querying raw foods
+    if _is_primary_food_query(normalized_query) and not brand:
+        score += 10
+
+    return score
+
+
+def _rank_off_products(query: str, products: list) -> list:
+    return sorted(
+        products,
+        key=lambda product: (
+            _score_off_product(query, product),
+            product.get("protein_per_100g", 0.0),
+            -product.get("kcal_per_100g", 0.0),
+        ),
+        reverse=True,
+    )
 
 
 def _parse_total_quantity(product_data: dict) -> Tuple[Optional[float], Optional[str]]:
@@ -182,53 +443,25 @@ def lookup_product(query: str, user_agent: str = DEFAULT_USER_AGENT, use_staging
     if query.isdigit():
         return search_product(query, user_agent=user_agent, use_staging=use_staging)
 
-    base_url = OFF_STAGING_API_URL.rsplit("/api/v2/product/{barcode}.json", 1)[0] if use_staging else OFF_API_URL.rsplit("/api/v2/product/{barcode}.json", 1)[0]
-    search_url = (
-        f"{base_url}/cgi/search.pl?"
-        f"search_terms={quote(query)}&search_simple=1&action=process&json=0"
-    )
+    if query.startswith("ai:") or query.startswith("ingredient:"):
+        return _build_ai_ingredient_product(query.split(":", 1)[1]) or _build_generic_ingredient_product(query)
 
-    request = Request(
-        search_url,
-        headers={
-            "User-Agent": user_agent,
-            "Accept": "application/json",
-        },
-    )
+    generic = _build_generic_ingredient_product(query)
 
-    https_context = _make_ssl_context()
+    products = search_products(query, user_agent=user_agent, use_staging=use_staging, limit=10)
+    if not products:
+        return generic
 
-    body = None
-    max_attempts = 3
-    for attempt in range(max_attempts):
-        try:
-            with urlopen(request, timeout=10, context=https_context) as response:
-                body = response.read().decode("utf-8")
-            break
-        except HTTPError as error:
-            if error.code == 404:
-                return None
-            # Retry on 503 Service Unavailable
-            if error.code == 503 and attempt < max_attempts - 1:
-                time.sleep(1 << attempt)
-                continue
-            raise RuntimeError(f"Open Food Facts search failed: {error}") from error
-        except URLError as error:
-            # transient network error -> retry a few times
-            if attempt < max_attempts - 1:
-                time.sleep(1 << attempt)
-                continue
-            raise RuntimeError(f"Open Food Facts search failed: {error}") from error
+    ranked = _rank_off_products(query, products)
+    if not ranked:
+        return generic
 
-    if not body:
-        return None
+    best = ranked[0]
+    if generic is not None and _is_primary_food_query(query):
+        if _score_off_product(query, best) < 70:
+            return _build_ai_ingredient_product(query) or generic
 
-    match = re.search(r"/product/(\d{4,})/", body)
-    if match:
-        return search_product(match.group(1), user_agent=user_agent, use_staging=use_staging)
-
-    # as a fallback return None
-    return None
+    return best
 
 
 def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_staging: bool = False, limit: int = 10) -> Optional[list]:
@@ -287,7 +520,15 @@ def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_stagin
             full = None
         if full:
             results.append(full)
-        if len(results) >= limit:
-            break
 
-    return results
+    if _is_primary_food_query(query):
+        ai_entry = _build_ai_ingredient_product(query)
+        if ai_entry is not None:
+            results.insert(0, ai_entry)
+
+    ranked = _rank_off_products(query, results)
+
+    if limit:
+        ranked = ranked[:limit]
+
+    return ranked

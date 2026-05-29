@@ -24,7 +24,9 @@ def create_app(test_config=None):
     app.register_blueprint(routes_asaai.asaai_bp)
 
     from .meal_tracker_repo import ensure_schema as ensure_meal_tracker_schema
+    from .fridge_repo import ensure_schema as ensure_fridge_schema
     with app.app_context():
+        ensure_fridge_schema()
         ensure_meal_tracker_schema()
 
     from .routes import bp as frontend_bp

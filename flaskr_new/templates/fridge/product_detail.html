@@ -5,39 +5,41 @@
 {% endblock %}
 
 {% block content %}
-  <form method="post">
-    <label for="name">Name</label>
-    <input name="name" id="name" value="{{ request.form.get('name', post['name']) }}" required>
+  <div class="page-card" style="max-width:760px;">
+    <form method="post">
+      <label for="name">Name</label>
+      <input name="name" id="name" value="{{ request.form.get('name', post['name']) }}" required>
 
-    <label for="brand">Brand</label>
-    <input name="brand" id="brand" value="{{ request.form.get('brand', post['brand']) }}">
+      <label for="brand">Brand</label>
+      <input name="brand" id="brand" value="{{ request.form.get('brand', post['brand']) }}">
 
-    <label for="barcode">Barcode</label>
-    <input name="barcode" id="barcode" value="{{ request.form.get('barcode', post['barcode']) }}" readonly>
+      <label for="barcode">Barcode</label>
+      <input name="barcode" id="barcode" value="{{ request.form.get('barcode', post['barcode']) }}" readonly>
 
-    <label for="current_amount">Amount</label>
-    <input name="current_amount" id="current_amount" value="{{ request.form.get('current_amount', post['current_amount']) }}">
+      <label for="current_amount">Amount</label>
+      <input name="current_amount" id="current_amount" value="{{ request.form.get('current_amount', post['current_amount']) }}">
 
-    <label for="unit">Unit</label>
-    <input name="unit" id="unit" value="{{ request.form.get('unit', post['unit']) }}">
+      <label for="unit">Unit</label>
+      <input name="unit" id="unit" value="{{ request.form.get('unit', post['unit']) }}">
 
-    <fieldset>
-      <legend>Total Nutrition (for {{ post['current_amount'] }} {{ post['unit'] }})</legend>
-      <p>
-        <strong>Kcal:</strong> {{ post['total_kcal'] }}<br>
-        <strong>Protein:</strong> {{ post['total_protein'] }}g<br>
-        <strong>Fat:</strong> {{ post['total_fat'] }}g<br>
-        <strong>Carbs:</strong> {{ post['total_carbs'] }}g
-      </p>
-      <p style="font-size: 0.9em; color: #666;">
-        <em>(Per 100g: {{ post['kcal_per_100g'] }} kcal • {{ post['protein_per_100g'] }}g protein • {{ post['fat_per_100g'] }}g fat • {{ post['carbs_per_100g'] }}g carbs)</em>
-      </p>
-    </fieldset>
+      <fieldset>
+        <legend>Total Nutrition (for {{ post['current_amount'] }} {{ post['unit'] }})</legend>
+        <p>
+          <strong>Kcal:</strong> {{ post['total_kcal'] }}<br>
+          <strong>Protein:</strong> {{ post['total_protein'] }}g<br>
+          <strong>Fat:</strong> {{ post['total_fat'] }}g<br>
+          <strong>Carbs:</strong> {{ post['total_carbs'] }}g
+        </p>
+        <p class="muted">
+          Per 100g: {{ post['kcal_per_100g'] }} kcal • {{ post['protein_per_100g'] }}g protein • {{ post['fat_per_100g'] }}g fat • {{ post['carbs_per_100g'] }}g carbs
+        </p>
+      </fieldset>
 
-    <input type="submit" value="Save">
-  </form>
-  <hr>
-  <form action="{{ url_for('frontend.delete_product', item_id=post['id']) }}" method="post">
-    <input class="danger" type="submit" value="Delete" onclick="return confirm('Are you sure?');">
-  </form>
+      <input type="submit" value="Save">
+    </form>
+    <hr>
+    <form action="{{ url_for('frontend.delete_product', item_id=post['id']) }}" method="post">
+      <input class="danger" type="submit" value="Delete" onclick="return confirm('Are you sure?');">
+    </form>
+  </div>
 {% endblock %}

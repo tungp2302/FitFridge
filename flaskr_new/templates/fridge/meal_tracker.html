@@ -5,12 +5,30 @@
 {% endblock %}
 
 {% block content %}
-  <style>
-    @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
-    .search-item:hover { background:#f8fafc; }
-    .loading .spinner { display:inline-block; }
-    #selected-product { box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-  </style>
+  <section class="page-card" style="margin-bottom:1rem;">
+    <div class="hub-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+      <div>
+        <h2 style="margin:0 0 .25rem 0;">Today</h2>
+        <p class="muted" style="margin:0;">Daily macros and meal logging in one place.</p>
+      </div>
+      <div class="user-chip">{{ summary.recommendation }}</div>
+    </div>
+    <div class="stats-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:1rem;">
+      <div class="card">
+        <h3>Consumed</h3>
+        <div class="card-body"><strong>{{ consumed.kcal }}</strong> kcal<br>P {{ consumed.protein_g }} g · C {{ consumed.carbs_g }} g · F {{ consumed.fat_g }} g</div>
+      </div>
+      <div class="card">
+        <h3>Target</h3>
+        <div class="card-body"><strong>{{ summary.targets.kcal }}</strong> kcal<br>P {{ summary.targets.protein_g }} g · C {{ summary.targets.carbs_g }} g · F {{ summary.targets.fat_g }} g</div>
+      </div>
+      <div class="card">
+        <h3>Remaining</h3>
+        <div class="card-body"><strong>{{ summary.remaining.kcal }}</strong> kcal<br>P {{ summary.remaining.protein_g }} g · C {{ summary.remaining.carbs_g }} g · F {{ summary.remaining.fat_g }} g</div>
+      </div>
+    </div>
+  </section>
+
   <section class="insight-grid">
     <article class="insight-card">
       <div class="card-header">
@@ -42,17 +60,17 @@
     <article class="insight-card">
       <div class="card-header">
         <h2>Barcode log</h2>
-        <span class="muted">Scan or type barcode</span>
+        <span class="muted">Search, barcode, or fridge item</span>
       </div>
       <form method="post">
         <input type="hidden" name="action" value="track_meal">
         <label for="search_name">Search product name</label>
-        <input type="text" id="search_name" placeholder="Type product name to search">
-        <div id="search-results" style="display:none; max-height:260px; overflow:auto; border:1px solid #ddd; margin-top:.5rem; background:#fff; position:relative; z-index:40;">
+        <input type="text" id="search_name" placeholder="Search by product name">
+        <div id="search-results" style="display:none; max-height:260px; overflow:auto; border:1px solid #e5e7eb; margin-top:.5rem; background:#fff; position:relative; z-index:40; border-radius:12px;">
           <!-- results or loading state injected here -->
         </div>
 
-        <div id="selected-product" style="display:none; margin-top:.5rem; padding:.5rem; border:1px solid #e5e7eb; border-radius:6px; background:#fff; color:#000;"></div>
+        <div id="selected-product" style="display:none; margin-top:.5rem; padding:.75rem; border:1px solid #e5e7eb; border-radius:12px; background:#fff; color:#000;"></div>
 
         <label for="barcode">Selected barcode</label>
         <input type="text" name="barcode" id="barcode" placeholder="3017620422003">
@@ -69,8 +87,8 @@
           <button type="button" class="section-btn" data-section="Snack">Snack</button>
         </div>
 
-        <p class="muted">Wenn das Produkt bereits im Kuehlschrank liegt, wird die Menge dort automatisch abgezogen.</p>
-        <input type="submit" value="Log">
+        <p class="muted">If the product exists in your fridge, the same amount is deducted automatically.</p>
+        <input type="submit" value="Log meal">
       </form>
     </article>
 
@@ -175,7 +193,7 @@
 
       function setLoading(){
         results.style.display='block';
-        results.innerHTML = `<div class="loading" style="padding:.6rem; color:#555; display:flex; gap:.5rem; align-items:center;"><div class="spinner" style="width:14px;height:14px;border:2px solid #ccc;border-top-color:#333;border-radius:50%;animation:spin 1s linear infinite"></div><div>Suche...</div></div>`;
+        results.innerHTML = `<div class="loading" style="padding:.75rem; color:#555; display:flex; gap:.6rem; align-items:center;"><div class="spinner" style="width:14px;height:14px;border:2px solid #d1d5db;border-top-color:#16a34a;border-radius:50%;animation:spin 1s linear infinite"></div><div>Produkte werden gesucht…</div></div>`;
       }
 
       function render(items){
@@ -183,7 +201,7 @@
         if(!items || items.length === 0){ results.style.display='none'; results.innerHTML=''; selectedDiv.style.display='none'; return; }
         results.style.display='block';
         results.innerHTML = items.map((i, idx) => `
-          <div class="search-item" data-idx="${idx}" style="padding:.5rem; border-bottom:1px solid #f0f0f0; cursor:pointer;">
+          <div class="search-item" data-idx="${idx}" style="padding:.65rem .75rem; border-bottom:1px solid #f3f4f6; cursor:pointer;">
             <strong>${i.name || '(no name)'}</strong> — <span class="muted">${i.brand || ''}</span><br>
             <small>Barcode: ${i.barcode || ''} · ${i.kcal_per_100g || ''} kcal/100g</small>
           </div>
@@ -259,7 +277,7 @@
           .then((data)=>{ currentController = null; render(data); })
           .catch((err)=>{
             if(err && err.name === 'AbortError') return; // ignore aborts
-            results.innerHTML = `<div style="padding:.6rem;color:#666;">Fehler bei der Suche</div>`;
+            results.innerHTML = `<div style="padding:.75rem;color:#666;">Fehler bei der Suche</div>`;
           });
       }
 

@@ -121,3 +121,16 @@ def get_recent_events(days: int = 30, limit: int = 50) -> List[Dict]:
         (_iso(since), limit),
     ).fetchall()
     return [_row_to_dict(r) for r in rows]
+
+
+def list_consumption_log(days: int = 30, limit: int = 100) -> List[Dict]:
+    """Convenience wrapper returning recent consumption/refill events.
+
+    Returns up to `limit` recent events from the last `days` days.
+    """
+    return get_recent_events(days=days, limit=limit)
+
+
+def get_consumption_for_product(product_id: int, days: int = 30) -> List[Dict]:
+    """Convenience wrapper returning history for a single product."""
+    return get_consumption_history(product_id, days=days)

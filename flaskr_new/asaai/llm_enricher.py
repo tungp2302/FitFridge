@@ -19,11 +19,132 @@ import json
 from typing import Optional
 
 from .ollama_client import generate_from_ollama
+from .recipe_matcher import _is_protein_source, _normalize_text
 
 from .macro_calculator import (
     calculate_recipe_macros,
     rank_by_daily_goal,
 )
+
+
+def build_freestyle_recipe_prompt(fridge_items, daily_goal=None):
+    """Build a strict JSON prompt for one realistic fridge-based recipe."""
+    protein_items = [
+        item.get("name", "") for item in fridge_items if _is_protein_source(item.get("name", ""))
+    ]
+    payload = {
+        "fridge_items": [item.get("name", "") for item in fridge_items],
+        "fridge_protein_items": protein_items,
+        "daily_goal_remaining": daily_goal or {},
+    }
+
+    return (
+        "Du bist ein realistischer Rezept-Generator für FitFridge. "
+        "Erfinde GENAU EIN Rezept, das stark auf den vorhandenen Kühlschrank-Inhalt basiert. "
+        "Bevorzuge Proteinquellen im Kühlschrank, dann Gemüse und Sättigungsbeilagen. "
+        "Erfunde keine exotischen Zutaten, wenn eine einfachere Variante möglich ist. "
+        "Nutze höchstens 3 Pantry-Staples wie Öl, Salz, Pfeffer, Zwiebel, Knoblauch. "
+        "Wenn ein Proteinziel vorhanden ist, priorisiere proteinreiche Hauptzutaten und formuliere das Rezept entsprechend. "
+        "Antworte ausschließlich als valides JSON-Objekt ohne Markdown, ohne Listen außerhalb des JSON und ohne Zusatztext.\n\n"
+        "JSON-Schema:\n"
+        "{\n"
+        '  "title": "string",\n'
+        '  "why_this_works": "string",\n'
+        '  "ingredients": ["string"],\n'
+        '  "instructions": ["string"],\n'
+        '  "estimated_macros": {"kcal": number, "protein": number, "fat": number, "carbs": number},\n'
+        '  "used_fridge_items": ["string"],\n'
+        '  "pantry_assumptions": ["string"]\n'
+        "}\n\n"
+        f"Daten:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
+    )
+
+
+def generate_freestyle_recipe(
+    fridge_items,
+    daily_goal=None,
+    model=None,
+    base_url=None,
+    timeout=120,
+):
+    """Generate one realistic recipe from fridge contents only."""
+    if not fridge_items:
+        return {
+            "recipe": {
+                "title": "No ingredients available",
+                "why_this_works": "Dein Kühlschrank ist leer.",
+                "ingredients": [],
+                "instructions": ["Add ingredients to your fridge first."],
+                "estimated_macros": {"kcal": 0, "protein": 0, "fat": 0, "carbs": 0},
+                "used_fridge_items": [],
+                "pantry_assumptions": [],
+            },
+            "prompt_used": "",
+            "raw_response": "",
+        }
+
+    prompt = build_freestyle_recipe_prompt(fridge_items, daily_goal)
+    try:
+        response = generate_from_ollama(
+            prompt=prompt,
+            model=model,
+            base_url=base_url,
+            timeout=timeout,
+            num_predict=650,
+        )
+    except Exception as exc:
+        return {
+            "recipe": {
+                "title": "LLM unavailable",
+                "why_this_works": f"LLM error: {exc}",
+                "ingredients": [],
+                "instructions": ["Try again when Ollama is running."],
+                "estimated_macros": {"kcal": 0, "protein": 0, "fat": 0, "carbs": 0},
+                "used_fridge_items": [item.get("name", "") for item in fridge_items],
+                "pantry_assumptions": [],
+            },
+            "prompt_used": prompt,
+            "raw_response": "",
+        }
+
+    parsed = _parse_json_response(response)
+    if parsed is None:
+        parsed = {
+            "title": "Fridge freestyle recipe",
+            "why_this_works": "The model returned unstructured text.",
+            "ingredients": [],
+            "instructions": [response.strip()],
+            "estimated_macros": {"kcal": 0, "protein": 0, "fat": 0, "carbs": 0},
+            "used_fridge_items": [item.get("name", "") for item in fridge_items],
+            "pantry_assumptions": [],
+        }
+
+    return {
+        "recipe": parsed,
+        "prompt_used": prompt,
+        "raw_response": response,
+    }
+
+
+def _parse_json_response(text):
+    """Best-effort JSON parsing for LLM output."""
+    if not text:
+        return None
+    stripped = text.strip()
+    try:
+        return json.loads(stripped)
+    except Exception:
+        pass
+
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+
+    try:
+        return json.loads(stripped[start : end + 1])
+    except Exception:
+        return None
 
 
 def build_enricher_prompt(matches, fridge_items, daily_goal=None):
@@ -44,14 +165,23 @@ def build_enricher_prompt(matches, fridge_items, daily_goal=None):
         str: Vollständiger Prompt für Ollama
     """
     # Daten kompakt zusammenfassen (LLM mag knappe Inputs)
+    protein_items = [
+        item.get("name") for item in fridge_items if _is_protein_source(item.get("name", ""))
+    ]
+
     payload = {
         "fridge_items": [item.get("name", "") for item in fridge_items],
+        "fridge_protein_items": protein_items,
         "matches": [
             {
                 "name": m["recipe"]["name"],
                 "score": m["match_score"],
-                "available": m["available"],
-                "missing": m["missing"],
+                "available": m.get("available", []),
+                "available_protein_sources": m.get("available_protein_sources", []),
+                "missing": m.get("missing", []),
+                "est_protein": m.get("est_protein"),
+                "est_kcal": m.get("est_kcal"),
+                "protein_per_100kcal": m.get("protein_per_100kcal"),
             }
             for m in matches
         ],

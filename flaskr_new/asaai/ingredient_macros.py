@@ -84,6 +84,10 @@ INGREDIENT_DB = {
     "peas": {"kcal_per_100g": 81, "protein_per_100g": 5.4, "fat_per_100g": 0.4, "carbs_per_100g": 14.0},
     "corn": {"kcal_per_100g": 86, "protein_per_100g": 3.2, "fat_per_100g": 1.2, "carbs_per_100g": 19.0},
 
+    # === Obst ===
+    "banana": {"kcal_per_100g": 89, "protein_per_100g": 1.1, "fat_per_100g": 0.3, "carbs_per_100g": 22.8},
+    "bananas": {"kcal_per_100g": 89, "protein_per_100g": 1.1, "fat_per_100g": 0.3, "carbs_per_100g": 22.8},
+
     # === Hülsenfrüchte ===
     "beans": {"kcal_per_100g": 127, "protein_per_100g": 8.7, "fat_per_100g": 0.5, "carbs_per_100g": 23.0},
     "lentils": {"kcal_per_100g": 116, "protein_per_100g": 9.0, "fat_per_100g": 0.4, "carbs_per_100g": 20.0},
