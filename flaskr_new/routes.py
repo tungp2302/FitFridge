@@ -347,6 +347,36 @@ def api_products_search():
     return jsonify(reduced)
 
 
+@bp.route("/api/products/ai")
+@login_required
+def api_products_ai():
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify({})
+
+    try:
+        from .openfoodfacts_client import ai_estimate
+
+        prod = ai_estimate(q)
+    except Exception:
+        prod = None
+
+    if not prod:
+        return jsonify({})
+
+    reduced = {
+        "name": prod.get("name"),
+        "brand": prod.get("brand"),
+        "barcode": prod.get("barcode"),
+        "kcal_per_100g": prod.get("kcal_per_100g"),
+        "protein_per_100g": prod.get("protein_per_100g"),
+        "fat_per_100g": prod.get("fat_per_100g"),
+        "carbs_per_100g": prod.get("carbs_per_100g"),
+        "ai": True,
+    }
+    return jsonify(reduced)
+
+
 @bp.route("/fridge/<int:item_id>/delete", methods=("POST",))
 @login_required
 def delete_product(item_id):

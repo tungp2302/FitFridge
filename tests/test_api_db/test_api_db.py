@@ -184,6 +184,18 @@ def test_lookup_product_prefers_raw_banana_over_snack(monkeypatch):
     assert result["protein_per_100g"] == 1.1
 
 
+def test_search_products_returns_ai_entry_for_german_primary_food(monkeypatch):
+    monkeypatch.setattr(ofc, "_llm_ai_product_metadata", lambda query, canonical: {"display_name": "Banane", "why": "Grundnahrungsmittel"})
+    monkeypatch.setattr(ofc, "urlopen", lambda *args, **kwargs: _FakeResponse({"products": []}))
+
+    results = ofc.search_products("Banane")
+
+    assert results
+    assert results[0]["name"] == "Banane"
+    assert results[0]["brand"] == "FitFridge AI"
+    assert results[0]["barcode"] == "ingredient:banana"
+
+
 def test_freestyle_recipe_endpoint_returns_recipe(app, monkeypatch):
     from flaskr_new.asaai import routes_asaai
 

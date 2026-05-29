@@ -93,19 +93,60 @@ def generate_freestyle_recipe(
             num_predict=650,
         )
     except Exception as exc:
-        return {
-            "recipe": {
-                "title": "LLM unavailable",
-                "why_this_works": f"LLM error: {exc}",
-                "ingredients": [],
-                "instructions": ["Try again when Ollama is running."],
-                "estimated_macros": {"kcal": 0, "protein": 0, "fat": 0, "carbs": 0},
-                "used_fridge_items": [item.get("name", "") for item in fridge_items],
-                "pantry_assumptions": [],
-            },
-            "prompt_used": prompt,
-            "raw_response": "",
-        }
+        # Ollama not available — provide a deterministic fallback recipe
+        try:
+            from .ingredient_macros import lookup_ingredient
+
+            # Select up to 3 fridge items to form a simple recipe
+            selected = [item.get("name", "") for item in fridge_items][:3]
+            title = " + ".join([s for s in selected if s]) or "Simple Fridge Meal"
+
+            # Build simple instructions
+            instr = []
+            if selected:
+                instr.append(f"Prepare the following ingredients: {', '.join(selected)}.")
+                instr.append("Season with salt and pepper and heat a pan with a little oil.")
+                instr.append("Cook protein source first (if present) until done, then add vegetables and warm through.")
+                instr.append("Serve hot.")
+            else:
+                instr = ["No ingredients available. Add items to your fridge first."]
+
+            # Estimate macros by summing curated ingredient macros (100g each fallback)
+            est = {"kcal": 0.0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
+            for name in selected:
+                macros = lookup_ingredient(name) or {}
+                est["kcal"] += float(macros.get("kcal_per_100g", 0.0))
+                est["protein"] += float(macros.get("protein_per_100g", 0.0))
+                est["fat"] += float(macros.get("fat_per_100g", 0.0))
+                est["carbs"] += float(macros.get("carbs_per_100g", 0.0))
+
+            return {
+                "recipe": {
+                    "title": title,
+                    "why_this_works": f"Fallback recipe using available fridge items ({len(selected)} used). LLM unavailable: {exc}",
+                    "ingredients": selected,
+                    "instructions": instr,
+                    "estimated_macros": {k: round(v, 1) for k, v in est.items()},
+                    "used_fridge_items": selected,
+                    "pantry_assumptions": ["oil", "salt", "pepper"],
+                },
+                "prompt_used": prompt,
+                "raw_response": "",
+            }
+        except Exception:
+            return {
+                "recipe": {
+                    "title": "LLM unavailable",
+                    "why_this_works": f"LLM error: {exc}",
+                    "ingredients": [],
+                    "instructions": ["Try again when Ollama is running."],
+                    "estimated_macros": {"kcal": 0, "protein": 0, "fat": 0, "carbs": 0},
+                    "used_fridge_items": [item.get("name", "") for item in fridge_items],
+                    "pantry_assumptions": [],
+                },
+                "prompt_used": prompt,
+                "raw_response": "",
+            }
 
     parsed = _parse_json_response(response)
     if parsed is None:

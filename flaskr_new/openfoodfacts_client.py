@@ -7,12 +7,11 @@ import json
 import re
 import ssl
 import time
+import unicodedata
 from typing import Optional, Tuple, Dict
 from urllib.parse import quote
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-
-from .ollama_client import generate_from_ollama
 
 try:
     import certifi
@@ -87,30 +86,45 @@ PRIMARY_FOOD_KEYWORDS = {
 }
 
 
-GERMAN_FOOD_ALIASES = {
+PRIMARY_FOOD_ALIASES = {
+    # German -> English primary foods
     "banane": "banana",
+    "bananen": "banana",
+    "apfel": "apple",
+    "birne": "pear",
+    "orange": "orange",
+    "traube": "grape",
+    "trauben": "grape",
     "hahnchen": "chicken",
-    "haehnchen": "chicken",
-    "hahnchenschenkel": "chicken thigh",
-    "haehnchenschenkel": "chicken thigh",
+    "huhnchen": "chicken",
     "huhn": "chicken",
-    "huhnerbrust": "chicken breast",
-    "rindfleisch": "beef",
+    "hahnchenschenkel": "chicken thigh",
+    "huhnerschenkel": "chicken thigh",
     "rind": "beef",
+    "rindfleisch": "beef",
+    "schwein": "pork",
     "schweinefleisch": "pork",
-    "reis": "rice",
+    "lachs": "salmon",
+    "thunfisch": "tuna",
+    "garnelen": "shrimp",
+    "garnele": "shrimp",
+    "brokkoli": "broccoli",
+    "karotte": "carrot",
+    "mohre": "carrot",
     "zwiebel": "onion",
     "zwiebeln": "onion",
     "knoblauch": "garlic",
     "kartoffel": "potato",
-    "kartoffeln": "potatoes",
-    "brokkoli": "broccoli",
-    "tomate": "tomato",
-    "tomaten": "tomatoes",
-    "gurke": "cucumber",
-    "karotte": "carrot",
-    "eier": "eggs",
+    "kartoffeln": "potato",
+    "reis": "rice",
+    "nudeln": "pasta",
+    "nudel": "pasta",
     "ei": "egg",
+    "eier": "egg",
+    "tomate": "tomato",
+    "tomaten": "tomato",
+    "gurke": "cucumber",
+    "spinat": "spinach",
 }
 
 
@@ -131,32 +145,29 @@ def _float_value(value, default: float = 0.0) -> float:
 
 
 def _normalize_text(value: str) -> str:
-    text = str(value or "").lower().strip()
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = text.encode("ascii", "ignore").decode("ascii")
+    text = text.lower().strip()
     text = re.sub(r"[^a-z0-9\s]", " ", text)
     return " ".join(text.split())
 
 
-def _normalize_query_key(query: str) -> str:
+def _canonical_primary_query(query: str) -> str:
     normalized = _normalize_text(query)
     if not normalized:
         return ""
 
-    mapped = GERMAN_FOOD_ALIASES.get(normalized)
+    mapped = PRIMARY_FOOD_ALIASES.get(normalized)
     if mapped:
         return mapped
 
     tokens = normalized.split()
-    if tokens:
-        mapped_tokens = [GERMAN_FOOD_ALIASES.get(token, token) for token in tokens]
-        joined = " ".join(mapped_tokens).strip()
-        if joined:
-            return joined
-
-    return normalized
+    mapped_tokens = [PRIMARY_FOOD_ALIASES.get(token, token) for token in tokens]
+    return " ".join(mapped_tokens)
 
 
 def _is_primary_food_query(query: str) -> bool:
-    normalized = _normalize_query_key(query)
+    normalized = _canonical_primary_query(query)
     if not normalized:
         return False
     from .asaai.ingredient_macros import lookup_ingredient
@@ -167,16 +178,49 @@ def _is_primary_food_query(query: str) -> bool:
 
 
 def _ingredient_display_name(query: str) -> str:
-    normalized = _normalize_query_key(query)
+    normalized = _normalize_text(query)
     if not normalized:
         return ""
     return " ".join(part.capitalize() for part in normalized.split())
 
 
+def _llm_ai_product_metadata(query: str, canonical_query: str) -> dict:
+    """Use Ollama to label a primary ingredient as a friendly AI entry."""
+    from .asaai.ollama_client import generate_from_ollama
+
+    prompt = (
+        "Du bist ein Produkt-Normalisierer für FitFridge. "
+        "Nimm einen Lebensmittel-Suchbegriff und gib ein kurzes JSON-Objekt zurück. "
+        "Das Produkt soll ein unverarbeitetes Grundnahrungsmittel beschreiben, nicht ein Snack oder Fertigprodukt. "
+        "Wenn der Eingabetext deutsch ist, antworte deutsch; wenn englisch, antworte englisch. "
+        "Antworte nur als JSON ohne Markdown oder Zusatztext.\n\n"
+        "JSON-Schema:\n"
+        "{\n"
+        '  "display_name": "string",\n'
+        '  "why": "string"\n'
+        "}\n\n"
+        f"Suchbegriff: {query}\n"
+        f"Canonical ingredient: {canonical_query}"
+    )
+
+    try:
+        response = generate_from_ollama(prompt=prompt, timeout=8, num_predict=140)
+    except Exception:
+        return {}
+
+    try:
+        parsed = json.loads(response.strip())
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        pass
+    return {}
+
+
 def _build_generic_ingredient_product(query: str) -> Optional[Dict]:
     from .asaai.ingredient_macros import lookup_ingredient
 
-    normalized = _normalize_query_key(query)
+    normalized = _canonical_primary_query(query)
     if not normalized:
         return None
 
@@ -184,9 +228,14 @@ def _build_generic_ingredient_product(query: str) -> Optional[Dict]:
     if nutrients is None:
         return None
 
+    llm_meta = _llm_ai_product_metadata(query, normalized)
+    display_name = _ingredient_display_name(query) or _ingredient_display_name(normalized)
+    if isinstance(llm_meta, dict):
+        display_name = llm_meta.get("display_name") or display_name
+
     return {
-        "name": _ingredient_display_name(normalized),
-        "brand": "",
+        "name": display_name,
+        "brand": "FitFridge AI",
         "barcode": f"ingredient:{normalized}",
         "kcal_per_100g": float(nutrients.get("kcal_per_100g", 0.0)),
         "protein_per_100g": float(nutrients.get("protein_per_100g", 0.0)),
@@ -196,59 +245,19 @@ def _build_generic_ingredient_product(query: str) -> Optional[Dict]:
         "total_amount": 100.0,
         "unit": "g",
         "raw_quantity": "100 g",
-        "raw_product": {"ingredient_source": True, "query": normalized},
+        "raw_product": {
+            "ingredient_source": True,
+            "ai_generated": True,
+            "query": _normalize_text(query),
+            "canonical_query": normalized,
+            "ai_note": llm_meta.get("why") if isinstance(llm_meta, dict) else "",
+        },
     }
-
-
-def _build_ai_ingredient_product(query: str) -> Optional[Dict]:
-    """Generate a single AI ingredient entry for primary-food queries."""
-    normalized = _normalize_query_key(query)
-    if not normalized:
-        return None
-
-    generic = _build_generic_ingredient_product(normalized)
-    if generic is None:
-        return None
-
-    prompt = (
-        "Du bist ein Produkt-Assistent für FitFridge. "
-        "Erzeuge aus dem Suchbegriff eine kurze, klare Bezeichnung für eine rohe Lebensmittel-Zutat. "
-        "Antworte als JSON mit den Feldern name und brand. "
-        "name soll nur der Lebensmittelname sein, brand soll kurz 'AI Ingredient' sein. "
-        f"Suchbegriff: {query}\n"
-        f"Normierter Lebensmittelname: {generic['name']}"
-    )
-
-    ai_name = generic["name"]
-    ai_brand = "AI Ingredient"
-
-    try:
-        response = generate_from_ollama(prompt, timeout=20, num_predict=80)
-        data = json.loads(response.strip())
-        if isinstance(data, dict):
-            name = str(data.get("name") or "").strip()
-            brand = str(data.get("brand") or "").strip()
-            if name:
-                ai_name = name
-            if brand:
-                ai_brand = brand
-    except Exception:
-        pass
-
-    generic["name"] = ai_name
-    generic["brand"] = ai_brand
-    generic["barcode"] = f"ai:{normalized}"
-    generic["raw_product"] = {
-        "ingredient_source": True,
-        "ai_generated": True,
-        "query": normalized,
-    }
-    return generic
 
 
 def _score_off_product(query: str, product: dict) -> float:
     """Prefer raw ingredients over branded/processed products for food queries."""
-    normalized_query = _normalize_text(query)
+    normalized_query = _canonical_primary_query(query)
     name = _normalize_text(product.get("name", ""))
     brand = _normalize_text(product.get("brand", ""))
     raw = product.get("raw_product") or {}
@@ -443,9 +452,6 @@ def lookup_product(query: str, user_agent: str = DEFAULT_USER_AGENT, use_staging
     if query.isdigit():
         return search_product(query, user_agent=user_agent, use_staging=use_staging)
 
-    if query.startswith("ai:") or query.startswith("ingredient:"):
-        return _build_ai_ingredient_product(query.split(":", 1)[1]) or _build_generic_ingredient_product(query)
-
     generic = _build_generic_ingredient_product(query)
 
     products = search_products(query, user_agent=user_agent, use_staging=use_staging, limit=10)
@@ -459,7 +465,7 @@ def lookup_product(query: str, user_agent: str = DEFAULT_USER_AGENT, use_staging
     best = ranked[0]
     if generic is not None and _is_primary_food_query(query):
         if _score_off_product(query, best) < 70:
-            return _build_ai_ingredient_product(query) or generic
+            return generic
 
     return best
 
@@ -521,10 +527,9 @@ def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_stagin
         if full:
             results.append(full)
 
-    if _is_primary_food_query(query):
-        ai_entry = _build_ai_ingredient_product(query)
-        if ai_entry is not None:
-            results.insert(0, ai_entry)
+    generic = _build_generic_ingredient_product(query)
+    if generic is not None and _is_primary_food_query(query):
+        results.insert(0, generic)
 
     ranked = _rank_off_products(query, results)
 
@@ -532,3 +537,57 @@ def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_stagin
         ranked = ranked[:limit]
 
     return ranked
+
+
+def ai_estimate(query: str) -> Optional[dict]:
+    """Return an AI-generated estimate for a primary ingredient.
+
+    Always attempts to provide a generic ingredient entry. If a curated
+    nutrient lookup exists, it will be returned. Otherwise the function
+    will still return a minimal AI-labelled product object (with zeros)
+    so the frontend can offer an "AI estimate" choice.
+    """
+    if not query:
+        return None
+
+    # Prefer the richer generic product when available
+    try:
+        generic = _build_generic_ingredient_product(query)
+    except Exception:
+        generic = None
+
+    if generic is not None:
+        return generic
+
+    # Fallback: ask the LLM for a friendly display name and note
+    try:
+        canonical = _canonical_primary_query(query)
+    except Exception:
+        canonical = _normalize_text(query)
+
+    try:
+        llm_meta = _llm_ai_product_metadata(query, canonical) or {}
+    except Exception:
+        llm_meta = {}
+
+    display_name = llm_meta.get("display_name") or _ingredient_display_name(query) or query
+
+    return {
+        "name": display_name,
+        "brand": "FitFridge AI",
+        "barcode": f"ingredient:{_normalize_text(query)}",
+        "kcal_per_100g": 0.0,
+        "protein_per_100g": 0.0,
+        "fat_per_100g": 0.0,
+        "carbs_per_100g": 0.0,
+        "sugar_per_100g": 0.0,
+        "total_amount": 100.0,
+        "unit": "g",
+        "raw_quantity": "100 g",
+        "raw_product": {
+            "ai_generated": True,
+            "query": _normalize_text(query),
+            "canonical_query": canonical,
+            "ai_note": llm_meta.get("why") or "",
+        },
+    }

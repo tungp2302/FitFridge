@@ -48,7 +48,7 @@
         results.style.display='block';
         results.innerHTML = items.map((i, idx) => `
           <div class="search-item" data-idx="${idx}" style="padding:.5rem; border-bottom:1px solid #f0f0f0; cursor:pointer;">
-            <strong>${i.name || '(no name)'}</strong> — <span class="muted">${i.brand || ''}</span><br>
+            <strong>${i.name || '(no name)'}${i.ai? ' — <em style="color:#0b6;">AI estimate</em>': ''}</strong> — <span class="muted">${i.brand || ''}</span><br>
             <small>Barcode: ${i.barcode || ''} · ${i.kcal_per_100g || ''} kcal/100g</small>
           </div>
         `).join('');
@@ -70,10 +70,18 @@
         if(timer) clearTimeout(timer);
         if(q.length < 2){ results.style.display='none'; results.innerHTML=''; createAnyway.style.display='none'; return; }
         timer = setTimeout(()=>{
-          fetch(`/api/products/search?q=${encodeURIComponent(q)}`)
-            .then(r=>r.json())
-            .then(render)
-            .catch(()=>{ results.style.display='none'; createAnyway.style.display='inline-block'; });
+          // Fetch both AI estimate and OpenFoodFacts/local search in parallel
+          const aiReq = fetch(`/api/products/ai?q=${encodeURIComponent(q)}`).then(r=>r.json()).catch(()=>({}));
+          const apiReq = fetch(`/api/products/search?q=${encodeURIComponent(q)}`).then(r=>r.json()).catch(()=>([]));
+          Promise.all([aiReq, apiReq]).then(([aiItem, items])=>{
+            // If AI returned a non-empty object, insert it as first element and mark it
+            const combined = [];
+            if(aiItem && Object.keys(aiItem).length){ aiItem.ai = true; combined.push(aiItem); }
+            if(Array.isArray(items)) combined.push(...items);
+            // If nothing found, show create anyway and make AI visible if present
+            if(combined.length === 0){ results.style.display='none'; results.innerHTML=''; createAnyway.style.display='inline-block'; return; }
+            render(combined);
+          }).catch(()=>{ results.style.display='none'; createAnyway.style.display='inline-block'; });
         }, 250);
       });
 
@@ -83,22 +91,22 @@
         const q = input.value.trim();
         if(!q){ return; }
         setLoadingState(true);
-        fetch(`/api/products/search?q=${encodeURIComponent(q)}`)
-          .then(r=>r.json())
-          .then(items=>{
-            if(!items || items.length === 0){
-              // no matches -> proceed to create using current query
-              form.submit();
-              return;
-            }
-            // show matches for selection
-            setLoadingState(false);
-            render(items);
-          })
-          .catch(()=>{
-            // on error, allow creation
+        // On submit, fetch AI estimate + search; if either yields options show them, otherwise proceed to create
+        const aiReq = fetch(`/api/products/ai?q=${encodeURIComponent(q)}`).then(r=>r.json()).catch(()=>({}));
+        const apiReq = fetch(`/api/products/search?q=${encodeURIComponent(q)}`).then(r=>r.json()).catch(()=>([]));
+        Promise.all([aiReq, apiReq]).then(([aiItem, items])=>{
+          const combined = [];
+          if(aiItem && Object.keys(aiItem).length){ aiItem.ai = true; combined.push(aiItem); }
+          if(Array.isArray(items)) combined.push(...items);
+          if(!combined || combined.length === 0){
+            // no matches -> proceed to create using current query
             form.submit();
-          });
+            return;
+          }
+          // show matches for selection
+          setLoadingState(false);
+          render(combined);
+        }).catch(()=>{ form.submit(); });
       });
 
       // 'Create anyway' button: submit form using current query
