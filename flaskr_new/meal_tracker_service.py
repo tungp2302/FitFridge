@@ -5,7 +5,7 @@ from typing import Dict
 
 from . import fridge_repo, product_repo
 from .fridge_service import update_dashboard_item
-from .meal_tracker_repo import DEFAULT_SETTINGS, add_meal_entry, get_recent_meals, get_settings, get_today_totals, save_settings
+from .meal_tracker_repo import DEFAULT_SETTINGS, add_meal_entry, delete_meal_entry, get_recent_meals, get_settings, get_today_totals, save_settings
 from .nutrition_service import calculate_for_amount
 from .openfoodfacts_client import lookup_product
 
@@ -167,6 +167,7 @@ def log_meal_from_product(user_id: int, product: Dict, amount: float, unit: str,
 
 __all__ = [
     "add_meal_entry",
+    "delete_meal_entry",
     "build_daily_summary",
     "log_meal_from_product",
     "normalize_macro_percentages",

@@ -2,8 +2,7 @@
 {% block title %}ASaAI Hub{% endblock %}
 {% block content %}
 <div class="container mt-4">
-  <h1>ASaAI — Demo-Hub</h1>
-  <p>Ein Klick zu allen KI-Funktionen. Keine URLs merken, einfach ausprobieren.</p>
+  <h1>ASaAI Hub</h1>
 
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:1rem;">
     <button id="btn-match" class="btn">Rezept-Treffer</button>
@@ -11,7 +10,7 @@
     <button id="btn-nutrition" class="btn">Ernährungs-Check</button>
     <button id="btn-forecast" class="btn">Verbrauchsprognose</button>
     <button id="btn-shopping" class="btn">Einkaufsplaner</button>
-    <a class="link-button" href="{{ url_for('asaai.planner_ui') }}">Rezeptplaner</a>
+    <a class="link-button" href="{{ url_for('frontend.asaai_insight') }}">ASaAI Einblick</a>
     <button id="btn-all" class="btn">Alles ausführen</button>
   </div>
 
@@ -37,7 +36,7 @@ function setBusy(id, busy){
   const btn = document.getElementById(id);
   if(!btn) return;
   btn.disabled = busy;
-  btn.textContent = busy ? 'Loading...' : btn.dataset.label;
+  btn.textContent = busy ? 'Lädt...' : btn.dataset.label;
 }
 
 function formatInfinity(value){
@@ -45,7 +44,7 @@ function formatInfinity(value){
 }
 
 function summarizeForecast(forecasts){
-  if(!Array.isArray(forecasts) || forecasts.length === 0) return 'Keine Forecast-Daten verfügbar.';
+  if(!Array.isArray(forecasts) || forecasts.length === 0) return 'Keine Prognosedaten verfügbar.';
   return forecasts.map(item => {
     const days = formatInfinity(item.days_until_empty);
     return `${item.name} — ${days} Tage bis leer`;
@@ -55,13 +54,13 @@ function summarizeForecast(forecasts){
 async function fetchMatch(){
   const el = document.getElementById('out-match');
   setBusy('btn-match', true);
-  el.textContent = 'Loading...';
+  el.textContent = 'Lädt...';
   try{
     const r = await fetch('/asaai/recipes/match-only');
     const j = await r.json();
     if(j.matches && j.matches.length){
-      el.textContent = j.matches.slice(0,5).map(m=>`${m.recipe.name} — score ${Math.round((m.match_score||0)*100)/100}\nMissing: ${ (m.missing||[]).slice(0,5).join(', ') }`).join('\n\n');
-    } else el.textContent = 'No matches found.';
+      el.textContent = j.matches.slice(0,5).map(m=>`${m.recipe.name} — Punktzahl ${Math.round((m.match_score||0)*100)/100}\nFehlt: ${ (m.missing||[]).slice(0,5).join(', ') }`).join('\n\n');
+    } else el.textContent = 'Keine Treffer gefunden.';
   }catch(e){ el.textContent = 'Fehler beim Laden: '+e }
   finally{ setBusy('btn-match', false); }
 }
@@ -69,7 +68,7 @@ async function fetchMatch(){
 async function fetchSuggest(){
   const el = document.getElementById('out-suggest');
   setBusy('btn-suggest', true);
-  el.textContent = 'Loading...';
+  el.textContent = 'Lädt...';
   try{
     const r = await fetch('/asaai/recipes/suggest', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({daily_goal:{protein:30,kcal:2000}})});
     const j = await r.json();
@@ -81,7 +80,7 @@ async function fetchSuggest(){
 async function fetchNutrition(){
   const el = document.getElementById('out-nutrition');
   setBusy('btn-nutrition', true);
-  el.textContent = 'Loading...';
+  el.textContent = 'Lädt...';
   try{
     const r = await fetch('/asaai/insights/nutrition');
     const j = await r.json();
@@ -93,7 +92,7 @@ async function fetchNutrition(){
 async function fetchForecast(){
   const el = document.getElementById('out-forecast');
   setBusy('btn-forecast', true);
-  el.textContent = 'Loading...';
+  el.textContent = 'Lädt...';
   try{
     const r = await fetch('/asaai/forecast');
     const j = await r.json();
@@ -105,7 +104,7 @@ async function fetchForecast(){
 async function fetchShopping(){
   const el = document.getElementById('out-shopping');
   setBusy('btn-shopping', true);
-  el.textContent = 'Loading...';
+  el.textContent = 'Lädt...';
   try{
     const r = await fetch('/asaai/shopping/list');
     const j = await r.json();

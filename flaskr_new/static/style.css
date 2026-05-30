@@ -210,6 +210,25 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   margin-bottom: 1.5rem;
 }
 
+.today-dashboard__actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.today-text-button,
+.today-inline-text-button{
+  background:transparent;
+  color:#111827;
+  box-shadow:none;
+  padding:0;
+  min-width:0;
+  font-size:1rem;
+  font-weight:700;
+}
+
+.today-inline-text-button{font-size:.95rem}
+
 .today-dashboard__body{
   display:grid;
   gap:1.5rem;
@@ -313,7 +332,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   height:20px;
   border-radius:999px;
   background:#d8d8d8;
-  overflow:hidden;
+  overflow:visible;
   position:relative;
 }
 
@@ -433,6 +452,309 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   color:#111827;
 }
 
+.tab-switch{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:8px;
+  margin-bottom:14px;
+  padding:6px;
+  background:#f3f4f6;
+  border-radius:18px;
+}
+
+.tab-switch__button{
+  background:transparent;
+  color:#374151;
+  border-radius:14px;
+  padding:11px 12px;
+}
+
+.tab-switch__button.is-active{
+  background:#ffffff;
+  color:#111827;
+  box-shadow:0 8px 18px rgba(15,23,42,.08);
+}
+
+.add-panel{display:none;}
+.add-panel.is-active{display:block;}
+
+.fridge-panel-scroll{
+  max-height:min(58vh, 560px);
+  overflow-y:auto;
+  padding-right:4px;
+}
+
+.pending-items{
+  display:grid;
+  gap:10px;
+  margin:10px 0 14px;
+}
+
+.pending-items__empty{
+  padding:10px 0 4px;
+}
+
+.pending-item{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  padding:12px 14px;
+  border-radius:16px;
+  background:#f8fafc;
+  border:1px solid #e5e7eb;
+}
+
+.pending-item__main{min-width:0}
+
+.pending-item__meta{
+  margin-top:4px;
+  color:#6b7280;
+  font-size:.92rem;
+}
+
+.pending-item__controls{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-shrink:0;
+}
+
+.pending-item__field{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+
+.pending-item__field label{
+  color:#6b7280;
+  font-size:.74rem;
+  font-weight:700;
+  text-transform:lowercase;
+}
+
+.pending-item__amount{
+  width:84px;
+  margin-bottom:0;
+}
+
+.pending-item__remaining{
+  width:84px;
+  margin-bottom:0;
+}
+
+.clear-x-button{
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:#eef2f7;
+  color:#111827;
+  padding:0;
+  font-size:1.25rem;
+  line-height:1;
+  box-shadow:none;
+}
+
+.search-row{
+  display:grid;
+  grid-template-columns:minmax(0, 1fr) auto;
+  gap:10px;
+  align-items:start;
+}
+
+.search-action-button{
+  white-space:nowrap;
+  height:46px;
+}
+
+.search-results-panel{
+  margin-top:8px;
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  background:#fff;
+  max-height:240px;
+  overflow:auto;
+}
+
+.search-item{
+  border-bottom:1px solid #f3f4f6;
+  padding:12px 14px;
+  cursor:pointer;
+}
+
+.search-item:last-child{border-bottom:none}
+
+.search-item__top,
+.selected-product-panel__title,
+.today-food-card__side{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.search-item__badge,
+.selected-product-panel__badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:4px 8px;
+  border-radius:999px;
+  font-size:.76rem;
+  font-weight:800;
+  letter-spacing:.02em;
+}
+
+.search-item__badge.is-ai,
+.selected-product-panel__badge.is-ai{
+  background:#dcfce7;
+  color:#15803d;
+}
+
+.search-item__badge.is-off,
+.selected-product-panel__badge.is-off{
+  background:#e2e8f0;
+  color:#334155;
+}
+
+.search-item__brand{margin-top:4px}
+
+.search-item small{color:#6b7280}
+
+.selected-product-panel{
+  margin-top:10px;
+  padding:12px 14px;
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  background:#fff;
+}
+
+.selected-product-panel__title{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:flex-start;
+}
+
+.selected-product-panel__meta{
+  margin-top:4px;
+  color:#6b7280;
+  font-size:.95rem;
+}
+
+.selected-product-panel__actions{
+  display:flex;
+  gap:10px;
+  margin-top:10px;
+}
+
+.meal-section-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+  margin:4px 0 10px;
+}
+
+.add-modal__actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+}
+
+.fridge-picker-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(190px, 1fr));
+  gap:12px;
+}
+
+.fridge-picker-card{
+  border:1px solid #e5e7eb;
+  border-radius:18px;
+  padding:14px;
+  background:#fff;
+}
+
+.fridge-picker-card__head{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-start;
+}
+
+.fridge-picker-card__meta{
+  margin:8px 0 10px;
+  font-size:.92rem;
+}
+
+.fridge-picker-card__form{
+  padding:0;
+  box-shadow:none;
+  background:transparent;
+}
+
+.today-foods-list{
+  display:grid;
+  gap:10px;
+}
+
+.today-food-card{
+  display:grid;
+  grid-template-columns:minmax(0, 1fr) auto;
+  gap:6px 12px;
+  align-items:center;
+  padding:14px 16px;
+  border-radius:16px;
+  background:#ffffff;
+  box-shadow:var(--shadow);
+}
+
+.today-food-card__main{min-width:0}
+
+.today-food-card__side{flex-direction:column;align-items:flex-end}
+
+.today-food-card__meta,
+.today-food-card__nutri,
+.today-food-card__kcal{
+  color:#6b7280;
+  font-size:.95rem;
+}
+
+.today-food-card__kcal{
+  color:#111827;
+  font-weight:700;
+}
+
+.today-food-card__delete-form{margin:0; padding:0; box-shadow:none; background:transparent}
+
+.today-food-card__delete{
+  width:28px;
+  height:28px;
+  font-size:1rem;
+}
+
+.fridge-overview{
+  max-width:640px;
+}
+
+.today-food-card__edit{
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:#eef2f7;
+  color:#111827;
+  padding:0;
+  font-size:.95rem;
+  line-height:1;
+  box-shadow:none;
+}
+
+.edit-amount-modal__panel{width:min(92vw, 360px)}
+
 @keyframes spin{
   from{transform:rotate(0deg)}
   to{transform:rotate(360deg)}
@@ -458,4 +780,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   .settings-modal__actions{flex-direction:column}
   .settings-modal__actions input[type=submit],
   .settings-modal__secondary{width:100%}
+  .search-row{grid-template-columns:1fr}
+  .add-modal__actions{flex-direction:column}
+  .add-modal__actions input[type=submit],
+  .add-modal__actions button{width:100%}
+  .today-food-card{grid-template-columns:1fr}
+  .today-food-card__side{align-items:flex-start}
 }

@@ -84,10 +84,8 @@ def ensure_schema() -> None:
             try:
                 db.execute(column_sql)
             except Exception:
-                # ignore if alter fails for older sqlite versions
                 pass
     db.commit()
-    
 
 
 def get_settings(user_id: int) -> Dict:
@@ -98,8 +96,7 @@ def get_settings(user_id: int) -> Dict:
     ).fetchone()
     if row is None:
         return {"user_id": user_id, **DEFAULT_SETTINGS}
-    data = dict(row)
-    return data
+    return dict(row)
 
 
 def save_settings(user_id: int, daily_kcal: float, protein_pct: float, carbs_pct: float, fat_pct: float) -> None:
@@ -119,6 +116,47 @@ def save_settings(user_id: int, daily_kcal: float, protein_pct: float, carbs_pct
             (float(daily_kcal), float(protein_pct), float(carbs_pct), float(fat_pct), _iso(_now()), user_id),
         )
     db.commit()
+
+
+def delete_meal_entry(entry_id: int, user_id: int) -> bool:
+    db = get_db()
+    result = db.execute(
+        "DELETE FROM meal_tracker_entry WHERE id = ? AND user_id = ?",
+        (entry_id, user_id),
+    )
+    db.commit()
+    return result.rowcount > 0
+
+
+def update_meal_entry_amount(entry_id: int, user_id: int, new_amount: float) -> bool:
+    db = get_db()
+    row = db.execute(
+        "SELECT amount, kcal, protein_g, carbs_g, fat_g FROM meal_tracker_entry WHERE id = ? AND user_id = ?",
+        (entry_id, user_id),
+    ).fetchone()
+    if row is None:
+        return False
+
+    old_amount = float(row["amount"] or 0.0)
+    new_amount = float(new_amount)
+    if old_amount <= 0 or new_amount <= 0:
+        return False
+
+    factor = new_amount / old_amount
+    result = db.execute(
+        "UPDATE meal_tracker_entry SET amount = ?, kcal = ?, protein_g = ?, carbs_g = ?, fat_g = ? WHERE id = ? AND user_id = ?",
+        (
+            round(new_amount, 1),
+            round(float(row["kcal"]) * factor, 1),
+            round(float(row["protein_g"]) * factor, 1),
+            round(float(row["carbs_g"]) * factor, 1),
+            round(float(row["fat_g"]) * factor, 1),
+            entry_id,
+            user_id,
+        ),
+    )
+    db.commit()
+    return result.rowcount > 0
 
 
 def add_meal_entry(
@@ -158,7 +196,6 @@ def add_meal_entry(
         db.commit()
         return cur.lastrowid
     except Exception as exc:
-        # fallback for older DBs without the section column
         if "no column named section" in str(exc).lower():
             cur = db.execute(
                 "INSERT INTO meal_tracker_entry (user_id, meal_name, product_id, barcode, amount, unit, kcal, protein_g, carbs_g, fat_g, note, eaten_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -201,3 +238,16 @@ def get_today_totals(user_id: int) -> Dict[str, float]:
         totals["carbs_g"] += float(meal.get("carbs_g", 0.0))
         totals["fat_g"] += float(meal.get("fat_g", 0.0))
     return {key: round(value, 1) for key, value in totals.items()}
+
+
+__all__ = [
+    "DEFAULT_SETTINGS",
+    "ensure_schema",
+    "get_settings",
+    "save_settings",
+    "delete_meal_entry",
+    "update_meal_entry_amount",
+    "add_meal_entry",
+    "get_recent_meals",
+    "get_today_totals",
+]

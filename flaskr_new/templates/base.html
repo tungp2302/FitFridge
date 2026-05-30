@@ -9,25 +9,22 @@
 <body>
   <div class="app-shell">
     <aside class="sidebar">
-      <a class="brand-button" href="{{ url_for('asaai.hub_ui') }}">FitFridge</a>
+      <a class="brand-button" href="{{ url_for('frontend.dashboard') }}">FitFridge</a>
       <p class="brand-copy">Deine Lebensmittel. Der Überblick.</p>
       <nav class="sidebar-nav" aria-label="Primary">
         <a href="{{ url_for('frontend.dashboard') }}">Kühlschrank</a>
-        <a href="{{ url_for('frontend.add_product') }}">Lebensmittel</a>
-        <a href="{{ url_for('frontend.meal_tracker') }}">Meal Tracker</a>
-        {% if g.user %}
-          <a href="{{ url_for('frontend.asaai_insight') }}">ASaAI Insight</a>
-        {% endif %}
+        <a href="{{ url_for('frontend.meal_tracker') }}">Mahlzeiten-Tracker</a>
+        <a href="{{ url_for('asaai.planner_ui') }}">Rezeptplaner</a>
         <a href="{{ url_for('asaai.hub_ui') }}">ASaAI Hub</a>
       </nav>
 
       <div class="sidebar-footer">
         {% if g.user %}
           <div class="user-chip">{{ g.user['username'] }}</div>
-          <a class="link-button subtle" href="{{ url_for('frontend.logout') }}">Log Out</a>
+          <a class="link-button subtle" href="{{ url_for('frontend.logout') }}">Abmelden</a>
         {% else %}
-          <a class="link-button" href="{{ url_for('frontend.register') }}">Register</a>
-          <a class="link-button subtle" href="{{ url_for('frontend.login') }}">Log In</a>
+          <a class="link-button" href="{{ url_for('frontend.register') }}">Registrieren</a>
+          <a class="link-button subtle" href="{{ url_for('frontend.login') }}">Anmelden</a>
         {% endif %}
       </div>
     </aside>

@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from flaskr_new import create_app
@@ -91,3 +93,88 @@ def test_meal_logging_deducts_from_fridge(app_context):
     assert meal_row["amount"] == 100.0
     assert meal_row["unit"] == "g"
     assert meal_row["meal_name"] == "Nutella"
+
+
+def test_meal_entry_delete_requires_matching_user(app_context):
+    entry_id = repo.add_meal_entry(1, "Snack", 120, 10, 12, 5)
+
+    assert repo.delete_meal_entry(entry_id, 2) is False
+    assert repo.delete_meal_entry(entry_id, 1) is True
+
+    remaining = db.get_db().execute("SELECT COUNT(*) AS count FROM meal_tracker_entry WHERE id = ?", (entry_id,)).fetchone()
+    assert remaining["count"] == 0
+
+
+def test_meal_tracker_route_can_delete_meal(app):
+    with app.app_context():
+        entry_id = repo.add_meal_entry(1, "Snack", 120, 10, 12, 5)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = 1
+
+        response = client.post(
+            "/meal-tracker",
+            data={"action": "delete_meal", "meal_entry_id": str(entry_id)},
+            follow_redirects=True,
+        )
+
+    assert response.status_code == 200
+    assert b"Mahlzeit geloescht." in response.data
+
+
+def test_meal_entry_amount_update_scales_nutrition(app_context):
+    entry_id = repo.add_meal_entry(1, "Pasta", 200, 10, 20, 5, amount=100, unit="g")
+
+    assert repo.update_meal_entry_amount(entry_id, 1, 150) is True
+
+    row = db.get_db().execute(
+        "SELECT amount, kcal, protein_g, carbs_g, fat_g FROM meal_tracker_entry WHERE id = ?",
+        (entry_id,),
+    ).fetchone()
+
+    assert row["amount"] == 150.0
+    assert row["kcal"] == 300.0
+    assert row["protein_g"] == 15.0
+    assert row["carbs_g"] == 30.0
+    assert row["fat_g"] == 7.5
+
+
+def test_selected_payload_remaining_is_saved_to_fridge(app):
+    payload = [
+        {
+            "name": "Mango",
+            "brand": "FitFridge AI",
+            "barcode": "ingredient:mango",
+            "kcal_per_100g": 60,
+            "protein_per_100g": 1,
+            "fat_per_100g": 0.5,
+            "carbs_per_100g": 14,
+            "unit": "g",
+            "amount": 120,
+            "remaining_amount": 80,
+        }
+    ]
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = 1
+
+        response = client.post(
+            "/meal-tracker",
+            data={"action": "track_meal", "selected_payload": json.dumps(payload)},
+            follow_redirects=True,
+        )
+
+    assert response.status_code == 200
+
+    with app.app_context():
+        row = db.get_db().execute(
+            "SELECT fi.current_amount, fi.unit, p.name FROM fridge_item fi JOIN product p ON p.id = fi.product_id WHERE fi.user_id = ? ORDER BY fi.id DESC LIMIT 1",
+            (1,),
+        ).fetchone()
+
+    assert row is not None
+    assert row["current_amount"] == 80.0
+    assert row["unit"] == "g"
+    assert row["name"] == "Mango"
