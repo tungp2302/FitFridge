@@ -132,9 +132,11 @@ def match_only():
 def freestyle_recipe():
     """Generate one realistic recipe directly from fridge contents."""
     daily_goal = None
+    recipe_category = None
     data = request.get_json(silent=True) or {}
     if isinstance(data, dict):
         daily_goal = data.get("daily_goal")
+        recipe_category = data.get("recipe_category")
 
     try:
         items = _current_fridge_items()
@@ -163,6 +165,7 @@ def freestyle_recipe():
     result = generate_freestyle_recipe(
         fridge_items=fridge_items,
         daily_goal=daily_goal,
+        recipe_category=recipe_category,
     )
     return jsonify(result)
 

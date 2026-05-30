@@ -2,32 +2,32 @@
 {% block title %}ASaAI Hub{% endblock %}
 {% block content %}
 <div class="container mt-4">
-  <h1>ASaAI — Quick Demo Hub</h1>
-  <p>One-click access to AI features. No URLs to type.</p>
+  <h1>ASaAI — Demo-Hub</h1>
+  <p>Ein Klick zu allen KI-Funktionen. Keine URLs merken, einfach ausprobieren.</p>
 
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:1rem;">
-    <button id="btn-match" class="btn">Recipe Matcher</button>
-    <button id="btn-suggest" class="btn">Suggest Recipes</button>
-    <button id="btn-nutrition" class="btn">Nutrition Insight</button>
-    <button id="btn-forecast" class="btn">Consumption Forecast</button>
-    <button id="btn-shopping" class="btn">Shopping Advisor</button>
-    <a class="link-button" href="{{ url_for('asaai.planner_ui') }}">Meal Planner</a>
-    <button id="btn-all" class="btn">Run All</button>
+    <button id="btn-match" class="btn">Rezept-Treffer</button>
+    <button id="btn-suggest" class="btn">Rezeptvorschläge</button>
+    <button id="btn-nutrition" class="btn">Ernährungs-Check</button>
+    <button id="btn-forecast" class="btn">Verbrauchsprognose</button>
+    <button id="btn-shopping" class="btn">Einkaufsplaner</button>
+    <a class="link-button" href="{{ url_for('asaai.planner_ui') }}">Rezeptplaner</a>
+    <button id="btn-all" class="btn">Alles ausführen</button>
   </div>
 
   <div id="results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;">
-    <div id="card-match" class="card"><h3>Recipe Matches</h3><div class="card-body" id="out-match">(click Recipe Matcher)</div></div>
-    <div id="card-suggest" class="card"><h3>Suggestions</h3><div class="card-body" id="out-suggest">(click Suggest Recipes)</div></div>
-    <div id="card-nutrition" class="card"><h3>Nutrition</h3><div class="card-body" id="out-nutrition">(click Nutrition Insight)</div></div>
-    <div id="card-forecast" class="card"><h3>Forecast</h3><div class="card-body" id="out-forecast">(click Consumption Forecast)</div></div>
-    <div id="card-shopping" class="card"><h3>Shopping</h3><div class="card-body" id="out-shopping">(click Shopping Advisor)</div></div>
+    <div id="card-match" class="card"><h3>Rezept-Treffer</h3><div class="card-body" id="out-match">(Rezept-Treffer klicken)</div></div>
+    <div id="card-suggest" class="card"><h3>Vorschläge</h3><div class="card-body" id="out-suggest">(Rezeptvorschläge klicken)</div></div>
+    <div id="card-nutrition" class="card"><h3>Ernährung</h3><div class="card-body" id="out-nutrition">(Ernährungs-Check klicken)</div></div>
+    <div id="card-forecast" class="card"><h3>Prognose</h3><div class="card-body" id="out-forecast">(Verbrauchsprognose klicken)</div></div>
+    <div id="card-shopping" class="card"><h3>Einkauf</h3><div class="card-body" id="out-shopping">(Einkaufsplaner klicken)</div></div>
   </div>
 </div>
 
 <style>
   .card{background:#f5f5f5;padding:10px;border-radius:6px;border:1px solid #ddd}
-  .card h3{margin:0 0 .5rem 0}
-  .card-body{background:white;padding:8px;border-radius:4px;min-height:64px;white-space:pre-wrap;overflow:auto}
+  .card h3{margin:0 0 .5rem 0;font-size:1rem}
+  .card-body{background:white;padding:8px;border-radius:4px;min-height:64px;white-space:pre-wrap;overflow:auto;line-height:1.45}
   button.btn{background:#2b8b7a;color:white;border:none;padding:8px 12px;border-radius:4px;cursor:pointer}
   button.btn:active{transform:translateY(1px)}
 </style>

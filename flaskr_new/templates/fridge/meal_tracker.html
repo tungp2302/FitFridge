@@ -5,58 +5,132 @@
 {% endblock %}
 
 {% block content %}
-  <section class="page-card" style="margin-bottom:1rem;">
-    <div class="hub-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+  {% set target_kcal = summary.targets.kcal|float %}
+  {% set consumed_kcal = consumed.kcal|float %}
+  {% set protein_target = summary.targets.protein_g|float %}
+  {% set carbs_target = summary.targets.carbs_g|float %}
+  {% set fat_target = summary.targets.fat_g|float %}
+  {% set protein_consumed = consumed.protein_g|float %}
+  {% set carbs_consumed = consumed.carbs_g|float %}
+  {% set fat_consumed = consumed.fat_g|float %}
+  {% set protein_pct = 0 if protein_target <= 0 else (protein_consumed / protein_target * 100) %}
+  {% set carbs_pct = 0 if carbs_target <= 0 else (carbs_consumed / carbs_target * 100) %}
+  {% set fat_pct = 0 if fat_target <= 0 else (fat_consumed / fat_target * 100) %}
+  {% if protein_pct < 0 %}{% set protein_pct = 0 %}{% endif %}{% if protein_pct > 100 %}{% set protein_pct = 100 %}{% endif %}
+  {% if carbs_pct < 0 %}{% set carbs_pct = 0 %}{% endif %}{% if carbs_pct > 100 %}{% set carbs_pct = 100 %}{% endif %}
+  {% if fat_pct < 0 %}{% set fat_pct = 0 %}{% endif %}{% if fat_pct > 100 %}{% set fat_pct = 100 %}{% endif %}
+  {% set progress_pct = 0 if target_kcal <= 0 else (consumed_kcal / target_kcal * 100) %}
+  {% if progress_pct < 0 %}{% set progress_pct = 0 %}{% endif %}
+  {% if progress_pct > 100 %}{% set progress_pct = 100 %}{% endif %}
+  {% set progress_ratio = progress_pct / 100 %}
+  {% set protein_ratio = protein_pct / 100 %}
+  {% set carbs_ratio = carbs_pct / 100 %}
+  {% set fat_ratio = fat_pct / 100 %}
+
+  <section class="page-card today-dashboard" style="margin-bottom:1rem;">
+    <div class="today-dashboard__header">
       <div>
         <h2 style="margin:0 0 .25rem 0;">Today</h2>
-        <p class="muted" style="margin:0;">Daily macros and meal logging in one place.</p>
+        <p class="muted" style="margin:0;">Simple macros at a glance.</p>
       </div>
-      <div class="user-chip">{{ summary.recommendation }}</div>
+      <button type="button" class="today-settings-trigger" id="open-settings" aria-label="Open daily goal settings">⚙</button>
     </div>
-    <div class="stats-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:1rem;">
-      <div class="card">
-        <h3>Consumed</h3>
-        <div class="card-body"><strong>{{ consumed.kcal }}</strong> kcal<br>P {{ consumed.protein_g }} g · C {{ consumed.carbs_g }} g · F {{ consumed.fat_g }} g</div>
+
+    <div class="today-dashboard__body">
+      <div class="macro-donut-grid">
+        <div class="macro-donut-block">
+          <div class="macro-donut" style="--progress: {{ protein_ratio }};">
+            <div class="macro-donut__inner">
+              <div class="macro-donut__target">{{ protein_target|round(0) }} g</div>
+              <div class="macro-donut__percent">{{ protein_pct|round(0) }}%</div>
+            </div>
+          </div>
+          <div class="macro-donut__caption">protein</div>
+        </div>
+        <div class="macro-donut-block">
+          <div class="macro-donut" style="--progress: {{ carbs_ratio }};">
+            <div class="macro-donut__inner">
+              <div class="macro-donut__target">{{ carbs_target|round(0) }} g</div>
+              <div class="macro-donut__percent">{{ carbs_pct|round(0) }}%</div>
+            </div>
+          </div>
+          <div class="macro-donut__caption">carbs</div>
+        </div>
+        <div class="macro-donut-block">
+          <div class="macro-donut" style="--progress: {{ fat_ratio }};">
+            <div class="macro-donut__inner">
+              <div class="macro-donut__target">{{ fat_target|round(0) }} g</div>
+              <div class="macro-donut__percent">{{ fat_pct|round(0) }}%</div>
+            </div>
+          </div>
+          <div class="macro-donut__caption">fat</div>
+        </div>
       </div>
-      <div class="card">
-        <h3>Target</h3>
-        <div class="card-body"><strong>{{ summary.targets.kcal }}</strong> kcal<br>P {{ summary.targets.protein_g }} g · C {{ summary.targets.carbs_g }} g · F {{ summary.targets.fat_g }} g</div>
-      </div>
-      <div class="card">
-        <h3>Remaining</h3>
-        <div class="card-body"><strong>{{ summary.remaining.kcal }}</strong> kcal<br>P {{ summary.remaining.protein_g }} g · C {{ summary.remaining.carbs_g }} g · F {{ summary.remaining.fat_g }} g</div>
+
+      <div class="today-progress-card">
+        <div class="today-progress__headline">
+          <span class="today-progress__percent">{{ progress_pct|round(0) }}%</span>
+        </div>
+        <div class="today-progress__bar" aria-hidden="true">
+          <div class="today-progress__fill" style="width: {{ progress_pct }}%;"></div>
+        </div>
+        <div class="today-progress__footer">
+          <span>{{ consumed_kcal|round(0) }} / {{ target_kcal|round(0) }} kcal</span>
+          <span class="today-progress__label">calories</span>
+        </div>
       </div>
     </div>
   </section>
 
-  <section class="insight-grid">
-    <article class="insight-card">
-      <div class="card-header">
-        <h2>Settings</h2>
-        <span class="muted">Daily goal</span>
+  <div class="settings-modal" id="settings-modal" aria-hidden="true">
+    <div class="settings-modal__backdrop" id="settings-modal-backdrop"></div>
+    <div class="settings-modal__panel" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+      <div class="settings-modal__header">
+        <div>
+          <h2 id="settings-modal-title">Settings</h2>
+          <p class="muted" style="margin:0;">Daily goal</p>
+        </div>
+        <button type="button" class="settings-modal__close" id="close-settings" aria-label="Close settings">×</button>
       </div>
-      <form method="post">
+      <form method="post" id="settings-form">
         <input type="hidden" name="action" value="save_settings">
         <label for="daily_kcal">Target calories</label>
         <input type="number" step="1" min="0" name="daily_kcal" id="daily_kcal" value="{{ request.form.get('daily_kcal', settings['daily_kcal']) }}">
 
-        <label for="protein_pct">Protein %</label>
-        <input type="range" min="0" max="100" name="protein_pct" id="protein_pct" value="{{ request.form.get('protein_pct', settings['protein_pct']) }}">
-        <div class="muted">Current: <span id="protein_pct_value">{{ settings['protein_pct'] }}</span>%</div>
+        <div class="goal-slider">
+          <div class="goal-slider__meta">
+            <span class="goal-slider__label">Protein</span>
+            <span class="goal-slider__value"><span id="protein_pct_value">{{ settings['protein_pct'] }}</span>% / <span id="protein_g_value">{{ ((settings['daily_kcal']|float) * (settings['protein_pct']|float) / 100.0 / 4.0)|round(0) }}</span> g</span>
+          </div>
+          <input type="range" min="0" max="100" name="protein_pct" id="protein_pct" value="{{ request.form.get('protein_pct', settings['protein_pct']) }}">
+        </div>
 
-        <label for="carbs_pct">Carbs %</label>
-        <input type="range" min="0" max="100" name="carbs_pct" id="carbs_pct" value="{{ request.form.get('carbs_pct', settings['carbs_pct']) }}">
-        <div class="muted">Current: <span id="carbs_pct_value">{{ settings['carbs_pct'] }}</span>%</div>
+        <div class="goal-slider">
+          <div class="goal-slider__meta">
+            <span class="goal-slider__label">Carbs</span>
+            <span class="goal-slider__value"><span id="carbs_pct_value">{{ settings['carbs_pct'] }}</span>% / <span id="carbs_g_value">{{ ((settings['daily_kcal']|float) * (settings['carbs_pct']|float) / 100.0 / 4.0)|round(0) }}</span> g</span>
+          </div>
+          <input type="range" min="0" max="100" name="carbs_pct" id="carbs_pct" value="{{ request.form.get('carbs_pct', settings['carbs_pct']) }}">
+        </div>
 
-        <label for="fat_pct">Fat %</label>
-        <input type="range" min="0" max="100" name="fat_pct" id="fat_pct" value="{{ request.form.get('fat_pct', settings['fat_pct']) }}">
-        <div class="muted">Current: <span id="fat_pct_value">{{ settings['fat_pct'] }}</span>%</div>
+        <div class="goal-slider">
+          <div class="goal-slider__meta">
+            <span class="goal-slider__label">Fat</span>
+            <span class="goal-slider__value"><span id="fat_pct_value">{{ settings['fat_pct'] }}</span>% / <span id="fat_g_value">{{ ((settings['daily_kcal']|float) * (settings['fat_pct']|float) / 100.0 / 9.0)|round(0) }}</span> g</span>
+          </div>
+          <input type="range" min="0" max="100" name="fat_pct" id="fat_pct" value="{{ request.form.get('fat_pct', settings['fat_pct']) }}">
+        </div>
 
-        <p class="muted">Sliders werden beim Speichern auf 100% normalisiert.</p>
-        <input type="submit" value="Save settings">
+        <p class="muted settings-modal__hint">Die drei Anteile werden automatisch auf 100% gehalten. Werte links sind Prozent und Zielgramm pro Tag.</p>
+        <div class="settings-modal__actions">
+          <button type="button" class="settings-modal__secondary" id="cancel-settings">Cancel</button>
+          <input type="submit" value="Save settings">
+        </div>
       </form>
-    </article>
+    </div>
+  </div>
 
+  <section class="insight-grid">
     <article class="insight-card">
       <div class="card-header">
         <h2>Barcode log</h2>
@@ -161,23 +235,129 @@
 
   <script>
     (function () {
+      const modal = document.getElementById('settings-modal');
+      const openButton = document.getElementById('open-settings');
+      const closeButton = document.getElementById('close-settings');
+      const cancelButton = document.getElementById('cancel-settings');
+      const backdrop = document.getElementById('settings-modal-backdrop');
       const protein = document.getElementById('protein_pct');
       const carbs = document.getElementById('carbs_pct');
       const fat = document.getElementById('fat_pct');
+      const dailyKcal = document.getElementById('daily_kcal');
       const pValue = document.getElementById('protein_pct_value');
       const cValue = document.getElementById('carbs_pct_value');
       const fValue = document.getElementById('fat_pct_value');
+      const pGramValue = document.getElementById('protein_g_value');
+      const cGramValue = document.getElementById('carbs_g_value');
+      const fGramValue = document.getElementById('fat_g_value');
 
-      function sync() {
-        pValue.textContent = protein.value;
-        cValue.textContent = carbs.value;
-        fValue.textContent = fat.value;
+      const macroWeights = {
+        protein: 4,
+        carbs: 4,
+        fat: 9,
+      };
+
+      function roundWhole(value) {
+        return Math.round(Number(value) || 0);
       }
 
-      protein.addEventListener('input', sync);
-      carbs.addEventListener('input', sync);
-      fat.addEventListener('input', sync);
-      sync();
+      function gramsFor(slider, pct) {
+        const kcal = Number(dailyKcal.value || 0);
+        const grams = (kcal * pct) / 100 / macroWeights[slider];
+        return roundWhole(grams);
+      }
+
+      function updateLabels() {
+        const proteinPct = roundWhole(protein.value);
+        const carbsPct = roundWhole(carbs.value);
+        const fatPct = roundWhole(fat.value);
+        pValue.textContent = proteinPct;
+        cValue.textContent = carbsPct;
+        fValue.textContent = fatPct;
+        pGramValue.textContent = gramsFor('protein', proteinPct);
+        cGramValue.textContent = gramsFor('carbs', carbsPct);
+        fGramValue.textContent = gramsFor('fat', fatPct);
+      }
+
+      function distributeRemainder(changedKey, changedValue) {
+        const sliders = {
+          protein,
+          carbs,
+          fat,
+        };
+        const keys = Object.keys(sliders);
+        const otherKeys = keys.filter((key) => key !== changedKey);
+        const remaining = 100 - changedValue;
+        const currentOtherTotal = otherKeys.reduce((sum, key) => sum + roundWhole(sliders[key].value), 0);
+
+        if (remaining <= 0) {
+          otherKeys.forEach((key) => {
+            sliders[key].value = 0;
+          });
+          return;
+        }
+
+        if (currentOtherTotal <= 0) {
+          const base = Math.floor(remaining / otherKeys.length);
+          let leftover = remaining - base * otherKeys.length;
+          otherKeys.forEach((key) => {
+            const nextValue = base + (leftover > 0 ? 1 : 0);
+            sliders[key].value = nextValue;
+            if (leftover > 0) leftover -= 1;
+          });
+          return;
+        }
+
+        const provisional = otherKeys.map((key) => {
+          const oldValue = roundWhole(sliders[key].value);
+          const exact = (remaining * oldValue) / currentOtherTotal;
+          const floorValue = Math.floor(exact);
+          return { key, floorValue, remainder: exact - floorValue };
+        });
+
+        let distributed = provisional.reduce((sum, entry) => sum + entry.floorValue, 0);
+        let missing = remaining - distributed;
+        provisional.sort((a, b) => b.remainder - a.remainder);
+        provisional.forEach((entry) => {
+          const nextValue = entry.floorValue + (missing > 0 ? 1 : 0);
+          sliders[entry.key].value = nextValue;
+          if (missing > 0) missing -= 1;
+        });
+      }
+
+      function syncFrom(sourceKey) {
+        const source = { protein, carbs, fat }[sourceKey];
+        const nextValue = Math.max(0, Math.min(100, roundWhole(source.value)));
+        source.value = nextValue;
+        distributeRemainder(sourceKey, nextValue);
+        updateLabels();
+      }
+
+      function openModal() {
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+      }
+
+      function closeModal() {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+      }
+
+      openButton.addEventListener('click', openModal);
+      closeButton.addEventListener('click', closeModal);
+      cancelButton.addEventListener('click', closeModal);
+      backdrop.addEventListener('click', closeModal);
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+          closeModal();
+        }
+      });
+
+      protein.addEventListener('input', () => syncFrom('protein'));
+      carbs.addEventListener('input', () => syncFrom('carbs'));
+      fat.addEventListener('input', () => syncFrom('fat'));
+      dailyKcal.addEventListener('input', updateLabels);
+      updateLabels();
     })();
   </script>
   <script>

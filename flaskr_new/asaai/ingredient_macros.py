@@ -87,6 +87,7 @@ INGREDIENT_DB = {
     # === Obst ===
     "banana": {"kcal_per_100g": 89, "protein_per_100g": 1.1, "fat_per_100g": 0.3, "carbs_per_100g": 22.8},
     "bananas": {"kcal_per_100g": 89, "protein_per_100g": 1.1, "fat_per_100g": 0.3, "carbs_per_100g": 22.8},
+    "mango": {"kcal_per_100g": 60, "protein_per_100g": 0.8, "fat_per_100g": 0.4, "carbs_per_100g": 15.0},
 
     # === Hülsenfrüchte ===
     "beans": {"kcal_per_100g": 127, "protein_per_100g": 8.7, "fat_per_100g": 0.5, "carbs_per_100g": 23.0},

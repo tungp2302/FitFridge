@@ -48,6 +48,32 @@ def create_dashboard_item(query, author_id=None):
     return fridge_repo.add_item(product_id, current_amount, unit, user_id=author_id)
 
 
+def create_dashboard_item_from_data(product_data, author_id=None):
+    """Create a fridge item directly from an already selected product payload."""
+    if not product_data:
+        raise ValueError("product_data is required")
+
+    barcode = product_data.get("barcode") or ""
+    product = product_repo.get_by_barcode(barcode) if barcode else None
+
+    if product is None:
+        product_id = product_repo.create_product(
+            name=product_data.get("name") or "Unnamed",
+            brand=product_data.get("brand") or "",
+            barcode=barcode or product_data.get("name") or "selected-product",
+            kcal_per_100g=float(product_data.get("kcal_per_100g") or 0.0),
+            protein_per_100g=float(product_data.get("protein_per_100g") or 0.0),
+            fat_per_100g=float(product_data.get("fat_per_100g") or 0.0),
+            carbs_per_100g=float(product_data.get("carbs_per_100g") or 0.0),
+        )
+    else:
+        product_id = product["id"]
+
+    current_amount = float(product_data.get("total_amount") or 100.0)
+    unit = product_data.get("unit") or "g"
+    return fridge_repo.add_item(product_id, current_amount, unit, user_id=author_id)
+
+
 def _get_item_for_user(item_id, user_id=None):
     if user_id is None:
         return fridge_repo.get_item(item_id)

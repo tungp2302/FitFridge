@@ -27,7 +27,7 @@ from .macro_calculator import (
 )
 
 
-def build_freestyle_recipe_prompt(fridge_items, daily_goal=None):
+def build_freestyle_recipe_prompt(fridge_items, daily_goal=None, recipe_category=None):
     """Build a strict JSON prompt for one realistic fridge-based recipe."""
     protein_items = [
         item.get("name", "") for item in fridge_items if _is_protein_source(item.get("name", ""))
@@ -36,11 +36,15 @@ def build_freestyle_recipe_prompt(fridge_items, daily_goal=None):
         "fridge_items": [item.get("name", "") for item in fridge_items],
         "fridge_protein_items": protein_items,
         "daily_goal_remaining": daily_goal or {},
+        "recipe_category": recipe_category or "",
     }
+
+    category_hint = f"Die Rezeptart soll {recipe_category} sein. " if recipe_category else ""
 
     return (
         "Du bist ein realistischer Rezept-Generator für FitFridge. "
         "Erfinde GENAU EIN Rezept, das stark auf den vorhandenen Kühlschrank-Inhalt basiert. "
+        f"{category_hint}"
         "Bevorzuge Proteinquellen im Kühlschrank, dann Gemüse und Sättigungsbeilagen. "
         "Erfunde keine exotischen Zutaten, wenn eine einfachere Variante möglich ist. "
         "Nutze höchstens 3 Pantry-Staples wie Öl, Salz, Pfeffer, Zwiebel, Knoblauch. "
@@ -63,6 +67,7 @@ def build_freestyle_recipe_prompt(fridge_items, daily_goal=None):
 def generate_freestyle_recipe(
     fridge_items,
     daily_goal=None,
+    recipe_category=None,
     model=None,
     base_url=None,
     timeout=120,
@@ -83,7 +88,7 @@ def generate_freestyle_recipe(
             "raw_response": "",
         }
 
-    prompt = build_freestyle_recipe_prompt(fridge_items, daily_goal)
+    prompt = build_freestyle_recipe_prompt(fridge_items, daily_goal, recipe_category=recipe_category)
     try:
         response = generate_from_ollama(
             prompt=prompt,
@@ -123,6 +128,7 @@ def generate_freestyle_recipe(
             return {
                 "recipe": {
                     "title": title,
+                    "recipe_category": recipe_category or "",
                     "why_this_works": f"Fallback recipe using available fridge items ({len(selected)} used). LLM unavailable: {exc}",
                     "ingredients": selected,
                     "instructions": instr,
@@ -137,6 +143,7 @@ def generate_freestyle_recipe(
             return {
                 "recipe": {
                     "title": "LLM unavailable",
+                    "recipe_category": recipe_category or "",
                     "why_this_works": f"LLM error: {exc}",
                     "ingredients": [],
                     "instructions": ["Try again when Ollama is running."],
@@ -152,6 +159,7 @@ def generate_freestyle_recipe(
     if parsed is None:
         parsed = {
             "title": "Fridge freestyle recipe",
+            "recipe_category": recipe_category or "",
             "why_this_works": "The model returned unstructured text.",
             "ingredients": [],
             "instructions": [response.strip()],

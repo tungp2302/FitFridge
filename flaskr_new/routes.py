@@ -1,6 +1,7 @@
 """Frontend-Routen fuer FitFridge."""
 
 import functools
+import json
 
 from flask import Blueprint, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.exceptions import abort
@@ -23,6 +24,7 @@ from .meal_tracker_service import (
 from .fridge_service import (
     calculate_total_nutrition,
     create_dashboard_item,
+    create_dashboard_item_from_data,
     delete_dashboard_item,
     get_dashboard_item,
     list_dashboard_items,
@@ -286,17 +288,24 @@ def product_detail(item_id):
 def add_product():
     if request.method == "POST":
         query = request.form.get("query", "").strip()
+        selected_payload_raw = request.form.get("selected_payload", "").strip()
         error = None
 
-        if not query:
+        if not query and not selected_payload_raw:
             error = "Barcode or product name is required."
 
         if error is not None:
             flash(error)
         else:
             try:
-                create_dashboard_item(query, g.user["id"])
+                if selected_payload_raw:
+                    selected_payload = json.loads(selected_payload_raw)
+                    create_dashboard_item_from_data(selected_payload, g.user["id"])
+                else:
+                    create_dashboard_item(query, g.user["id"])
                 return redirect(url_for("frontend.dashboard"))
+            except json.JSONDecodeError:
+                flash("Selected product data could not be parsed.")
             except ValueError as exc:
                 flash(str(exc))
             except RuntimeError:

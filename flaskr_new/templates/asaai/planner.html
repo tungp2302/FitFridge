@@ -4,52 +4,73 @@
 <section class="page-card" style="margin-bottom:16px;">
   <div class="hub-header" style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
     <div>
-      <h1 style="margin:0 0 .25rem 0;">Meal Planner</h1>
-      <p class="muted" style="margin:0;">Enter your target, browse fridge-based recipes, and tap one to open cooking instructions.</p>
+      <h1 style="margin:0 0 .25rem 0;">Rezeptplaner</h1>
+      <p class="muted" style="margin:0;">Ziel eingeben, Rezepte aus dem Kühlschrank durchsehen und direkt eine Kochanleitung öffnen.</p>
     </div>
-    <a class="link-button" href="{{ url_for('asaai.hub_ui') }}">Back to Hub</a>
+    <a class="link-button" href="{{ url_for('asaai.hub_ui') }}">Zurück zum Hub</a>
   </div>
 </section>
 
 <div class="planner-shell">
   <section class="page-card">
-    <h2 style="margin-top:0;">Your target</h2>
+    <h2 style="margin-top:0;">Dein Ziel</h2>
     <div class="planner-toolbar">
       <div style="flex:1;min-width:130px;">
         <label for="protein">Protein</label>
         <input id="protein" type="number" min="0" step="1" value="60">
       </div>
       <div style="flex:1;min-width:130px;">
-        <label for="kcal">Calories</label>
+        <label for="kcal">Kalorien</label>
         <input id="kcal" type="number" min="0" step="1" value="800">
       </div>
-      <div style="flex:1;min-width:180px;align-self:end;">
-        <button id="run-freestyle" class="btn" style="width:100%;">Freestyle recipe</button>
+      <div style="flex:1;min-width:130px;">
+        <label for="carbs">Carbs</label>
+        <input id="carbs" type="number" min="0" step="1" value="90">
+      </div>
+      <div style="flex:1;min-width:130px;">
+        <label for="fat">Fett</label>
+        <input id="fat" type="number" min="0" step="1" value="25">
+      </div>
+    </div>
+
+    <div class="planner-toolbar" style="margin-top:12px;">
+      <div style="flex:1;min-width:220px;max-width:360px;">
+        <label for="recipe-category">Rezeptart</label>
+        <select id="recipe-category">
+          <option value="hauptspeise">Hauptspeise</option>
+          <option value="fruehstueck">Frühstück</option>
+          <option value="abendessen">Abendessen</option>
+          <option value="nachspeise">Nachspeise</option>
+          <option value="snack">Snack</option>
+        </select>
       </div>
       <div style="flex:1;min-width:180px;align-self:end;">
-        <button id="run-api" class="secondary" style="width:100%;">Use recipe API</button>
+        <button id="run-freestyle" class="btn" style="width:100%;">Freestyle-Rezept</button>
+      </div>
+      <div style="flex:1;min-width:180px;align-self:end;">
+        <button id="run-api" class="secondary" style="width:100%;">Matcher nutzen</button>
       </div>
     </div>
 
     <div class="muted-box" style="margin-top:12px;">
-      <strong>How it works</strong>
-      <p class="muted" style="margin:.35rem 0 0;">The app looks at your fridge, ranks recipe matches, and you can scroll through the cards. Tap any recipe to see ingredients and instructions.</p>
+      <strong>So funktioniert es</strong>
+      <p class="muted" style="margin:.35rem 0 0;">Die App schaut in deinen Kühlschrank, sortiert passende Rezepte und zeigt dir die wichtigsten Zutaten und Schritte direkt in den Karten.</p>
     </div>
 
     <div class="section-title">
-      <h3 style="margin:0;">Matching recipes</h3>
-      <span class="muted" id="status">Ready</span>
+      <h3 style="margin:0;">Passende Rezepte</h3>
+      <span class="muted" id="status">Bereit</span>
     </div>
     <div id="rail" class="planner-rail">
-      <div class="muted-box">Click <strong>Freestyle recipe</strong> to generate one dish from your fridge.</div>
+      <div class="muted-box">Klicke auf <strong>Freestyle-Rezept</strong>, um ein Gericht direkt aus deinem Kühlschrank zu erzeugen.</div>
     </div>
   </section>
 
   <aside class="recipe-detail" id="detail">
-    <h2 id="detail-title" style="margin-top:0;">Recipe details</h2>
-    <p class="muted" id="detail-subtitle">Select a recipe card to see cooking instructions.</p>
+    <h2 id="detail-title" style="margin-top:0;">Rezeptdetails</h2>
+    <p class="muted" id="detail-subtitle">Wähle eine Karte aus, um Zutaten und Anleitung zu sehen.</p>
     <div id="detail-body" class="muted-box">
-      No recipe selected yet.
+      Noch kein Rezept ausgewählt.
     </div>
   </aside>
 </div>
@@ -59,11 +80,45 @@ let currentMatches = [];
 let selectedIndex = -1;
 let requestToken = 0;
 
+function readGoalValue(id){
+  const raw = document.getElementById(id).value.trim();
+  if(raw === '') return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+function buildDailyGoal(){
+  const dailyGoal = {};
+  const recipeCategory = document.getElementById('recipe-category').value.trim();
+  const protein = readGoalValue('protein');
+  const kcal = readGoalValue('kcal');
+  const carbs = readGoalValue('carbs');
+  const fat = readGoalValue('fat');
+
+  if(recipeCategory) dailyGoal.recipe_category = recipeCategory;
+  if(protein !== null) dailyGoal.protein = protein;
+  if(kcal !== null) dailyGoal.kcal = kcal;
+  if(carbs !== null) dailyGoal.carbs = carbs;
+  if(fat !== null) dailyGoal.fat = fat;
+
+  return dailyGoal;
+}
+
 function macroLabel(match){
   const macros = match.macros || {};
   const kcal = macros.kcal != null ? `${Math.round(macros.kcal)} kcal` : 'kcal n/a';
   const protein = macros.protein != null ? `${Math.round(macros.protein)}g protein` : '';
   return [kcal, protein].filter(Boolean).join(' · ');
+}
+
+function freestyleMacroLabel(macros){
+  if(!macros) return 'Macros n/a';
+  const parts = [];
+  if(macros.kcal != null) parts.push(`${Math.round(macros.kcal)} kcal`);
+  if(macros.protein != null) parts.push(`${Math.round(macros.protein)}g protein`);
+  if(macros.carbs != null) parts.push(`${Math.round(macros.carbs)}g carbs`);
+  if(macros.fat != null) parts.push(`${Math.round(macros.fat)}g fat`);
+  return parts.length ? parts.join(' · ') : 'Macros n/a';
 }
 
 function ingredientsText(recipe){
@@ -143,16 +198,17 @@ function renderFreestyle(result){
         <span>LLM</span>
       </div>
       <p class="muted" style="margin:.45rem 0 .75rem;">Generated from your fridge</p>
+      <div class="muted" style="font-size:.92rem; margin-bottom:.5rem;">Category: ${recipe.recipe_category || recipe.category || 'Unspecified'}</div>
       <div style="margin-bottom:.5rem;">${(recipe.used_fridge_items || []).map(item => `<span class="pill">${item}</span>`).join('') || '<span class="muted">No fridge items used</span>'}</div>
       <div class="muted" style="font-size:.92rem;">Pantry assumptions: ${(recipe.pantry_assumptions || []).join(', ') || 'None'}</div>
     </article>
   `;
 
   document.getElementById('detail-title').textContent = recipe.title || 'Freestyle recipe';
-  document.getElementById('detail-subtitle').textContent = 'AI-generated from your fridge contents';
+  document.getElementById('detail-subtitle').textContent = `AI-generated from your fridge contents${recipe.recipe_category ? ' · ' + recipe.recipe_category : ''}`;
   document.getElementById('detail-body').innerHTML = `
     <div class="recipe-meta" style="margin-bottom:10px;">
-      <span>${recipe.estimated_macros ? `${Math.round(recipe.estimated_macros.kcal || 0)} kcal · ${Math.round(recipe.estimated_macros.protein || 0)}g protein` : 'Macros n/a'}</span>
+      <span>${freestyleMacroLabel(recipe.estimated_macros)}</span>
       <span>Freestyle</span>
     </div>
     <div class="muted-box" style="margin-bottom:10px;">
@@ -172,8 +228,7 @@ function renderFreestyle(result){
 }
 
 async function loadRecipes(){
-  const protein = Number(document.getElementById('protein').value || 0);
-  const kcal = Number(document.getElementById('kcal').value || 0);
+  const dailyGoal = buildDailyGoal();
   const status = document.getElementById('status');
   const token = ++requestToken;
   status.textContent = 'Loading recipes...';
@@ -192,7 +247,7 @@ async function loadRecipes(){
     const response = await fetch('/asaai/recipes/suggest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ daily_goal: { protein, kcal } }),
+      body: JSON.stringify({ daily_goal: dailyGoal }),
       signal: controller.signal
     });
     clearTimeout(timeout);
@@ -218,8 +273,7 @@ async function loadRecipes(){
 }
 
 async function loadFreestyleRecipe(){
-  const protein = Number(document.getElementById('protein').value || 0);
-  const kcal = Number(document.getElementById('kcal').value || 0);
+  const dailyGoal = buildDailyGoal();
   const status = document.getElementById('status');
   const token = ++requestToken;
   status.textContent = 'Generating freestyle recipe...';
@@ -229,7 +283,7 @@ async function loadFreestyleRecipe(){
     const response = await fetch('/asaai/recipes/freestyle', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ daily_goal: { protein, kcal } })
+      body: JSON.stringify({ daily_goal: dailyGoal })
     });
     const data = await response.json();
     if (token !== requestToken) return;

@@ -53,6 +53,7 @@ PROCESSED_FOOD_KEYWORDS = {
 
 PRIMARY_FOOD_KEYWORDS = {
     "banana",
+    "mango",
     "apple",
     "orange",
     "grape",
@@ -166,14 +167,18 @@ def _canonical_primary_query(query: str) -> str:
     return " ".join(mapped_tokens)
 
 
+def _strip_ai_ingredient_prefix(query: str) -> str:
+    normalized = str(query or "").strip()
+    lowered = normalized.lower()
+    if lowered.startswith("ingredient:") or lowered.startswith("ai:"):
+        return normalized.split(":", 1)[1].strip()
+    return normalized
+
+
 def _is_primary_food_query(query: str) -> bool:
     normalized = _canonical_primary_query(query)
     if not normalized:
         return False
-    from .asaai.ingredient_macros import lookup_ingredient
-
-    if lookup_ingredient(normalized) is not None:
-        return True
     return any(keyword in normalized for keyword in PRIMARY_FOOD_KEYWORDS)
 
 
@@ -217,42 +222,78 @@ def _llm_ai_product_metadata(query: str, canonical_query: str) -> dict:
     return {}
 
 
-def _build_generic_ingredient_product(query: str) -> Optional[Dict]:
-    from .asaai.ingredient_macros import lookup_ingredient
+def _llm_ai_macro_estimate(query: str, canonical_query: str) -> dict:
+    """Ask Ollama for a best-effort nutrition estimate for an arbitrary food."""
+    from .asaai.ollama_client import generate_from_ollama
 
-    normalized = _canonical_primary_query(query)
-    if not normalized:
-        return None
+    prompt = (
+        "Du bist ein Nährwert-Schätzer für FitFridge. "
+        "Schätze die typischen Nährwerte pro 100g für das genannte Lebensmittel. "
+        "Wenn du unsicher bist, gib eine plausible Durchschnittsschätzung statt 0. "
+        "Antworte nur als JSON ohne Markdown oder Zusatztext.\n\n"
+        "JSON-Schema:\n"
+        "{\n"
+        '  "display_name": "string",\n'
+        '  "why": "string",\n'
+        '  "estimated_macros": {"kcal": number, "protein": number, "fat": number, "carbs": number},\n'
+        '  "confidence": number\n'
+        "}\n\n"
+        f"Suchbegriff: {query}\n"
+        f"Canonical ingredient: {canonical_query}"
+    )
 
-    nutrients = lookup_ingredient(normalized)
-    if nutrients is None:
-        return None
+    try:
+        response = generate_from_ollama(prompt=prompt, timeout=10, num_predict=180)
+    except Exception:
+        return {}
 
-    llm_meta = _llm_ai_product_metadata(query, normalized)
-    display_name = _ingredient_display_name(query) or _ingredient_display_name(normalized)
-    if isinstance(llm_meta, dict):
-        display_name = llm_meta.get("display_name") or display_name
+    try:
+        parsed = json.loads(response.strip())
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        pass
+    return {}
+
+
+def _heuristic_ai_macro_estimate(query: str, canonical_query: str) -> dict:
+    """Fallback estimate when the model cannot answer."""
+    normalized = _normalize_text(canonical_query or query)
+    display_name = _ingredient_display_name(query) or _ingredient_display_name(normalized) or query
+
+    fruit_terms = {"banana", "mango", "apple", "orange", "grape", "pear", "berry", "berries", "fruit"}
+    vegetable_terms = {"broccoli", "carrot", "onion", "garlic", "tomato", "cucumber", "spinach", "pepper", "vegetable", "veg"}
+    protein_terms = {"chicken", "beef", "pork", "turkey", "fish", "salmon", "tuna", "shrimp", "egg", "eggs", "tofu", "lentils", "beans", "chickpeas"}
+    starch_terms = {"rice", "pasta", "potato", "potatoes", "bread", "oats", "quinoa", "couscous"}
+
+    tokens = set(normalized.split())
+
+    if tokens & fruit_terms:
+        macros = {"kcal": 60.0, "protein": 0.8, "fat": 0.3, "carbs": 15.0}
+        why = "Heuristische Schätzung für ein typisches Obst."
+    elif tokens & vegetable_terms:
+        macros = {"kcal": 30.0, "protein": 1.5, "fat": 0.2, "carbs": 6.0}
+        why = "Heuristische Schätzung für ein typisches Gemüse."
+    elif tokens & protein_terms:
+        macros = {"kcal": 160.0, "protein": 18.0, "fat": 8.0, "carbs": 0.0}
+        why = "Heuristische Schätzung für eine proteinreiche Zutat."
+    elif tokens & starch_terms:
+        macros = {"kcal": 130.0, "protein": 3.0, "fat": 1.0, "carbs": 28.0}
+        why = "Heuristische Schätzung für eine stärkehaltige Zutat."
+    else:
+        macros = {"kcal": 100.0, "protein": 3.0, "fat": 2.0, "carbs": 12.0}
+        why = "Heuristische Standardschätzung für ein unbekanntes Lebensmittel."
 
     return {
-        "name": display_name,
-        "brand": "FitFridge AI",
-        "barcode": f"ingredient:{normalized}",
-        "kcal_per_100g": float(nutrients.get("kcal_per_100g", 0.0)),
-        "protein_per_100g": float(nutrients.get("protein_per_100g", 0.0)),
-        "fat_per_100g": float(nutrients.get("fat_per_100g", 0.0)),
-        "carbs_per_100g": float(nutrients.get("carbs_per_100g", 0.0)),
-        "sugar_per_100g": 0.0,
-        "total_amount": 100.0,
-        "unit": "g",
-        "raw_quantity": "100 g",
-        "raw_product": {
-            "ingredient_source": True,
-            "ai_generated": True,
-            "query": _normalize_text(query),
-            "canonical_query": normalized,
-            "ai_note": llm_meta.get("why") if isinstance(llm_meta, dict) else "",
-        },
+        "display_name": display_name,
+        "why": why,
+        "estimated_macros": macros,
+        "confidence": 0.35,
     }
+
+
+def _build_generic_ingredient_product(query: str) -> Optional[Dict]:
+    return None
 
 
 def _score_off_product(query: str, product: dict) -> float:
@@ -449,25 +490,24 @@ def lookup_product(query: str, user_agent: str = DEFAULT_USER_AGENT, use_staging
     if not query:
         raise ValueError("query is required")
 
+    stripped_query = _strip_ai_ingredient_prefix(query)
+    if stripped_query != query:
+        return ai_estimate(stripped_query)
+
+    query = stripped_query
+
     if query.isdigit():
         return search_product(query, user_agent=user_agent, use_staging=use_staging)
 
-    generic = _build_generic_ingredient_product(query)
-
     products = search_products(query, user_agent=user_agent, use_staging=use_staging, limit=10)
     if not products:
-        return generic
+        return ai_estimate(query)
 
     ranked = _rank_off_products(query, products)
     if not ranked:
-        return generic
+        return ai_estimate(query)
 
-    best = ranked[0]
-    if generic is not None and _is_primary_food_query(query):
-        if _score_off_product(query, best) < 70:
-            return generic
-
-    return best
+    return ranked[0]
 
 
 def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_staging: bool = False, limit: int = 10) -> Optional[list]:
@@ -527,10 +567,6 @@ def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_stagin
         if full:
             results.append(full)
 
-    generic = _build_generic_ingredient_product(query)
-    if generic is not None and _is_primary_food_query(query):
-        results.insert(0, generic)
-
     ranked = _rank_off_products(query, results)
 
     if limit:
@@ -540,46 +576,47 @@ def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_stagin
 
 
 def ai_estimate(query: str) -> Optional[dict]:
-    """Return an AI-generated estimate for a primary ingredient.
+    """Return an AI-generated estimate for any food query.
 
-    Always attempts to provide a generic ingredient entry. If a curated
-    nutrient lookup exists, it will be returned. Otherwise the function
-    will still return a minimal AI-labelled product object (with zeros)
-    so the frontend can offer an "AI estimate" choice.
+    This path is independent from OpenFoodFacts search results and is
+    intended to stay visible as a separate selectable option in the UI.
     """
     if not query:
         return None
 
-    # Prefer the richer generic product when available
-    try:
-        generic = _build_generic_ingredient_product(query)
-    except Exception:
-        generic = None
+    query = _strip_ai_ingredient_prefix(query)
 
-    if generic is not None:
-        return generic
-
-    # Fallback: ask the LLM for a friendly display name and note
     try:
         canonical = _canonical_primary_query(query)
     except Exception:
         canonical = _normalize_text(query)
 
     try:
-        llm_meta = _llm_ai_product_metadata(query, canonical) or {}
+        llm_meta = _llm_ai_macro_estimate(query, canonical) or {}
     except Exception:
         llm_meta = {}
 
-    display_name = llm_meta.get("display_name") or _ingredient_display_name(query) or query
+    if not llm_meta:
+        llm_meta = _heuristic_ai_macro_estimate(query, canonical)
+
+    display_name = _ingredient_display_name(llm_meta.get("display_name")) or _ingredient_display_name(query) or query
+    estimated_macros = llm_meta.get("estimated_macros") or {}
+
+    def _macro_value(key: str, default: float = 0.0) -> float:
+        value = estimated_macros.get(key, default)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return float(default)
 
     return {
         "name": display_name,
         "brand": "FitFridge AI",
         "barcode": f"ingredient:{_normalize_text(query)}",
-        "kcal_per_100g": 0.0,
-        "protein_per_100g": 0.0,
-        "fat_per_100g": 0.0,
-        "carbs_per_100g": 0.0,
+        "kcal_per_100g": _macro_value("kcal"),
+        "protein_per_100g": _macro_value("protein"),
+        "fat_per_100g": _macro_value("fat"),
+        "carbs_per_100g": _macro_value("carbs"),
         "sugar_per_100g": 0.0,
         "total_amount": 100.0,
         "unit": "g",
@@ -589,5 +626,6 @@ def ai_estimate(query: str) -> Optional[dict]:
             "query": _normalize_text(query),
             "canonical_query": canonical,
             "ai_note": llm_meta.get("why") or "",
+            "ai_confidence": llm_meta.get("confidence"),
         },
     }

@@ -86,6 +86,27 @@ def test_fridge_item_crud(app_context):
     assert fridge_repo.get_item(fridge_item_id) is None
 
 
+def test_create_dashboard_item_from_data_inserts_directly(app_context):
+    payload = {
+        "name": "Butter",
+        "brand": "FitFridge AI",
+        "barcode": "ingredient:butter",
+        "kcal_per_100g": 717.0,
+        "protein_per_100g": 0.9,
+        "fat_per_100g": 81.0,
+        "carbs_per_100g": 0.1,
+        "total_amount": 100.0,
+        "unit": "g",
+    }
+
+    item_id = fridge_service.create_dashboard_item_from_data(payload)
+    item = fridge_repo.get_item(item_id)
+
+    assert item["name"] == "Butter"
+    assert item["barcode"] == "ingredient:butter"
+    assert item["current_amount"] == 100.0
+
+
 class _FakeResponse:
     def __init__(self, payload):
         self._payload = payload
@@ -163,7 +184,7 @@ def test_lookup_product_prefers_primary_food_over_processed(monkeypatch):
     assert result["barcode"] == "111"
 
 
-def test_lookup_product_prefers_raw_banana_over_snack(monkeypatch):
+def test_lookup_product_returns_off_result_for_plain_query(monkeypatch):
     processed = {
         "name": "Banana chips",
         "brand": "Sunny Bites",
@@ -179,21 +200,50 @@ def test_lookup_product_prefers_raw_banana_over_snack(monkeypatch):
 
     result = ofc.lookup_product("banana")
 
-    assert result["name"] == "Banana"
-    assert result["barcode"] == "ingredient:banana"
-    assert result["protein_per_100g"] == 1.1
+    assert result["name"] == "Banana chips"
+    assert result["barcode"] == "222"
 
 
-def test_search_products_returns_ai_entry_for_german_primary_food(monkeypatch):
-    monkeypatch.setattr(ofc, "_llm_ai_product_metadata", lambda query, canonical: {"display_name": "Banane", "why": "Grundnahrungsmittel"})
-    monkeypatch.setattr(ofc, "urlopen", lambda *args, **kwargs: _FakeResponse({"products": []}))
+def test_lookup_product_accepts_ai_ingredient_prefix(monkeypatch):
+    monkeypatch.setattr(
+        ofc,
+        "ai_estimate",
+        lambda query: {
+            "name": "Mango",
+            "brand": "FitFridge AI",
+            "barcode": "ingredient:mango",
+            "kcal_per_100g": 60,
+            "protein_per_100g": 0.8,
+            "fat_per_100g": 0.4,
+            "carbs_per_100g": 15.0,
+        },
+    )
 
-    results = ofc.search_products("Banane")
+    result = ofc.lookup_product("ingredient:mango")
 
-    assert results
-    assert results[0]["name"] == "Banane"
-    assert results[0]["brand"] == "FitFridge AI"
-    assert results[0]["barcode"] == "ingredient:banana"
+    assert result["name"] == "Mango"
+    assert result["barcode"] == "ingredient:mango"
+    assert result["kcal_per_100g"] == 60
+
+
+def test_ai_estimate_returns_llm_macros_for_primary_food(monkeypatch):
+    monkeypatch.setattr(
+        ofc,
+        "_llm_ai_macro_estimate",
+        lambda query, canonical: {
+            "display_name": "Mango",
+            "why": "LLM estimate",
+            "estimated_macros": {"kcal": 61, "protein": 0.8, "fat": 0.4, "carbs": 15.0},
+            "confidence": 0.77,
+        },
+    )
+
+    result = ofc.ai_estimate("Mango")
+
+    assert result["name"] == "Mango"
+    assert result["barcode"] == "ingredient:mango"
+    assert result["kcal_per_100g"] == 61
+    assert result["raw_product"]["ai_note"] == "LLM estimate"
 
 
 def test_freestyle_recipe_endpoint_returns_recipe(app, monkeypatch):
