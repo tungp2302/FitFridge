@@ -59,14 +59,19 @@
   {% for post in posts %}
     <article class="post">
       <header>
-        <div>
-          <h1>{{ post['name'] }}</h1>
-          <div class="about">{{ post['brand'] }} • {{ post['barcode'] }} • {{ post['created'].strftime('%Y-%m-%d') }}</div>
-        </div>
-        {% if g.user %}
-          <a class="action" href="{{ url_for('frontend.product_detail', item_id=post['id']) }}">Edit</a>
-        {% endif %}
-      </header>
+          <div>
+            <h1>{{ post['name'] }}</h1>
+            <div class="about">{{ post['brand'] }} • {{ post['barcode'] }} • {{ post['created'].strftime('%Y-%m-%d') }}</div>
+          </div>
+          {% if g.user %}
+            <div class="header-actions">
+              <a class="action" href="{{ url_for('frontend.product_detail', item_id=post['id']) }}">Edit</a>
+              <form method="post" action="{{ url_for('frontend.delete_product', item_id=post['id']) }}" style="display:inline;">
+                <button type="submit" class="inline-delete" aria-label="Delete product">×</button>
+              </form>
+            </div>
+          {% endif %}
+        </header>
       <p class="body">
         <strong>Amount:</strong> {{ post['current_amount'] }} {{ post['unit'] }}<br>
         <strong>Total Nutrition:</strong>

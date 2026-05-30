@@ -155,8 +155,42 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 /* adjusted insight styles fallback */
 .insight-text{background:#fafafa;padding:10px;border-radius:8px;border:1px solid #eef2f7}
 
-.post{padding:16px;margin-bottom:14px}
+.post{padding:16px;margin-bottom:14px;position:relative;overflow:hidden}
 .post > header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.post > header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;position:relative}
+.post > header .header-actions{position:absolute;right:12px;top:12px;z-index:90;display:flex;gap:8px;align-items:center}
+/* Inline delete style for fridge header */
+.inline-delete{background:transparent;border:none;color:#111827;font-size:1.05rem;padding:0;margin-left:6px;cursor:pointer}
+.inline-delete:hover{color:#b91c1c}
+
+/* Ensure any clear-x-button inside a post header/card is rendered as a simple X (no white box/shadow) */
+.post .clear-x-button,
+.post > header .clear-x-button{
+  background:transparent !important;
+  box-shadow:none !important;
+  border:none !important;
+  width:auto !important;
+  height:auto !important;
+  padding:0 !important;
+  margin:0 !important;
+  border-radius:0 !important;
+}
+
+/* Safety: hide stray floating panels/backdrops remnants inside posts */
+.post .settings-modal__panel,
+.post .settings-modal__backdrop{
+  display:none !important;
+}
+
+/* Remove global card styling from inline forms inside post headers (they were getting background+shadow) */
+.post > header form{
+  background:transparent !important;
+  box-shadow:none !important;
+  border-radius:0 !important;
+  padding:0 !important;
+  margin:0 !important;
+  display:inline-block !important;
+}
 .post h1{margin:0 0 6px 0;font-size:1.25rem}
 .about{color:var(--muted)}
 
@@ -377,6 +411,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 .settings-modal.is-open{display:block;}
 
 .settings-modal__backdrop{
+  display:none;
   position:absolute;
   inset:0;
   background:rgba(15,23,42,.44);
@@ -384,6 +419,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 }
 
 .settings-modal__panel{
+  display:none;
   position:relative;
   z-index:1;
   width:min(92vw, 460px);
@@ -393,6 +429,9 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   box-shadow:0 30px 80px rgba(15,23,42,.25);
   padding:18px;
 }
+
+.settings-modal.is-open .settings-modal__backdrop{display:block}
+.settings-modal.is-open .settings-modal__panel{display:block}
 
 .settings-modal__header{
   display:flex;
