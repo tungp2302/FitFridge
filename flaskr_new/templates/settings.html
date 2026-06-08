@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Einstellungen{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <section class="page-card" style="max-width:760px;">
+    <form method="post">
+      <h2 style="margin-top:0;">Lokales LLM</h2>
+      <p class="muted">Diese Auswahl wird für Add Food mit AI Estimate und das Freestyle-Rezept verwendet.</p>
+
+      <label for="llm_model">Ollama-Modell</label>
+      <select id="llm_model" name="llm_model">
+        {% for choice in model_choices %}
+          <option value="{{ choice.name }}" {% if settings.llm_model == choice.name %}selected{% endif %}>
+            {{ choice.label }}
+          </option>
+        {% endfor %}
+      </select>
+
+      <div class="muted-box" style="margin-top:12px;">
+        <strong>Modelle</strong>
+        <p class="muted" style="margin:.35rem 0 0;">qwen3.5:latest für den Desktop, qwen3:4b als Laptop-Variante, gemma3:1b für schnelle Tests.</p>
+      </div>
+
+      <div style="margin-top:16px;">
+        <input type="submit" value="Speichern">
+      </div>
+    </form>
+  </section>
+{% endblock %}

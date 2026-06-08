@@ -29,6 +29,15 @@
 {% block content %}
   <section class="page-card">
     <p class="muted">Quelle: {{ source }}</p>
+    <form method="get" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:.75rem 0 1rem 0;">
+      <label for="model">Ollama model</label>
+      <select id="model" name="model">
+        {% for choice in model_choices %}
+          <option value="{{ choice.name }}" {% if selected_model == choice.name %}selected{% endif %}>{{ choice.label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="secondary">Neu laden</button>
+    </form>
     <div class="page-card" style="padding:18px;">
       {%- set clean = insight.replace('**','').replace('* ','').replace('- ','') -%}
       {%- set full_formatted = clean.replace('\n\n', '</p><p>').replace('\n', '<br>') -%}

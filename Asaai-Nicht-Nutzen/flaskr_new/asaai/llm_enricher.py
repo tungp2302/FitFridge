@@ -47,7 +47,6 @@ def build_freestyle_recipe_prompt(fridge_items, daily_goal=None, recipe_category
         f"{category_hint}"
         "Bevorzuge Proteinquellen im Kühlschrank, dann Gemüse und Sättigungsbeilagen. "
         "Erfunde keine exotischen Zutaten, wenn eine einfachere Variante möglich ist. "
-        "Nutze höchstens 3 Pantry-Staples wie Öl, Salz, Pfeffer, Zwiebel, Knoblauch. "
         "Wenn ein Proteinziel vorhanden ist, priorisiere proteinreiche Hauptzutaten und formuliere das Rezept entsprechend. "
         "Antworte ausschließlich als valides JSON-Objekt ohne Markdown, ohne Listen außerhalb des JSON und ohne Zusatztext.\n\n"
         "JSON-Schema:\n"

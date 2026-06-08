@@ -7,8 +7,6 @@ from flask import Blueprint, flash, g, redirect, render_template, request, sessi
 from werkzeug.exceptions import abort
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .asaai.local_insight import generate_ai_insight
-from .consumption_log_repo import get_recent_events
 from .db import get_db
 from .meal_tracker_service import (
     add_meal_entry,
@@ -23,6 +21,8 @@ from .meal_tracker_service import (
     save_settings,
 )
 from .meal_tracker_repo import update_meal_entry_amount
+from .app_settings_repo import get_settings as get_app_settings, save_settings as save_app_settings
+from .asaai.ollama_client import OLLAMA_MODEL_CHOICES, resolve_ollama_model
 from .fridge_service import (
     calculate_total_nutrition,
     create_dashboard_item,
@@ -96,64 +96,24 @@ def dashboard():
     return render_template("fridge/dashboard.html", posts=posts_with_nutrition, overview=overview)
 
 
-def _build_insight_fallback(consumption_history, fridge_items):
-    refill_count = sum(1 for entry in consumption_history if entry.get("event_type") == "refill")
-    item_count = len(fridge_items)
-
-    if not consumption_history and not fridge_items:
-        return "Noch keine Zugaenge vorhanden. Sobald du etwas auffuellst oder neu in den Kuehlschrank legst, zeigt dir ASaAI hier ein lokales Insight an."
-
-    return (
-        "ASaAI konnte kein lokales Zugangs-Insight erzeugen oder der Ollama-Server antwortet nicht. "
-        f"Aktuell sind {item_count} Fridge-Items und {refill_count} Zugaenge/Auffuellungen vorhanden. "
-        "Verbrauch wird separat ausgewertet."
-    )
-
-
-@bp.route("/asaai/insight")
+@bp.route("/settings", methods=("GET", "POST"))
 @login_required
-def asaai_insight():
-    fridge_items = [dict(item) for item in list_dashboard_items(g.user["id"])]
-    recent_events = get_recent_events(days=30, limit=50)
-    addition_history = [entry for entry in recent_events if entry.get("event_type") == "refill"]
-    consumption_events = [entry for entry in recent_events if entry.get("event_type") == "consume"]
-    debug_live = request.args.get("debug_live") == "1"
+def settings():
+    allowed_models = {choice["name"] for choice in OLLAMA_MODEL_CHOICES}
 
-    source = "ollama"
-    try:
-        insight = generate_ai_insight(addition_history, fridge_items)
-        if not insight:
-            insight = _build_insight_fallback(addition_history, fridge_items)
-            source = "fallback"
-    except Exception as exc:
-        if debug_live:
-            return {
-                "source": "error",
-                "error_type": exc.__class__.__name__,
-                "error": str(exc),
-                "addition_count": len(addition_history),
-                "consumption_count": len(consumption_events),
-                "fridge_item_count": len(fridge_items),
-            }, 500
-        insight = _build_insight_fallback(addition_history, fridge_items)
-        source = "fallback"
+    if request.method == "POST":
+        selected_model = resolve_ollama_model(request.form.get("llm_model"))
+        if selected_model not in allowed_models:
+            flash("Unbekanntes LLM-Modell.")
+        else:
+            save_app_settings(g.user["id"], llm_model=selected_model)
+            flash("Einstellungen gespeichert.")
 
-    if request.args.get("format") == "json":
-        return {
-            "source": source,
-            "insight": insight,
-            "addition_count": len(addition_history),
-            "consumption_count": len(consumption_events),
-            "fridge_item_count": len(fridge_items),
-        }
-
+    settings_data = get_app_settings(g.user["id"])
     return render_template(
-        "fridge/insight.html",
-        insight=insight,
-        source=source,
-        addition_history=addition_history,
-        consumption_events=consumption_events,
-        fridge_items=fridge_items,
+        "settings.html",
+        settings=settings_data,
+        model_choices=OLLAMA_MODEL_CHOICES,
     )
 
 

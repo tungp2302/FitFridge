@@ -84,21 +84,15 @@
         const q = input.value.trim();
         if(!q){ return; }
         setLoadingState(true);
-        // On submit, fetch AI estimate + search using the full typed query.
-        const aiReq = fetch(`/api/products/ai?q=${encodeURIComponent(q)}`).then(r=>r.json()).catch(()=>({}));
-        const apiReq = fetch(`/api/products/search?q=${encodeURIComponent(q)}`).then(r=>r.json()).catch(()=>([]));
-        Promise.all([aiReq, apiReq]).then(([aiItem, items])=>{
-          const combined = [];
-          if(aiItem && Object.keys(aiItem).length){ aiItem.ai = true; combined.push(aiItem); }
-          if(Array.isArray(items)) combined.push(...items);
-          if(!combined || combined.length === 0){
+        fetch(`/api/products/search?q=${encodeURIComponent(q)}`).then(r=>r.json()).then((items)=>{
+          if(!Array.isArray(items) || items.length === 0){
             // no matches -> proceed to create using current query
             form.submit();
             return;
           }
           // show matches for selection
           setLoadingState(false);
-          render(combined);
+          render(items);
         }).catch(()=>{ form.submit(); });
       });
 

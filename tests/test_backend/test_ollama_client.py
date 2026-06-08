@@ -1,4 +1,14 @@
-from flaskr_new.asaai.ollama_client import generate_from_ollama
+from flaskr_new.asaai.ollama_client import generate_from_ollama, resolve_ollama_model
+
+
+def test_resolve_ollama_model_accepts_profiles_and_raw_tags(monkeypatch):
+    monkeypatch.delenv("ASAAI_OLLAMA_MODEL", raising=False)
+    monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+
+    assert resolve_ollama_model("desktop") == "qwen3.5:latest"
+    assert resolve_ollama_model("laptop") == "qwen3:4b"
+    assert resolve_ollama_model("fast") == "gemma3:1b"
+    assert resolve_ollama_model("custom:latest") == "custom:latest"
 
 
 class _FakeResponse:
@@ -33,3 +43,17 @@ def test_generate_from_ollama_parses_response(monkeypatch):
     text = generate_from_ollama("Sag hallo", timeout=12)
 
     assert text == "Hallo von Ollama"
+
+
+def test_generate_from_ollama_uses_configured_model_without_local_fallback(monkeypatch):
+    monkeypatch.setenv("OLLAMA_MODEL", "qwen3.5:latest")
+
+    def fake_post(url, json, timeout):
+        assert json["model"] == "qwen3.5:latest"
+        return _FakeResponse({"response": "Configured model response"})
+
+    monkeypatch.setattr("flaskr_new.asaai.ollama_client.requests.post", fake_post)
+
+    text = generate_from_ollama("Sag hallo")
+
+    assert text == "Configured model response"

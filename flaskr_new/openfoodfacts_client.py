@@ -24,111 +24,6 @@ OFF_STAGING_API_URL = "https://world.openfoodfacts.net/api/v2/product/{barcode}.
 DEFAULT_USER_AGENT = "FitFridge/1.0 (university project; contact: you@example.com)"
 
 
-PROCESSED_FOOD_KEYWORDS = {
-    "chorizo",
-    "sausage",
-    "salami",
-    "pepperoni",
-    "burger",
-    "nugget",
-    "patty",
-    "snack",
-    "cookie",
-    "biscuit",
-    "cake",
-    "chocolate",
-    "cereal",
-    "bar",
-    "drink",
-    "soda",
-    "juice",
-    "sauce",
-    "ready meal",
-    "instant",
-    "microwave",
-    "processed",
-    "mix",
-}
-
-
-PRIMARY_FOOD_KEYWORDS = {
-    "banana",
-    "mango",
-    "apple",
-    "orange",
-    "grape",
-    "pear",
-    "berry",
-    "berries",
-    "fruit",
-    "vegetable",
-    "veg",
-    "chicken",
-    "beef",
-    "pork",
-    "turkey",
-    "fish",
-    "salmon",
-    "tuna",
-    "shrimp",
-    "broccoli",
-    "carrot",
-    "onion",
-    "garlic",
-    "potato",
-    "rice",
-    "pasta",
-    "egg",
-    "lentil",
-    "beans",
-    "tomato",
-    "cucumber",
-    "spinach",
-}
-
-
-PRIMARY_FOOD_ALIASES = {
-    # German -> English primary foods
-    "banane": "banana",
-    "bananen": "banana",
-    "apfel": "apple",
-    "birne": "pear",
-    "orange": "orange",
-    "traube": "grape",
-    "trauben": "grape",
-    "hahnchen": "chicken",
-    "huhnchen": "chicken",
-    "huhn": "chicken",
-    "hahnchenschenkel": "chicken thigh",
-    "huhnerschenkel": "chicken thigh",
-    "rind": "beef",
-    "rindfleisch": "beef",
-    "schwein": "pork",
-    "schweinefleisch": "pork",
-    "lachs": "salmon",
-    "thunfisch": "tuna",
-    "garnelen": "shrimp",
-    "garnele": "shrimp",
-    "brokkoli": "broccoli",
-    "karotte": "carrot",
-    "mohre": "carrot",
-    "zwiebel": "onion",
-    "zwiebeln": "onion",
-    "knoblauch": "garlic",
-    "kartoffel": "potato",
-    "kartoffeln": "potato",
-    "reis": "rice",
-    "nudeln": "pasta",
-    "nudel": "pasta",
-    "ei": "egg",
-    "eier": "egg",
-    "tomate": "tomato",
-    "tomaten": "tomato",
-    "gurke": "cucumber",
-    "spinat": "spinach",
-}
-
-
 def _first_string(*values: Optional[str]) -> str:
     for v in values:
         if v:
@@ -153,33 +48,12 @@ def _normalize_text(value: str) -> str:
     return " ".join(text.split())
 
 
-def _canonical_primary_query(query: str) -> str:
-    normalized = _normalize_text(query)
-    if not normalized:
-        return ""
-
-    mapped = PRIMARY_FOOD_ALIASES.get(normalized)
-    if mapped:
-        return mapped
-
-    tokens = normalized.split()
-    mapped_tokens = [PRIMARY_FOOD_ALIASES.get(token, token) for token in tokens]
-    return " ".join(mapped_tokens)
-
-
 def _strip_ai_ingredient_prefix(query: str) -> str:
     normalized = str(query or "").strip()
     lowered = normalized.lower()
     if lowered.startswith("ingredient:") or lowered.startswith("ai:"):
         return normalized.split(":", 1)[1].strip()
     return normalized
-
-
-def _is_primary_food_query(query: str) -> bool:
-    normalized = _canonical_primary_query(query)
-    if not normalized:
-        return False
-    return any(keyword in normalized for keyword in PRIMARY_FOOD_KEYWORDS)
 
 
 def _ingredient_display_name(query: str) -> str:
@@ -189,36 +63,29 @@ def _ingredient_display_name(query: str) -> str:
     return " ".join(part.capitalize() for part in normalized.split())
 
 
-def _llm_ai_product_metadata(query: str, canonical_query: str) -> dict:
-    """Use Ollama to label a primary ingredient as a friendly AI entry."""
-    from .asaai.ollama_client import generate_from_ollama
-
-    prompt = (
-        "Du bist ein Produkt-Normalisierer für FitFridge. "
-        "Nimm einen Lebensmittel-Suchbegriff und gib ein kurzes JSON-Objekt zurück. "
-        "Das Produkt soll ein unverarbeitetes Grundnahrungsmittel beschreiben, nicht ein Snack oder Fertigprodukt. "
-        "Wenn der Eingabetext deutsch ist, antworte deutsch; wenn englisch, antworte englisch. "
-        "Antworte nur als JSON ohne Markdown oder Zusatztext.\n\n"
-        "JSON-Schema:\n"
-        "{\n"
-        '  "display_name": "string",\n'
-        '  "why": "string"\n'
-        "}\n\n"
-        f"Suchbegriff: {query}\n"
-        f"Canonical ingredient: {canonical_query}"
-    )
+def _parse_llm_json_object(response: str) -> dict:
+    text = str(response or "").strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s*```$", "", text).strip()
 
     try:
-        response = generate_from_ollama(prompt=prompt, timeout=8, num_predict=140)
-    except Exception:
-        return {}
-
-    try:
-        parsed = json.loads(response.strip())
+        parsed = json.loads(text)
         if isinstance(parsed, dict):
             return parsed
     except Exception:
         pass
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        try:
+            parsed = json.loads(text[start : end + 1])
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+
     return {}
 
 
@@ -243,53 +110,23 @@ def _llm_ai_macro_estimate(query: str, canonical_query: str) -> dict:
     )
 
     try:
-        response = generate_from_ollama(prompt=prompt, timeout=10, num_predict=180)
+        response = generate_from_ollama(prompt=prompt, timeout=10, num_predict=220, format_json=True)
     except Exception:
         return {}
 
-    try:
-        parsed = json.loads(response.strip())
-        if isinstance(parsed, dict):
-            return parsed
-    except Exception:
-        pass
-    return {}
+    return _parse_llm_json_object(response)
 
 
-def _heuristic_ai_macro_estimate(query: str, canonical_query: str) -> dict:
-    """Fallback estimate when the model cannot answer."""
-    normalized = _normalize_text(canonical_query or query)
-    display_name = _ingredient_display_name(query) or _ingredient_display_name(normalized) or query
-
-    fruit_terms = {"banana", "mango", "apple", "orange", "grape", "pear", "berry", "berries", "fruit"}
-    vegetable_terms = {"broccoli", "carrot", "onion", "garlic", "tomato", "cucumber", "spinach", "pepper", "vegetable", "veg"}
-    protein_terms = {"chicken", "beef", "pork", "turkey", "fish", "salmon", "tuna", "shrimp", "egg", "eggs", "tofu", "lentils", "beans", "chickpeas"}
-    starch_terms = {"rice", "pasta", "potato", "potatoes", "bread", "oats", "quinoa", "couscous"}
-
-    tokens = set(normalized.split())
-
-    if tokens & fruit_terms:
-        macros = {"kcal": 60.0, "protein": 0.8, "fat": 0.3, "carbs": 15.0}
-        why = "Heuristische Schätzung für ein typisches Obst."
-    elif tokens & vegetable_terms:
-        macros = {"kcal": 30.0, "protein": 1.5, "fat": 0.2, "carbs": 6.0}
-        why = "Heuristische Schätzung für ein typisches Gemüse."
-    elif tokens & protein_terms:
-        macros = {"kcal": 160.0, "protein": 18.0, "fat": 8.0, "carbs": 0.0}
-        why = "Heuristische Schätzung für eine proteinreiche Zutat."
-    elif tokens & starch_terms:
-        macros = {"kcal": 130.0, "protein": 3.0, "fat": 1.0, "carbs": 28.0}
-        why = "Heuristische Schätzung für eine stärkehaltige Zutat."
-    else:
-        macros = {"kcal": 100.0, "protein": 3.0, "fat": 2.0, "carbs": 12.0}
-        why = "Heuristische Standardschätzung für ein unbekanntes Lebensmittel."
-
-    return {
-        "display_name": display_name,
-        "why": why,
-        "estimated_macros": macros,
-        "confidence": 0.35,
-    }
+def _has_complete_macro_estimate(meta: dict) -> bool:
+    macros = (meta or {}).get("estimated_macros") or {}
+    if not isinstance(macros, dict):
+        return False
+    for key in ("kcal", "protein", "fat", "carbs"):
+        try:
+            float(macros[key])
+        except (KeyError, TypeError, ValueError):
+            return False
+    return True
 
 
 def _build_generic_ingredient_product(query: str) -> Optional[Dict]:
@@ -297,11 +134,9 @@ def _build_generic_ingredient_product(query: str) -> Optional[Dict]:
 
 
 def _score_off_product(query: str, product: dict) -> float:
-    """Prefer raw ingredients over branded/processed products for food queries."""
-    normalized_query = _canonical_primary_query(query)
+    """Rank OpenFoodFacts products by textual closeness to the query."""
+    normalized_query = _normalize_text(query)
     name = _normalize_text(product.get("name", ""))
-    brand = _normalize_text(product.get("brand", ""))
-    raw = product.get("raw_product") or {}
 
     score = 0.0
 
@@ -311,29 +146,6 @@ def _score_off_product(query: str, product: dict) -> float:
         score += 35
     elif name and any(token in name for token in normalized_query.split()):
         score += 15
-
-    if _is_primary_food_query(normalized_query):
-        if any(keyword in name for keyword in PRIMARY_FOOD_KEYWORDS):
-            score += 20
-        if brand:
-            score -= 5
-        ingredients_text = _normalize_text(
-            raw.get("ingredients_text_en")
-            or raw.get("ingredients_text")
-            or raw.get("categories")
-            or ""
-        )
-        if any(keyword in ingredients_text for keyword in PROCESSED_FOOD_KEYWORDS):
-            score -= 25
-        if any(keyword in name for keyword in PROCESSED_FOOD_KEYWORDS):
-            score -= 35
-    else:
-        if any(keyword in name for keyword in PROCESSED_FOOD_KEYWORDS):
-            score -= 10
-
-    # Prefer generic items with no obvious brand when querying raw foods
-    if _is_primary_food_query(normalized_query) and not brand:
-        score += 10
 
     return score
 
@@ -586,18 +398,15 @@ def ai_estimate(query: str) -> Optional[dict]:
 
     query = _strip_ai_ingredient_prefix(query)
 
-    try:
-        canonical = _canonical_primary_query(query)
-    except Exception:
-        canonical = _normalize_text(query)
+    canonical = _normalize_text(query)
 
     try:
         llm_meta = _llm_ai_macro_estimate(query, canonical) or {}
     except Exception:
         llm_meta = {}
 
-    if not llm_meta:
-        llm_meta = _heuristic_ai_macro_estimate(query, canonical)
+    if not _has_complete_macro_estimate(llm_meta):
+        return None
 
     display_name = _ingredient_display_name(llm_meta.get("display_name")) or _ingredient_display_name(query) or query
     estimated_macros = llm_meta.get("estimated_macros") or {}

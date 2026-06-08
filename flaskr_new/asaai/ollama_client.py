@@ -7,13 +7,37 @@ used without extra Python dependencies beyond `requests`.
 from __future__ import annotations
 
 import os
-from typing import Any, Iterable, Optional
+from typing import Any, Optional
 
 import requests
+from flask import g, has_app_context
 
 
 DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 DEFAULT_OLLAMA_MODEL = "qwen3.5:latest"
+
+OLLAMA_MODEL_CHOICES = [
+    {
+        "id": "desktop",
+        "name": "qwen3.5:latest",
+        "label": "Qwen 3.5 latest (desktop, 9B)",
+    },
+    {
+        "id": "laptop",
+        "name": "qwen3:4b",
+        "label": "Qwen 3 4B (laptop)",
+    },
+    {
+        "id": "fast",
+        "name": "gemma3:1b",
+        "label": "Gemma 3 1B (fast)",
+    },
+]
+
+_OLLAMA_MODEL_ALIASES = {
+    choice["id"]: choice["name"]
+    for choice in OLLAMA_MODEL_CHOICES
+}
 
 
 def _build_prompt(prompt: str, system: Optional[str] = None) -> str:
@@ -22,19 +46,56 @@ def _build_prompt(prompt: str, system: Optional[str] = None) -> str:
     return prompt
 
 
-def _detect_local_model(endpoint: str) -> str:
-    """Pick the first locally installed Ollama model when no model is configured."""
+def resolve_ollama_model(model: Optional[str] = None) -> Optional[str]:
+    """Resolve a configured model alias to the Ollama model name.
+
+    Accepts either one of the local profile IDs (`desktop`, `laptop`, `fast`)
+    or a raw Ollama model tag such as `qwen3:4b`.
+    """
+    selected = (model or _stored_ollama_model() or os.getenv("ASAAI_OLLAMA_MODEL") or os.getenv("OLLAMA_MODEL") or "").strip()
+    if not selected:
+        return None
+    return _OLLAMA_MODEL_ALIASES.get(selected, selected)
+
+
+def _stored_ollama_model() -> Optional[str]:
+    if not has_app_context():
+        return None
+    user = getattr(g, "user", None)
+    if user is None:
+        return None
+    try:
+        from ..app_settings_repo import get_settings
+
+        return get_settings(user["id"]).get("llm_model")
+    except Exception:
+        return None
+
+
+def _local_model_names(endpoint: str) -> list[str]:
+    """Return locally installed Ollama model names."""
     response = requests.get(f"{endpoint}/api/tags", timeout=10)
     response.raise_for_status()
 
     payload = response.json()
     models = payload.get("models") if isinstance(payload, dict) else None
+    names = []
     if isinstance(models, list) and models:
-        first = models[0]
-        if isinstance(first, dict):
-            name = first.get("name")
+        for model_info in models:
+            if isinstance(model_info, dict):
+                name = model_info.get("name")
+            else:
+                name = None
             if isinstance(name, str) and name.strip():
-                return name.strip()
+                names.append(name.strip())
+    return names
+
+
+def _detect_local_model(endpoint: str) -> str:
+    """Pick the first locally installed Ollama model when no model is configured."""
+    names = _local_model_names(endpoint)
+    if names:
+        return names[0]
 
     return DEFAULT_OLLAMA_MODEL
 
@@ -47,6 +108,7 @@ def generate_from_ollama(
     timeout: int = 30,
     system: Optional[str] = None,
     num_predict: Optional[int] = None,
+    format_json: bool = False,
     **_: Any,
 ) -> str:
     """Generate a response via a locally running Ollama instance.
@@ -70,23 +132,27 @@ def generate_from_ollama(
     del api_key
 
     endpoint = (base_url or os.getenv("OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL).rstrip("/")
-    selected_model = model or os.getenv("OLLAMA_MODEL")
+    selected_model = resolve_ollama_model(model)
     if not selected_model:
         selected_model = _detect_local_model(endpoint)
     payload_prompt = _build_prompt(prompt, system=system)
 
+    payload = {
+        "model": selected_model,
+        "prompt": payload_prompt,
+        "stream": False,
+        "think": False,
+        "options": {
+            "temperature": 0.2,
+            "num_predict": int(num_predict or int(os.getenv("OLLAMA_NUM_PREDICT", "160"))),
+        },
+    }
+    if format_json:
+        payload["format"] = "json"
+
     response = requests.post(
         f"{endpoint}/api/generate",
-        json={
-            "model": selected_model,
-            "prompt": payload_prompt,
-            "stream": False,
-            "think": False,
-            "options": {
-                "temperature": 0.3,
-                "num_predict": int(num_predict or int(os.getenv("OLLAMA_NUM_PREDICT", "160"))),
-            },
-        },
+        json=payload,
         timeout=timeout,
     )
     response.raise_for_status()

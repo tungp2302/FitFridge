@@ -1,14 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Meal Planner{% endblock %}
+{% block title %}Rezeptplaner{% endblock %}
 {% block content %}
 <section class="page-card" style="margin-bottom:16px;">
-  <div class="hub-header" style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
-    <div>
-      <h1 style="margin:0 0 .25rem 0;">Rezeptplaner</h1>
-      <p class="muted" style="margin:0;">Ziel eingeben, Rezepte aus dem Kühlschrank durchsehen und direkt eine Kochanleitung öffnen.</p>
-    </div>
-    <a class="link-button" href="{{ url_for('asaai.hub_ui') }}">Zurück zum Hub</a>
-  </div>
+  <h1 style="margin:0 0 .25rem 0;">Rezeptplaner</h1>
+  <p class="muted" style="margin:0;">Freestyle-Rezept aus deinem Kühlschrank mit lokalem Ollama-Modell.</p>
 </section>
 
 <div class="planner-shell">
@@ -47,18 +42,10 @@
       <div style="flex:1;min-width:180px;align-self:end;">
         <button id="run-freestyle" class="btn" style="width:100%;">Freestyle-Rezept</button>
       </div>
-      <div style="flex:1;min-width:180px;align-self:end;">
-        <button id="run-api" class="secondary" style="width:100%;">Matcher nutzen</button>
-      </div>
-    </div>
-
-    <div class="muted-box" style="margin-top:12px;">
-      <strong>So funktioniert es</strong>
-      <p class="muted" style="margin:.35rem 0 0;">Die App schaut in deinen Kühlschrank, sortiert passende Rezepte und zeigt dir die wichtigsten Zutaten und Schritte direkt in den Karten.</p>
     </div>
 
     <div class="section-title">
-      <h3 style="margin:0;">Passende Rezepte</h3>
+      <h3 style="margin:0;">Vorschlag</h3>
       <span class="muted" id="status">Bereit</span>
     </div>
     <div id="rail" class="planner-rail">
@@ -68,16 +55,14 @@
 
   <aside class="recipe-detail" id="detail">
     <h2 id="detail-title" style="margin-top:0;">Rezeptdetails</h2>
-    <p class="muted" id="detail-subtitle">Wähle eine Karte aus, um Zutaten und Anleitung zu sehen.</p>
+    <p class="muted" id="detail-subtitle">Noch kein Rezept erzeugt.</p>
     <div id="detail-body" class="muted-box">
-      Noch kein Rezept ausgewählt.
+      Wähle Zielwerte und starte das Freestyle-Rezept.
     </div>
   </aside>
 </div>
 
 <script>
-let currentMatches = [];
-let selectedIndex = -1;
 let requestToken = 0;
 
 function readGoalValue(id){
@@ -89,26 +74,17 @@ function readGoalValue(id){
 
 function buildDailyGoal(){
   const dailyGoal = {};
-  const recipeCategory = document.getElementById('recipe-category').value.trim();
   const protein = readGoalValue('protein');
   const kcal = readGoalValue('kcal');
   const carbs = readGoalValue('carbs');
   const fat = readGoalValue('fat');
 
-  if(recipeCategory) dailyGoal.recipe_category = recipeCategory;
   if(protein !== null) dailyGoal.protein = protein;
   if(kcal !== null) dailyGoal.kcal = kcal;
   if(carbs !== null) dailyGoal.carbs = carbs;
   if(fat !== null) dailyGoal.fat = fat;
 
   return dailyGoal;
-}
-
-function macroLabel(match){
-  const macros = match.macros || {};
-  const kcal = macros.kcal != null ? `${Math.round(macros.kcal)} kcal` : 'kcal n/a';
-  const protein = macros.protein != null ? `${Math.round(macros.protein)}g protein` : '';
-  return [kcal, protein].filter(Boolean).join(' · ');
 }
 
 function freestyleMacroLabel(macros){
@@ -121,95 +97,30 @@ function freestyleMacroLabel(macros){
   return parts.length ? parts.join(' · ') : 'Macros n/a';
 }
 
-function ingredientsText(recipe){
-  return (recipe.ingredients || []).map(i => `${i.measure || ''} ${i.name}`.trim()).join('\n');
-}
-
-function renderDetail(match){
-  const recipe = match.recipe || {};
-  const ingredients = recipe.ingredients || [];
-  document.getElementById('detail-title').textContent = recipe.name || 'Recipe details';
-  document.getElementById('detail-subtitle').textContent = `${recipe.area || ''}${recipe.category ? ' · ' + recipe.category : ''}`.trim();
-  document.getElementById('detail-body').innerHTML = `
-    <div class="recipe-meta" style="margin-bottom:10px;">
-      <span>${macroLabel(match)}</span>
-      <span>Match ${Math.round((match.match_score || 0) * 100)}%</span>
-    </div>
-    <div style="margin-bottom:10px;">
-      ${(match.available || []).slice(0,6).map(item => `<span class="pill">${item}</span>`).join('') || '<span class="muted">No matching ingredients listed</span>'}
-    </div>
-    <div class="muted-box" style="margin-bottom:10px;">
-      <strong>Ingredients</strong>
-      <pre style="white-space:pre-wrap;margin:.5rem 0 0;">${ingredientsText(recipe) || 'No ingredients listed.'}</pre>
-    </div>
-    <div class="muted-box">
-      <strong>Cooking instructions</strong>
-      <p style="white-space:pre-wrap;margin:.5rem 0 0;">${recipe.instructions || 'No instructions available.'}</p>
-    </div>
-  `;
-}
-
-function renderCards(matches){
-  const rail = document.getElementById('rail');
-  if(!matches || matches.length === 0){
-    rail.innerHTML = '<div class="muted-box">No recipe matches yet. Try a different target or add more fridge items.</div>';
-    document.getElementById('status').textContent = 'No matches';
-    return;
-  }
-  rail.innerHTML = matches.map((match, idx) => {
-    const recipe = match.recipe || {};
-    return `
-      <article class="recipe-card ${idx === 0 ? 'active' : ''}" data-idx="${idx}">
-        <div class="recipe-meta">
-          <strong>${recipe.name || 'Untitled recipe'}</strong>
-          <span>${Math.round((match.match_score || 0) * 100)}%</span>
-        </div>
-        <p class="muted" style="margin:.45rem 0 .75rem;">${recipe.area || 'Unknown area'} · ${recipe.category || 'Recipe'}</p>
-        <div style="margin-bottom:.5rem;">${macroLabel(match)}</div>
-        <div class="muted" style="font-size:.92rem;">Missing: ${(match.missing || []).slice(0,5).join(', ') || 'None'}</div>
-      </article>
-    `;
-  }).join('');
-
-  Array.from(rail.querySelectorAll('.recipe-card')).forEach(card => {
-    card.addEventListener('click', () => {
-      const idx = Number(card.dataset.idx);
-      selectedIndex = idx;
-      Array.from(rail.querySelectorAll('.recipe-card')).forEach(x => x.classList.remove('active'));
-      card.classList.add('active');
-      renderDetail(matches[idx]);
-    });
-  });
-
-  selectedIndex = 0;
-  renderDetail(matches[0]);
-  document.getElementById('status').textContent = `${matches.length} recipes found`;
-}
-
 function renderFreestyle(result){
   const rail = document.getElementById('rail');
   const recipe = result.recipe || {};
+  const isWarning = recipe.warning === true;
   const ingredients = recipe.ingredients || [];
   const instructions = recipe.instructions || [];
   rail.innerHTML = `
     <article class="recipe-card active" data-idx="0">
       <div class="recipe-meta">
         <strong>${recipe.title || 'Freestyle recipe'}</strong>
-        <span>LLM</span>
+        <span>${isWarning ? 'Warnung' : 'LLM'}</span>
       </div>
-      <p class="muted" style="margin:.45rem 0 .75rem;">Generated from your fridge</p>
-      <div class="muted" style="font-size:.92rem; margin-bottom:.5rem;">Category: ${recipe.recipe_category || recipe.category || 'Unspecified'}</div>
+      <p class="muted" style="margin:.45rem 0 .75rem;">${isWarning ? 'Keine Rezeptantwort erzeugt' : 'Generated from your fridge'}</p>
       <div style="margin-bottom:.5rem;">${(recipe.used_fridge_items || []).map(item => `<span class="pill">${item}</span>`).join('') || '<span class="muted">No fridge items used</span>'}</div>
       <div class="muted" style="font-size:.92rem;">Pantry assumptions: ${(recipe.pantry_assumptions || []).join(', ') || 'None'}</div>
     </article>
   `;
 
   document.getElementById('detail-title').textContent = recipe.title || 'Freestyle recipe';
-  document.getElementById('detail-subtitle').textContent = `AI-generated from your fridge contents${recipe.recipe_category ? ' · ' + recipe.recipe_category : ''}`;
+  document.getElementById('detail-subtitle').textContent = isWarning ? 'LLM-Anbindung prüfen' : 'AI-generated from your fridge contents';
   document.getElementById('detail-body').innerHTML = `
     <div class="recipe-meta" style="margin-bottom:10px;">
       <span>${freestyleMacroLabel(recipe.estimated_macros)}</span>
-      <span>Freestyle</span>
+      <span>${isWarning ? 'Warnung' : 'Freestyle'}</span>
     </div>
     <div class="muted-box" style="margin-bottom:10px;">
       <strong>Why this works</strong>
@@ -224,66 +135,21 @@ function renderFreestyle(result){
       <pre style="white-space:pre-wrap;margin:.5rem 0 0;">${instructions.length ? instructions.map((step, idx) => `${idx + 1}. ${step}`).join('\n\n') : 'No instructions available.'}</pre>
     </div>
   `;
-  document.getElementById('status').textContent = 'Freestyle recipe ready';
-}
-
-async function loadRecipes(){
-  const dailyGoal = buildDailyGoal();
-  const status = document.getElementById('status');
-  const token = ++requestToken;
-  status.textContent = 'Loading recipes...';
-  document.getElementById('run-freestyle').disabled = true;
-  document.getElementById('run-api').disabled = true;
-  try {
-    const fastResponse = await fetch('/asaai/recipes/match-only');
-    const fastData = await fastResponse.json();
-    if (token !== requestToken) return;
-    currentMatches = fastData.matches || [];
-    renderCards(currentMatches);
-    status.textContent = 'Fast matches loaded. Ranking by goal...';
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 9000);
-    const response = await fetch('/asaai/recipes/suggest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ daily_goal: dailyGoal }),
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-    const data = await response.json();
-    if (token !== requestToken) return;
-    currentMatches = data.enriched_matches || data.original_matches || currentMatches;
-    renderCards(currentMatches);
-    status.textContent = data.llm_recommendation ? 'Goal-ranked results ready' : 'Goal-ranked results loaded';
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      if (token === requestToken) {
-        status.textContent = 'Goal ranking is taking longer than usual. Showing fast matches.';
-      }
-      return;
-    }
-    if (token === requestToken) {
-      status.textContent = 'Fast matches shown; goal ranking unavailable';
-    }
-  } finally {
-    document.getElementById('run-freestyle').disabled = false;
-    document.getElementById('run-api').disabled = false;
-  }
+  document.getElementById('status').textContent = isWarning ? 'LLM warning' : 'Freestyle recipe ready';
 }
 
 async function loadFreestyleRecipe(){
   const dailyGoal = buildDailyGoal();
+  const recipeCategory = document.getElementById('recipe-category').value.trim();
   const status = document.getElementById('status');
   const token = ++requestToken;
   status.textContent = 'Generating freestyle recipe...';
   document.getElementById('run-freestyle').disabled = true;
-  document.getElementById('run-api').disabled = true;
   try {
     const response = await fetch('/asaai/recipes/freestyle', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ daily_goal: dailyGoal })
+      body: JSON.stringify({ daily_goal: dailyGoal, recipe_category: recipeCategory })
     });
     const data = await response.json();
     if (token !== requestToken) return;
@@ -295,11 +161,9 @@ async function loadFreestyleRecipe(){
     document.getElementById('rail').innerHTML = '<div class="muted-box">Freestyle generation failed. Please try again.</div>';
   } finally {
     document.getElementById('run-freestyle').disabled = false;
-    document.getElementById('run-api').disabled = false;
   }
 }
 
 document.getElementById('run-freestyle').addEventListener('click', loadFreestyleRecipe);
-document.getElementById('run-api').addEventListener('click', loadRecipes);
 </script>
 {% endblock %}

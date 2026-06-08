@@ -1,12 +1,11 @@
-"""ASaAI package for FitFridge."""
+"""Minimal AI helpers kept for FitFridge."""
 
-from .local_insight import build_insight_prompt, generate_ai_insight
-from .ollama_client import generate_from_ollama
-from .recipe_matcher import find_recipes_matching_fridge, calculate_match
-from .llm_enricher import enrich_recipes_with_llm, enrich_with_full_pipeline
-from .macro_calculator import (
-    calculate_recipe_macros,
-    calculate_ingredient_macros,
-    parse_measure_string,
-    rank_by_daily_goal,
-)
+from .freestyle_recipe import build_freestyle_recipe_prompt, generate_freestyle_recipe
+from .ollama_client import generate_from_ollama, resolve_ollama_model
+
+__all__ = [
+    "build_freestyle_recipe_prompt",
+    "generate_freestyle_recipe",
+    "generate_from_ollama",
+    "resolve_ollama_model",
+]

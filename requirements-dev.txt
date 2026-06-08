@@ -1,1 +1,6 @@
+flask
+werkzeug
+click
+certifi
+requests
 pytest>=9

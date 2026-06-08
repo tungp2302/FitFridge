@@ -154,8 +154,8 @@ def test_openfoodfacts_parsing(monkeypatch):
     assert result["sugar_per_100g"] == 56.3
 
 
-def test_lookup_product_prefers_primary_food_over_processed(monkeypatch):
-    raw_chicken = {
+def test_lookup_product_ranks_off_results_by_text_match(monkeypatch):
+    exact_match = {
         "name": "Chicken thigh",
         "brand": "",
         "barcode": "111",
@@ -165,7 +165,7 @@ def test_lookup_product_prefers_primary_food_over_processed(monkeypatch):
         "carbs_per_100g": 0.0,
         "raw_product": {"ingredients_text_en": "chicken thigh"},
     }
-    processed = {
+    partial_match = {
         "name": "Chicken & Chorizo Rice Pot",
         "brand": "Ready Meals Co",
         "barcode": "222",
@@ -176,7 +176,7 @@ def test_lookup_product_prefers_primary_food_over_processed(monkeypatch):
         "raw_product": {"ingredients_text_en": "chicken, chorizo, rice, seasoning"},
     }
 
-    monkeypatch.setattr(ofc, "search_products", lambda query, **kwargs: [processed, raw_chicken])
+    monkeypatch.setattr(ofc, "search_products", lambda query, **kwargs: [partial_match, exact_match])
 
     result = ofc.lookup_product("chicken thigh")
 
@@ -231,19 +231,75 @@ def test_ai_estimate_returns_llm_macros_for_primary_food(monkeypatch):
         ofc,
         "_llm_ai_macro_estimate",
         lambda query, canonical: {
-            "display_name": "Mango",
+            "display_name": "Dragonfruit",
             "why": "LLM estimate",
-            "estimated_macros": {"kcal": 61, "protein": 0.8, "fat": 0.4, "carbs": 15.0},
+            "estimated_macros": {"kcal": 57, "protein": 0.4, "fat": 0.1, "carbs": 13.0},
             "confidence": 0.77,
         },
     )
 
-    result = ofc.ai_estimate("Mango")
+    result = ofc.ai_estimate("Dragonfruit")
 
-    assert result["name"] == "Mango"
-    assert result["barcode"] == "ingredient:mango"
-    assert result["kcal_per_100g"] == 61
+    assert result["name"] == "Dragonfruit"
+    assert result["barcode"] == "ingredient:dragonfruit"
+    assert result["kcal_per_100g"] == 57
     assert result["raw_product"]["ai_note"] == "LLM estimate"
+
+
+def test_llm_ai_macro_estimate_parses_markdown_json(monkeypatch):
+    from flaskr_new.asaai import ollama_client
+
+    monkeypatch.setattr(
+        ollama_client,
+        "generate_from_ollama",
+        lambda **kwargs: """```json
+{
+  "display_name": "Apfel",
+  "why": "LLM estimate",
+  "estimated_macros": {"kcal": 52, "protein": 0.3, "fat": 0.2, "carbs": 14},
+  "confidence": 0.9
+}
+```""",
+    )
+
+    result = ofc._llm_ai_macro_estimate("Apfel", "apfel")
+
+    assert result["display_name"] == "Apfel"
+    assert result["estimated_macros"]["kcal"] == 52
+
+
+def test_ai_estimate_uses_llm_macros_for_german_paprika(monkeypatch):
+    monkeypatch.setattr(
+        ofc,
+        "_llm_ai_macro_estimate",
+        lambda query, canonical: {
+            "display_name": "Paprika",
+            "why": "LLM estimate",
+            "estimated_macros": {"kcal": 26, "protein": 1.0, "fat": 0.3, "carbs": 6},
+            "confidence": 0.8,
+        },
+    )
+
+    result = ofc.ai_estimate("Paprika")
+
+    assert result["name"] == "Paprika"
+    assert result["barcode"] == "ingredient:paprika"
+    assert result["kcal_per_100g"] == 26.0
+    assert result["protein_per_100g"] == 1.0
+
+
+def test_ai_estimate_returns_none_when_llm_has_no_complete_macros(monkeypatch):
+    monkeypatch.setattr(
+        ofc,
+        "_llm_ai_macro_estimate",
+        lambda query, canonical: {
+            "display_name": "Paprika",
+            "why": "Incomplete LLM estimate",
+            "estimated_macros": {"kcal": 26},
+        },
+    )
+
+    assert ofc.ai_estimate("Paprika") is None
 
 
 def test_freestyle_recipe_endpoint_returns_recipe(app, monkeypatch):

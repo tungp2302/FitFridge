@@ -4,13 +4,22 @@
 <div class="container mt-4">
   <h1>ASaAI Hub</h1>
 
+  <div class="model-toolbar">
+    <label for="ollama-model">Ollama model</label>
+    <select id="ollama-model">
+      {% for choice in model_choices %}
+        <option value="{{ choice.name }}" {% if selected_model == choice.name %}selected{% endif %}>{{ choice.label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:1rem;">
     <button id="btn-match" class="btn">Rezept-Treffer</button>
     <button id="btn-suggest" class="btn">Rezeptvorschläge</button>
     <button id="btn-nutrition" class="btn">Ernährungs-Check</button>
     <button id="btn-forecast" class="btn">Verbrauchsprognose</button>
     <button id="btn-shopping" class="btn">Einkaufsplaner</button>
-    <a class="link-button" href="{{ url_for('frontend.asaai_insight') }}">ASaAI Einblick</a>
+    <a id="insight-link" class="link-button" href="{{ url_for('frontend.asaai_insight') }}">ASaAI Einblick</a>
     <button id="btn-all" class="btn">Alles ausführen</button>
   </div>
 
@@ -29,9 +38,26 @@
   .card-body{background:white;padding:8px;border-radius:4px;min-height:64px;white-space:pre-wrap;overflow:auto;line-height:1.45}
   button.btn{background:#2b8b7a;color:white;border:none;padding:8px 12px;border-radius:4px;cursor:pointer}
   button.btn:active{transform:translateY(1px)}
+  .model-toolbar{display:flex;gap:8px;align-items:center;margin:.75rem 0 1rem 0;flex-wrap:wrap}
+  .model-toolbar select{padding:7px 10px;border:1px solid #bbb;border-radius:4px;background:white}
 </style>
 
 <script>
+function selectedModel(){
+  const el = document.getElementById('ollama-model');
+  return el ? el.value : '';
+}
+
+function modelQuery(){
+  const model = selectedModel();
+  return model ? `?model=${encodeURIComponent(model)}` : '';
+}
+
+function updateInsightLink(){
+  const link = document.getElementById('insight-link');
+  if(link) link.href = '/asaai/insight' + modelQuery();
+}
+
 function setBusy(id, busy){
   const btn = document.getElementById(id);
   if(!btn) return;
@@ -70,7 +96,7 @@ async function fetchSuggest(){
   setBusy('btn-suggest', true);
   el.textContent = 'Lädt...';
   try{
-    const r = await fetch('/asaai/recipes/suggest', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({daily_goal:{protein:30,kcal:2000}})});
+    const r = await fetch('/asaai/recipes/suggest', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({daily_goal:{protein:30,kcal:2000}, model:selectedModel()})});
     const j = await r.json();
     el.textContent = (j.enriched_matches && j.enriched_matches.length) ? j.enriched_matches.slice(0,3).map(x=>`${x.recipe.name} — ${x.recipe.area} — ${x.macros?('kcal '+x.macros.kcal):''}`).join('\n') : (j.llm_recommendation || JSON.stringify(j));
   }catch(e){ el.textContent = 'Fehler beim Laden: '+e }
@@ -82,7 +108,7 @@ async function fetchNutrition(){
   setBusy('btn-nutrition', true);
   el.textContent = 'Lädt...';
   try{
-    const r = await fetch('/asaai/insights/nutrition');
+    const r = await fetch('/asaai/insights/nutrition' + modelQuery());
     const j = await r.json();
     el.textContent = j.insight_text || JSON.stringify(j.analysis||j);
   }catch(e){ el.textContent = 'Fehler beim Laden: '+e }
@@ -94,7 +120,7 @@ async function fetchForecast(){
   setBusy('btn-forecast', true);
   el.textContent = 'Lädt...';
   try{
-    const r = await fetch('/asaai/forecast');
+    const r = await fetch('/asaai/forecast' + modelQuery());
     const j = await r.json();
     el.textContent = j.insight_text || summarizeForecast(j.forecasts || []);
   }catch(e){ el.textContent = 'Fehler beim Laden: '+e }
@@ -106,7 +132,7 @@ async function fetchShopping(){
   setBusy('btn-shopping', true);
   el.textContent = 'Lädt...';
   try{
-    const r = await fetch('/asaai/shopping/list');
+    const r = await fetch('/asaai/shopping/list' + modelQuery());
     const j = await r.json();
     el.textContent = j.shopping_list_text || JSON.stringify(j.low_stock_items||j);
   }catch(e){ el.textContent = 'Fehler beim Laden: '+e }
@@ -117,6 +143,9 @@ async function fetchShopping(){
   const btn = document.getElementById(id);
   if(btn) btn.dataset.label = btn.textContent;
 });
+const modelSelect = document.getElementById('ollama-model');
+if(modelSelect) modelSelect.addEventListener('change', updateInsightLink);
+updateInsightLink();
 
 document.getElementById('btn-match').addEventListener('click',fetchMatch);
 document.getElementById('btn-suggest').addEventListener('click',fetchSuggest);
