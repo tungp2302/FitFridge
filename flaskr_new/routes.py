@@ -22,7 +22,7 @@ from .meal_tracker_service import (
 )
 from .meal_tracker_repo import update_meal_entry_amount
 from .app_settings_repo import get_settings as get_app_settings, save_settings as save_app_settings
-from .asaai.ollama_client import OLLAMA_MODEL_CHOICES, resolve_ollama_model
+from .asaai.ollama_client import OLLAMA_MODEL_CHOICES, resolve_ollama_model, test_ollama_model
 from .fridge_service import (
     calculate_total_nutrition,
     create_dashboard_item,
@@ -100,20 +100,38 @@ def dashboard():
 @login_required
 def settings():
     allowed_models = {choice["name"] for choice in OLLAMA_MODEL_CHOICES}
+    llm_test = None
 
     if request.method == "POST":
+        action = request.form.get("action")
         selected_model = resolve_ollama_model(request.form.get("llm_model"))
         if selected_model not in allowed_models:
             flash("Unbekanntes LLM-Modell.")
         else:
             save_app_settings(g.user["id"], llm_model=selected_model)
-            flash("Einstellungen gespeichert.")
+            if action == "test_llm":
+                try:
+                    llm_test = test_ollama_model(selected_model)
+                    if llm_test["ok"]:
+                        flash(f"LLM-Test erfolgreich: {selected_model} antwortet.")
+                    else:
+                        flash(f"LLM-Test fehlgeschlagen: {selected_model} antwortet nicht.")
+                except Exception as exc:
+                    llm_test = {
+                        "ok": False,
+                        "model": selected_model,
+                        "error": str(exc),
+                    }
+                    flash(f"LLM-Test fehlgeschlagen: {exc}")
+            else:
+                flash("Einstellungen gespeichert.")
 
     settings_data = get_app_settings(g.user["id"])
     return render_template(
         "settings.html",
         settings=settings_data,
         model_choices=OLLAMA_MODEL_CHOICES,
+        llm_test=llm_test,
     )
 
 

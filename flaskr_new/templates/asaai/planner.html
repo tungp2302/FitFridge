@@ -101,26 +101,28 @@ function renderFreestyle(result){
   const rail = document.getElementById('rail');
   const recipe = result.recipe || {};
   const isWarning = recipe.warning === true;
+  const isFallback = recipe.fallback === true;
+  const stateLabel = isWarning ? 'Warnung' : (isFallback ? 'Fallback' : 'LLM');
   const ingredients = recipe.ingredients || [];
   const instructions = recipe.instructions || [];
   rail.innerHTML = `
     <article class="recipe-card active" data-idx="0">
       <div class="recipe-meta">
         <strong>${recipe.title || 'Freestyle recipe'}</strong>
-        <span>${isWarning ? 'Warnung' : 'LLM'}</span>
+        <span>${stateLabel}</span>
       </div>
-      <p class="muted" style="margin:.45rem 0 .75rem;">${isWarning ? 'Keine Rezeptantwort erzeugt' : 'Generated from your fridge'}</p>
+      <p class="muted" style="margin:.45rem 0 .75rem;">${isWarning || isFallback ? 'Modellantwort nicht brauchbar' : 'Generated from your fridge'}</p>
       <div style="margin-bottom:.5rem;">${(recipe.used_fridge_items || []).map(item => `<span class="pill">${item}</span>`).join('') || '<span class="muted">No fridge items used</span>'}</div>
       <div class="muted" style="font-size:.92rem;">Pantry assumptions: ${(recipe.pantry_assumptions || []).join(', ') || 'None'}</div>
     </article>
   `;
 
   document.getElementById('detail-title').textContent = recipe.title || 'Freestyle recipe';
-  document.getElementById('detail-subtitle').textContent = isWarning ? 'LLM-Anbindung prüfen' : 'AI-generated from your fridge contents';
+  document.getElementById('detail-subtitle').textContent = isWarning || isFallback ? 'LLM-Anbindung oder Modellleistung prüfen' : 'AI-generated from your fridge contents';
   document.getElementById('detail-body').innerHTML = `
     <div class="recipe-meta" style="margin-bottom:10px;">
       <span>${freestyleMacroLabel(recipe.estimated_macros)}</span>
-      <span>${isWarning ? 'Warnung' : 'Freestyle'}</span>
+      <span>${stateLabel}</span>
     </div>
     <div class="muted-box" style="margin-bottom:10px;">
       <strong>Why this works</strong>
@@ -135,7 +137,7 @@ function renderFreestyle(result){
       <pre style="white-space:pre-wrap;margin:.5rem 0 0;">${instructions.length ? instructions.map((step, idx) => `${idx + 1}. ${step}`).join('\n\n') : 'No instructions available.'}</pre>
     </div>
   `;
-  document.getElementById('status').textContent = isWarning ? 'LLM warning' : 'Freestyle recipe ready';
+  document.getElementById('status').textContent = isWarning ? 'LLM warning' : (isFallback ? 'Fallback recipe ready' : 'Freestyle recipe ready');
 }
 
 async function loadFreestyleRecipe(){
@@ -153,12 +155,15 @@ async function loadFreestyleRecipe(){
     });
     const data = await response.json();
     if (token !== requestToken) return;
+    if (!response.ok) {
+      throw new Error(data.error || 'Freestyle generation failed');
+    }
     renderFreestyle(data);
   } catch (error) {
     if (token === requestToken) {
-      status.textContent = 'Freestyle generation failed';
+      status.textContent = error.message || 'Freestyle generation failed';
     }
-    document.getElementById('rail').innerHTML = '<div class="muted-box">Freestyle generation failed. Please try again.</div>';
+    document.getElementById('rail').innerHTML = `<div class="muted-box">${error.message || 'Freestyle generation failed. Please try again.'}</div>`;
   } finally {
     document.getElementById('run-freestyle').disabled = false;
   }

@@ -63,3 +63,54 @@ def test_settings_page_saves_llm_model(app):
 
     with app.app_context():
         assert app_settings_repo.get_settings(1)["llm_model"] == "gemma3:1b"
+
+
+def test_settings_page_tests_llm_model_success(app, monkeypatch):
+    monkeypatch.setattr(
+        "flaskr_new.routes.test_ollama_model",
+        lambda model: {
+            "ok": True,
+            "model": model,
+            "base_url": "http://127.0.0.1:11434",
+            "installed": True,
+            "generated": True,
+            "installed_models": [model],
+            "response": "ok",
+        },
+    )
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = 1
+
+        response = client.post(
+            "/settings",
+            data={"llm_model": "gemma3:1b", "action": "test_llm"},
+            follow_redirects=True,
+        )
+
+    assert response.status_code == 200
+    assert b"LLM-Test erfolgreich" in response.data
+    assert b"gemma3:1b" in response.data
+    assert b"Antwortet: ja" in response.data
+
+
+def test_settings_page_tests_llm_model_failure(app, monkeypatch):
+    def fake_test_ollama_model(model):
+        raise RuntimeError("Ollama offline")
+
+    monkeypatch.setattr("flaskr_new.routes.test_ollama_model", fake_test_ollama_model)
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = 1
+
+        response = client.post(
+            "/settings",
+            data={"llm_model": "gemma3:1b", "action": "test_llm"},
+            follow_redirects=True,
+        )
+
+    assert response.status_code == 200
+    assert b"LLM-Test fehlgeschlagen" in response.data
+    assert b"Ollama offline" in response.data

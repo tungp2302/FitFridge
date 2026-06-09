@@ -94,9 +94,10 @@ def _llm_ai_macro_estimate(query: str, canonical_query: str) -> dict:
     from .asaai.ollama_client import generate_from_ollama
 
     prompt = (
-        "Du bist ein Nährwert-Schätzer für FitFridge. "
-        "Schätze die typischen Nährwerte pro 100g für das genannte Lebensmittel. "
+        "Du bist ein zertifizierter Ernährungsberater und Nährwert-Schätzer für FitFridge. "
+        "Schätze die Nährwerte pro 100g für das genannte Lebensmittel so präzise wie möglich. "
         "Wenn du unsicher bist, gib eine plausible Durchschnittsschätzung statt 0. "
+        "Du kannst sowohl auf deutsche als auch auf englische Begriffe zurückgreifen. "
         "Antworte nur als JSON ohne Markdown oder Zusatztext.\n\n"
         "JSON-Schema:\n"
         "{\n"

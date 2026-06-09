@@ -7,6 +7,7 @@ used without extra Python dependencies beyond `requests`.
 from __future__ import annotations
 
 import os
+import json
 from typing import Any, Optional
 
 import requests
@@ -98,6 +99,62 @@ def _detect_local_model(endpoint: str) -> str:
         return names[0]
 
     return DEFAULT_OLLAMA_MODEL
+
+
+def test_ollama_model(model: Optional[str] = None, base_url: Optional[str] = None, timeout: int = 20) -> dict:
+    """Check whether Ollama can handle the JSON mode used by the recipe planner."""
+    endpoint = (base_url or os.getenv("OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL).rstrip("/")
+    selected_model = resolve_ollama_model(model) or DEFAULT_OLLAMA_MODEL
+    names = _local_model_names(endpoint)
+    if selected_model not in names:
+        return {
+            "ok": False,
+            "model": selected_model,
+            "base_url": endpoint,
+            "installed": False,
+            "generated": False,
+            "installed_models": names,
+            "error": "Modell ist lokal nicht installiert.",
+        }
+
+    response = requests.post(
+        f"{endpoint}/api/generate",
+        json={
+            "model": selected_model,
+            "prompt": (
+                "Antworte nur mit einem JSON-Objekt: "
+                '{"ok":true,"title":"Planner Test","estimated_macros":{"protein":60,"fat":25}}'
+            ),
+            "stream": False,
+            "think": False,
+            "format": "json",
+            "options": {
+                "temperature": 0,
+                "num_predict": 120,
+            },
+        },
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    data = response.json()
+    text = data.get("response") if isinstance(data, dict) else ""
+    parsed = {}
+    if isinstance(text, str) and text.strip():
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            parsed = {}
+    generated = isinstance(parsed, dict) and parsed.get("ok") is True
+    return {
+        "ok": generated,
+        "model": selected_model,
+        "base_url": endpoint,
+        "installed": True,
+        "generated": generated,
+        "installed_models": names,
+        "response": text.strip() if isinstance(text, str) else "",
+        "error": "" if generated else "Modell antwortet, aber nicht mit brauchbarem Planner-JSON.",
+    }
 
 
 def generate_from_ollama(

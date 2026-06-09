@@ -47,7 +47,15 @@ def freestyle_recipe():
         }), 500
 
     fridge_items = [
-        {"name": item["name"], "amount": item["current_amount"]}
+        {
+            "name": item["name"],
+            "amount": item["current_amount"],
+            "unit": item.get("unit"),
+            "kcal_per_100g": item.get("kcal_per_100g"),
+            "protein_per_100g": item.get("protein_per_100g"),
+            "fat_per_100g": item.get("fat_per_100g"),
+            "carbs_per_100g": item.get("carbs_per_100g"),
+        }
         for item in items
     ]
     result = generate_freestyle_recipe(

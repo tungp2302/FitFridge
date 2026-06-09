@@ -24,8 +24,35 @@
         <p class="muted" style="margin:.35rem 0 0;">qwen3.5:latest für den Desktop, qwen3:4b als Laptop-Variante, gemma3:1b für schnelle Tests.</p>
       </div>
 
-      <div style="margin-top:16px;">
-        <input type="submit" value="Speichern">
+      {% if llm_test %}
+        <div class="muted-box" style="margin-top:12px;">
+          <strong>LLM-Test</strong>
+          <p class="muted" style="margin:.35rem 0 0;">
+            {{ llm_test.model }}:
+            {% if llm_test.ok %}
+              installiert und generiert erfolgreich.
+            {% else %}
+              nicht bereit.
+            {% endif %}
+          </p>
+          <p class="muted" style="margin:.35rem 0 0;">
+            Installiert: {{ 'ja' if llm_test.installed else 'nein' }} ·
+            Antwortet: {{ 'ja' if llm_test.generated else 'nein' }}
+          </p>
+          {% if llm_test.response %}
+            <p class="muted" style="margin:.35rem 0 0;">Testantwort: {{ llm_test.response }}</p>
+          {% endif %}
+          {% if llm_test.error %}
+            <p class="muted" style="margin:.35rem 0 0;">Fehler: {{ llm_test.error }}</p>
+          {% elif llm_test.installed_models %}
+            <p class="muted" style="margin:.35rem 0 0;">Installiert: {{ llm_test.installed_models | join(', ') }}</p>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button type="submit" name="action" value="save_settings">Speichern</button>
+        <button type="submit" name="action" value="test_llm" class="secondary">Modell testen</button>
       </div>
     </form>
   </section>

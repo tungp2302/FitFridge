@@ -309,15 +309,42 @@ def test_freestyle_recipe_endpoint_returns_recipe(app, monkeypatch):
         routes_asaai,
         "_current_fridge_items",
         lambda: [
-            {"name": "Chicken thigh", "current_amount": 400},
-            {"name": "Rice", "current_amount": 250},
-            {"name": "Broccoli", "current_amount": 200},
+            {
+                "name": "Chicken thigh",
+                "current_amount": 400,
+                "unit": "g",
+                "kcal_per_100g": 209,
+                "protein_per_100g": 26,
+                "fat_per_100g": 10.9,
+                "carbs_per_100g": 0,
+            },
+            {
+                "name": "Rice",
+                "current_amount": 250,
+                "unit": "g",
+                "kcal_per_100g": 130,
+                "protein_per_100g": 2.7,
+                "fat_per_100g": 0.3,
+                "carbs_per_100g": 28,
+            },
+            {
+                "name": "Broccoli",
+                "current_amount": 200,
+                "unit": "g",
+                "kcal_per_100g": 34,
+                "protein_per_100g": 2.8,
+                "fat_per_100g": 0.4,
+                "carbs_per_100g": 7,
+            },
         ],
     )
-    monkeypatch.setattr(
-        routes_asaai,
-        "generate_freestyle_recipe",
-        lambda fridge_items, daily_goal=None, **kwargs: {
+
+    captured = {}
+
+    def fake_generate_freestyle_recipe(fridge_items, daily_goal=None, **kwargs):
+        captured["fridge_items"] = fridge_items
+        captured["daily_goal"] = daily_goal
+        return {
             "recipe": {
                 "title": "Chicken thigh rice bowl",
                 "why_this_works": "High protein, uses current fridge items.",
@@ -329,7 +356,12 @@ def test_freestyle_recipe_endpoint_returns_recipe(app, monkeypatch):
             },
             "prompt_used": "prompt",
             "raw_response": "{}",
-        },
+        }
+
+    monkeypatch.setattr(
+        routes_asaai,
+        "generate_freestyle_recipe",
+        fake_generate_freestyle_recipe,
     )
 
     client = app.test_client()
@@ -342,6 +374,9 @@ def test_freestyle_recipe_endpoint_returns_recipe(app, monkeypatch):
     payload = response.get_json()
     assert payload["recipe"]["title"] == "Chicken thigh rice bowl"
     assert "Chicken thigh" in payload["recipe"]["used_fridge_items"]
+    assert captured["fridge_items"][0]["unit"] == "g"
+    assert captured["fridge_items"][0]["kcal_per_100g"] == 209
+    assert captured["fridge_items"][1]["carbs_per_100g"] == 28
 
 
 def test_create_dashboard_item_uses_off_data(app_context, monkeypatch):

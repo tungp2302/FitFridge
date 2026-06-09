@@ -1,4 +1,8 @@
-from flaskr_new.asaai.ollama_client import generate_from_ollama, resolve_ollama_model
+from flaskr_new.asaai.ollama_client import (
+    generate_from_ollama,
+    resolve_ollama_model,
+    test_ollama_model as check_ollama_model,
+)
 
 
 def test_resolve_ollama_model_accepts_profiles_and_raw_tags(monkeypatch):
@@ -57,3 +61,48 @@ def test_generate_from_ollama_uses_configured_model_without_local_fallback(monke
     text = generate_from_ollama("Sag hallo")
 
     assert text == "Configured model response"
+
+
+def test_test_ollama_model_checks_generation(monkeypatch):
+    calls = {"post": 0}
+
+    def fake_get(url, timeout):
+        assert url == "http://127.0.0.1:11434/api/tags"
+        return _FakeResponse({"models": [{"name": "gemma3:1b"}]})
+
+    def fake_post(url, json, timeout):
+        calls["post"] += 1
+        assert url == "http://127.0.0.1:11434/api/generate"
+        assert json["model"] == "gemma3:1b"
+        assert json["format"] == "json"
+        assert json["options"]["num_predict"] == 120
+        return _FakeResponse({"response": '{"ok": true, "title": "Planner Test"}'})
+
+    monkeypatch.setattr("flaskr_new.asaai.ollama_client.requests.get", fake_get)
+    monkeypatch.setattr("flaskr_new.asaai.ollama_client.requests.post", fake_post)
+
+    result = check_ollama_model("gemma3:1b")
+
+    assert result["ok"] is True
+    assert result["installed"] is True
+    assert result["generated"] is True
+    assert result["response"] == '{"ok": true, "title": "Planner Test"}'
+    assert calls["post"] == 1
+
+
+def test_test_ollama_model_rejects_non_json_response(monkeypatch):
+    def fake_get(url, timeout):
+        return _FakeResponse({"models": [{"name": "gemma3:1b"}]})
+
+    def fake_post(url, json, timeout):
+        return _FakeResponse({"response": "ok"})
+
+    monkeypatch.setattr("flaskr_new.asaai.ollama_client.requests.get", fake_get)
+    monkeypatch.setattr("flaskr_new.asaai.ollama_client.requests.post", fake_post)
+
+    result = check_ollama_model("gemma3:1b")
+
+    assert result["ok"] is False
+    assert result["installed"] is True
+    assert result["generated"] is False
+    assert "Planner-JSON" in result["error"]
