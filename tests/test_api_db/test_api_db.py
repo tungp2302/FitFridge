@@ -230,7 +230,7 @@ def test_ai_estimate_returns_llm_macros_for_primary_food(monkeypatch):
     monkeypatch.setattr(
         ofc,
         "_llm_ai_macro_estimate",
-        lambda query, canonical: {
+        lambda query, canonical, model=None: {
             "display_name": "Dragonfruit",
             "why": "LLM estimate",
             "estimated_macros": {"kcal": 57, "protein": 0.4, "fat": 0.1, "carbs": 13.0},
@@ -272,7 +272,7 @@ def test_ai_estimate_uses_llm_macros_for_german_paprika(monkeypatch):
     monkeypatch.setattr(
         ofc,
         "_llm_ai_macro_estimate",
-        lambda query, canonical: {
+        lambda query, canonical, model=None: {
             "display_name": "Paprika",
             "why": "LLM estimate",
             "estimated_macros": {"kcal": 26, "protein": 1.0, "fat": 0.3, "carbs": 6},
@@ -292,7 +292,7 @@ def test_ai_estimate_returns_none_when_llm_has_no_complete_macros(monkeypatch):
     monkeypatch.setattr(
         ofc,
         "_llm_ai_macro_estimate",
-        lambda query, canonical: {
+        lambda query, canonical, model=None: {
             "display_name": "Paprika",
             "why": "Incomplete LLM estimate",
             "estimated_macros": {"kcal": 26},
@@ -302,8 +302,23 @@ def test_ai_estimate_returns_none_when_llm_has_no_complete_macros(monkeypatch):
     assert ofc.ai_estimate("Paprika") is None
 
 
+def test_freestyle_recipe_endpoint_requires_login(app):
+    client = app.test_client()
+    response = client.post("/asaai/recipes/freestyle", json={})
+
+    assert response.status_code == 401
+    assert response.get_json()["recipes"] == []
+
+
 def test_freestyle_recipe_endpoint_returns_recipe(app, monkeypatch):
     from flaskr_new.asaai import routes_asaai
+
+    with app.app_context():
+        db.get_db().execute(
+            "INSERT INTO user (username, password) VALUES (?, ?)",
+            ("testuser", "pw"),
+        )
+        db.get_db().commit()
 
     monkeypatch.setattr(
         routes_asaai,
@@ -367,6 +382,9 @@ def test_freestyle_recipe_endpoint_returns_recipe(app, monkeypatch):
     )
 
     client = app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = 1
+
     response = client.post(
         "/asaai/recipes/freestyle",
         json={"daily_goal": {"protein": 60, "kcal": 800}},

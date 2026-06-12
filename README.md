@@ -12,10 +12,11 @@ Initialize the database
 Tutorial zum testen:
 1. Im Projektordner das Terminal öffnen. (ist schon)
 Umgebung erstellen:  python3 -m venv .venv
-Umgebung aktivieren: source .venv/bin/activate
-Dependencies installieren: pip install flask click werkzeug pytest certifi requests
+Umgebung aktivieren: source .venv/bin/activate   (Windows: .\.venv\Scripts\Activate.ps1)
+Dependencies installieren: pip install -r requirements.txt
 2. Befehle ausführen
-Datenbank initialisieren: flask --app flaskr_new init-db
+Datenbank initialisieren (optional, fuer kompletten Reset): flask --app flaskr_new init-db
+   Hinweis: Die App legt fehlende Tabellen beim Start automatisch an.
 dev Server starten: flask --app flaskr_new run --debug
 
 3. Im browser öffnen
@@ -26,16 +27,10 @@ http://127.0.0.1:5000
 
 For tests nachdem in der Umgebung:
 1: dependencies: pip install -r requirements-dev.txt
-# ensure runtime libs
-pip install flask werkzeug click certifi requests
-pytest install: python3 -m pip install -r requirements-dev.txt
-2: DB initialisieren: $ flask --app flaskr_new init-db
-3: Tests: 
+   (enthaelt requirements.txt + pytest)
+2: Tests:
 # single test file
 python -m pytest tests/test_api_db/test_api_db.py -q
-
-# endpoint tests
-python -m pytest tests/test_api_db/test_api_endpoint.py -q
 
 # all tests
 python -m pytest -q

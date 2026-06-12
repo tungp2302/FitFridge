@@ -63,6 +63,7 @@ def ensure_schema() -> None:
             carbs_g REAL NOT NULL DEFAULT 0,
             fat_g REAL NOT NULL DEFAULT 0,
             note TEXT,
+            section TEXT,
             eaten_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES user (id)
         )
@@ -174,49 +175,26 @@ def add_meal_entry(
     section: Optional[str] = None,
 ) -> int:
     db = get_db()
-    try:
-        cur = db.execute(
-            "INSERT INTO meal_tracker_entry (user_id, meal_name, product_id, barcode, amount, unit, kcal, protein_g, carbs_g, fat_g, note, section, eaten_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                user_id,
-                meal_name,
-                product_id,
-                barcode,
-                float(amount) if amount is not None else None,
-                unit,
-                float(kcal),
-                float(protein_g),
-                float(carbs_g),
-                float(fat_g),
-                note,
-                section,
-                _iso(_now()),
-            ),
-        )
-        db.commit()
-        return cur.lastrowid
-    except Exception as exc:
-        if "no column named section" in str(exc).lower():
-            cur = db.execute(
-                "INSERT INTO meal_tracker_entry (user_id, meal_name, product_id, barcode, amount, unit, kcal, protein_g, carbs_g, fat_g, note, eaten_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    user_id,
-                    meal_name,
-                    product_id,
-                    barcode,
-                    float(amount) if amount is not None else None,
-                    unit,
-                    float(kcal),
-                    float(protein_g),
-                    float(carbs_g),
-                    float(fat_g),
-                    note,
-                    _iso(_now()),
-                ),
-            )
-            db.commit()
-            return cur.lastrowid
-        raise
+    cur = db.execute(
+        "INSERT INTO meal_tracker_entry (user_id, meal_name, product_id, barcode, amount, unit, kcal, protein_g, carbs_g, fat_g, note, section, eaten_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            user_id,
+            meal_name,
+            product_id,
+            barcode,
+            float(amount) if amount is not None else None,
+            unit,
+            float(kcal),
+            float(protein_g),
+            float(carbs_g),
+            float(fat_g),
+            note,
+            section,
+            _iso(_now()),
+        ),
+    )
+    db.commit()
+    return cur.lastrowid
 
 
 def get_recent_meals(user_id: int, days: int = 1) -> List[Dict]:

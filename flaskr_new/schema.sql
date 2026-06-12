@@ -79,6 +79,7 @@ CREATE TABLE meal_tracker_entry (
     carbs_g REAL NOT NULL DEFAULT 0,
     fat_g REAL NOT NULL DEFAULT 0,
     note TEXT,
+    section TEXT,
     eaten_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user (id)
 );

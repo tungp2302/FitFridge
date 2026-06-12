@@ -1,9 +1,13 @@
 """Fachlogik fuer den Fridge-Bereich von FitFridge."""
 
+import logging
+
 from . import fridge_repo, product_repo
 from .consumption_log_repo import log_consume, log_refill
 from .openfoodfacts_client import lookup_product
 from flaskr_new.nutrition_service import calculate_for_amount
+
+logger = logging.getLogger(__name__)
 
 def list_dashboard_items(user_id=None):
     return fridge_repo.list_items(user_id=user_id)
@@ -11,6 +15,30 @@ def list_dashboard_items(user_id=None):
 
 def get_dashboard_item(item_id, user_id=None):
     return fridge_repo.get_item(item_id, user_id=user_id)
+
+
+def _resolve_or_create_product(product_data, fallback_barcode):
+    """Find an existing product by barcode or create it from the payload."""
+    barcode = product_data.get("barcode") or ""
+    product = product_repo.get_by_barcode(barcode) if barcode else None
+    if product is not None:
+        return product["id"]
+    return product_repo.create_product(
+        name=product_data.get("name") or "Unnamed",
+        brand=product_data.get("brand") or "",
+        barcode=barcode or fallback_barcode,
+        kcal_per_100g=float(product_data.get("kcal_per_100g") or 0.0),
+        protein_per_100g=float(product_data.get("protein_per_100g") or 0.0),
+        fat_per_100g=float(product_data.get("fat_per_100g") or 0.0),
+        carbs_per_100g=float(product_data.get("carbs_per_100g") or 0.0),
+    )
+
+
+def _add_item_from_product_data(product_data, fallback_barcode, author_id):
+    product_id = _resolve_or_create_product(product_data, fallback_barcode)
+    current_amount = float(product_data.get("total_amount") or 100.0)
+    unit = product_data.get("unit") or "g"
+    return fridge_repo.add_item(product_id, current_amount, unit, user_id=author_id)
 
 
 def create_dashboard_item(query, author_id=None):
@@ -27,25 +55,7 @@ def create_dashboard_item(query, author_id=None):
     if not product_data:
         raise ValueError("No product found for query")
 
-    barcode = product_data.get("barcode")
-    product = product_repo.get_by_barcode(barcode) if barcode else None
-
-    if product is None:
-        product_id = product_repo.create_product(
-            name=product_data.get("name") or "Unnamed",
-            brand=product_data.get("brand") or "",
-            barcode=barcode or query,
-            kcal_per_100g=float(product_data.get("kcal_per_100g") or 0.0),
-            protein_per_100g=float(product_data.get("protein_per_100g") or 0.0),
-            fat_per_100g=float(product_data.get("fat_per_100g") or 0.0),
-            carbs_per_100g=float(product_data.get("carbs_per_100g") or 0.0),
-        )
-    else:
-        product_id = product["id"]
-
-    current_amount = float(product_data.get("total_amount") or 100.0)
-    unit = product_data.get("unit") or "g"
-    return fridge_repo.add_item(product_id, current_amount, unit, user_id=author_id)
+    return _add_item_from_product_data(product_data, fallback_barcode=query, author_id=author_id)
 
 
 def create_dashboard_item_from_data(product_data, author_id=None):
@@ -53,34 +63,19 @@ def create_dashboard_item_from_data(product_data, author_id=None):
     if not product_data:
         raise ValueError("product_data is required")
 
-    barcode = product_data.get("barcode") or ""
-    product = product_repo.get_by_barcode(barcode) if barcode else None
-
-    if product is None:
-        product_id = product_repo.create_product(
-            name=product_data.get("name") or "Unnamed",
-            brand=product_data.get("brand") or "",
-            barcode=barcode or product_data.get("name") or "selected-product",
-            kcal_per_100g=float(product_data.get("kcal_per_100g") or 0.0),
-            protein_per_100g=float(product_data.get("protein_per_100g") or 0.0),
-            fat_per_100g=float(product_data.get("fat_per_100g") or 0.0),
-            carbs_per_100g=float(product_data.get("carbs_per_100g") or 0.0),
-        )
-    else:
-        product_id = product["id"]
-
-    current_amount = float(product_data.get("total_amount") or 100.0)
-    unit = product_data.get("unit") or "g"
-    return fridge_repo.add_item(product_id, current_amount, unit, user_id=author_id)
+    fallback_barcode = product_data.get("name") or "selected-product"
+    return _add_item_from_product_data(product_data, fallback_barcode=fallback_barcode, author_id=author_id)
 
 
 def _get_item_for_user(item_id, user_id=None):
+    """Scoped lookup: mit ``user_id`` nur eigene oder besitzerlose Items.
+
+    Bewusst KEIN Fallback auf eine ungescopte Suche - sonst koennte ein
+    Nutzer ueber geratene IDs die Items anderer Nutzer lesen/aendern.
+    """
     if user_id is None:
         return fridge_repo.get_item(item_id)
-    item = fridge_repo.get_item(item_id, user_id=user_id)
-    if item is not None:
-        return item
-    return fridge_repo.get_item(item_id)
+    return fridge_repo.get_item(item_id, user_id=user_id)
 
 def update_dashboard_item(item_id, current_amount=None, unit=None, name=None, brand=None, user_id=None):
     """Update fridge item amount and optionally product metadata."""
@@ -131,19 +126,13 @@ def update_dashboard_item(item_id, current_amount=None, unit=None, name=None, br
 def delete_dashboard_item(item_id):
     return fridge_repo.delete_item(item_id)
 
-def consume_amount(item_id, amount, user_id=None):
-    """Reduziert die Restmenge eines Fridge-Items.
-
-    Bei Erfolg wird zusätzlich Tungs consumption_log aktualisiert.
+def _change_amount(item_id, amount, user_id, *, consume):
+    """Gemeinsame Logik fuer Verbrauchen und Auffuellen.
 
     Edge Cases:
     - amount <= 0 oder None: success=False
-    - Item existiert nicht: success=False
-    - Mehr verbrauchen als vorhanden: Bestand wird auf 0.0 begrenzt
-
-    Parameter:
-        item_id (int): ID des Fridge-Items
-        amount (float): Verbrauchte Menge
+    - Item existiert nicht (oder gehoert einem anderen Nutzer): success=False
+    - Beim Verbrauchen wird der Bestand auf 0.0 begrenzt
 
     Returns:
         dict: {"success": bool, "new_amount": float, "message": str}
@@ -165,82 +154,36 @@ def consume_amount(item_id, amount, user_id=None):
 
     item_dict = dict(item)
     current = float(item_dict["current_amount"])
-    new_amount = max(0.0, current - float(amount))
+    delta = float(amount)
+    new_amount = max(0.0, current - delta) if consume else current + delta
 
     fridge_repo.update_amount(item_id, new_amount)
 
-    # Tungs consumption_log mit füttern
+    # Verbrauchs-/Auffuell-Log schreiben; die Hauptaktion soll auch bei
+    # fehlgeschlagenem Logging erfolgreich bleiben.
+    log_fn = log_consume if consume else log_refill
+    note = "consume_amount direkt" if consume else "refill_amount direkt"
     try:
-        log_consume(
-            item_dict["product_id"],
-            float(amount),
-            item_dict["unit"],
-            note="consume_amount direkt",
-        )
+        log_fn(item_dict["product_id"], delta, item_dict["unit"], note=note)
     except Exception:
-        # Falls Logging fehlschlägt, soll trotzdem die Hauptaktion erfolgreich sein
-        pass
+        logger.exception("consumption_log konnte nicht geschrieben werden (item %s)", item_id)
 
-    return {
-        "success": True,
-        "new_amount": new_amount,
-        "message": f"{amount} {item_dict['unit']} {item_dict['name']} verbraucht. Rest: {new_amount} {item_dict['unit']}.",
-    }
+    if consume:
+        message = f"{amount} {item_dict['unit']} {item_dict['name']} verbraucht. Rest: {new_amount} {item_dict['unit']}."
+    else:
+        message = f"{amount} {item_dict['unit']} {item_dict['name']} aufgefüllt. Neuer Stand: {new_amount} {item_dict['unit']}."
+
+    return {"success": True, "new_amount": new_amount, "message": message}
+
+
+def consume_amount(item_id, amount, user_id=None):
+    """Reduziert die Restmenge eines Fridge-Items (Bestand min. 0.0)."""
+    return _change_amount(item_id, amount, user_id, consume=True)
 
 
 def refill_amount(item_id, amount, user_id=None):
-    """Erhöht die Restmenge eines Fridge-Items.
-
-    Bei Erfolg wird zusätzlich Tungs consumption_log aktualisiert.
-
-    Edge Cases:
-    - amount <= 0 oder None: success=False
-    - Item existiert nicht: success=False
-
-    Parameter:
-        item_id (int): ID des Fridge-Items
-        amount (float): Hinzugefügte Menge
-
-    Returns:
-        dict: {"success": bool, "new_amount": float, "message": str}
-    """
-    if amount is None or amount <= 0:
-        return {
-            "success": False,
-            "new_amount": 0.0,
-            "message": "Menge muss größer als 0 sein.",
-        }
-
-    item = _get_item_for_user(item_id, user_id=user_id)
-    if item is None:
-        return {
-            "success": False,
-            "new_amount": 0.0,
-            "message": f"Produkt mit ID {item_id} nicht im Kühlschrank gefunden.",
-        }
-
-    item_dict = dict(item)
-    current = float(item_dict["current_amount"])
-    new_amount = current + float(amount)
-
-    fridge_repo.update_amount(item_id, new_amount)
-
-    # Tungs consumption_log mit füttern
-    try:
-        log_refill(
-            item_dict["product_id"],
-            float(amount),
-            item_dict["unit"],
-            note="refill_amount direkt",
-        )
-    except Exception:
-        pass
-
-    return {
-        "success": True,
-        "new_amount": new_amount,
-        "message": f"{amount} {item_dict['unit']} {item_dict['name']} aufgefüllt. Neuer Stand: {new_amount} {item_dict['unit']}.",
-    }
+    """Erhöht die Restmenge eines Fridge-Items."""
+    return _change_amount(item_id, amount, user_id, consume=False)
 
 def calculate_total_nutrition(item):
     """
@@ -260,7 +203,7 @@ def calculate_total_nutrition(item):
         "carbs_per_100g": item.get("carbs_per_100g", 0.0),
     }
 
-    # Delegation an Raams Funktion (handle edge-cases dort)
+    # Delegation an den Nutrition-Service (Edge-Cases werden dort behandelt)
     calc = calculate_for_amount(product_nutrients, amount, unit)
 
     # Mappe auf die bisherigen Keys, die routes.py erwartet

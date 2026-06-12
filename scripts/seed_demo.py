@@ -82,7 +82,7 @@ def seed_demo_data() -> None:
                 "carbs_per_100g": 0.7,
                 "expiry_date": "2026-06-01",
                 "current_amount": 6,
-                "unit": "pcs",
+                "unit": "stk",
             },
             {
                 "name": "Steak",

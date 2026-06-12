@@ -1,17 +1,15 @@
 """Tests für consume_amount und refill_amount aus fridge_service.
 
-Diese Tests prüfen die Edge Cases der von Raam implementierten
-Bestands-Tracking-Funktionen:
+Diese Tests prüfen die Edge Cases der Bestands-Tracking-Funktionen:
 - Normale Operationen
 - Negative/Zero/None-Mengen
 - Schutz vor negativen Beständen
 - Unbekannte Item-IDs
 
-Tungs Tests für consumption_log-Logging sind separat in
-test_fridge_service_logging.py.
+Das consumption_log-Logging wird separat in
+test_fridge_service_logging.py geprüft.
 """
 
-import os
 import pytest
 
 from flaskr_new import create_app
@@ -21,20 +19,13 @@ from flaskr_new.fridge_service import consume_amount, refill_amount
 
 
 @pytest.fixture
-def app():
+def app(tmp_path):
     """Erstellt eine Test-App mit frischer DB für jeden Test."""
-    test_db_path = "/tmp/test_raam_consume_refill.sqlite"
-    if os.path.exists(test_db_path):
-        os.remove(test_db_path)
-
-    app = create_app({"TESTING": True, "DATABASE": test_db_path})
+    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "consume_refill.sqlite")})
 
     with app.app_context():
         db.init_db()
         yield app
-
-    if os.path.exists(test_db_path):
-        os.remove(test_db_path)
 
 
 @pytest.fixture
@@ -156,3 +147,37 @@ def test_multiple_consumes_accumulate(app, item_id):
 
         item = fridge_repo.get_item(item_id)
         assert item["current_amount"] == 400.0  # 500 - 100
+
+
+# === Autorisierung (IDOR-Schutz) ===
+
+def test_consume_foreign_item_is_rejected(app):
+    """Ein Nutzer darf Items anderer Nutzer nicht verbrauchen/auffüllen."""
+    with app.app_context():
+        connection = db.get_db()
+        connection.execute("INSERT INTO user (username, password) VALUES ('owner', 'x')")
+        connection.execute("INSERT INTO user (username, password) VALUES ('attacker', 'x')")
+        connection.commit()
+
+        product_id = product_repo.create_product(
+            name="Geheimer Joghurt",
+            brand="Owner Brand",
+            barcode="owner-item-001",
+            kcal_per_100g=60.0,
+            protein_per_100g=5.0,
+            fat_per_100g=2.0,
+            carbs_per_100g=4.0,
+        )
+        owned_item_id = fridge_repo.add_item(product_id, 500.0, "g", user_id=1)
+
+        consume_result = consume_amount(owned_item_id, 30, user_id=2)
+        refill_result = refill_amount(owned_item_id, 30, user_id=2)
+
+        assert consume_result["success"] is False
+        assert refill_result["success"] is False
+        assert fridge_repo.get_item(owned_item_id)["current_amount"] == 500.0
+
+        # Der Besitzer selbst darf weiterhin verbrauchen.
+        owner_result = consume_amount(owned_item_id, 30, user_id=1)
+        assert owner_result["success"] is True
+        assert owner_result["new_amount"] == 470.0

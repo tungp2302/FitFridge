@@ -1,6 +1,3 @@
-flask
-werkzeug
-click
-certifi
-requests
+# Entwicklungs-Abhaengigkeiten (inkl. Laufzeit).
+-r requirements.txt
 pytest>=9

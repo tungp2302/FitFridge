@@ -440,19 +440,19 @@
         pendingItemsContainer.innerHTML = pendingItems.map((item, index) => `
           <div class="pending-item" data-index="${index}">
             <div class="pending-item__main">
-              <strong>${item.name || '(no name)'}</strong>
-              <div class="pending-item__meta">${item.brand ? item.brand + ' · ' : ''}${item.kcal_per_100g || ''} kcal / 100g${item.ai ? ' · AI' : ''}</div>
+              <strong>${escHtml(item.name || '(no name)')}</strong>
+              <div class="pending-item__meta">${item.brand ? escHtml(item.brand) + ' · ' : ''}${escHtml(item.kcal_per_100g || '')} kcal / 100g${item.ai ? ' · AI' : ''}</div>
             </div>
             <div class="pending-item__controls">
               <div class="pending-item__field">
                 <label>amount</label>
-                <input type="number" step="0.1" min="0" class="pending-item__amount" value="${item.amount || 100}" aria-label="Amount for ${item.name || 'product'}">
+                <input type="number" step="0.1" min="0" class="pending-item__amount" value="${escHtml(item.amount || 100)}" aria-label="Amount for ${escHtml(item.name || 'product')}">
               </div>
               <div class="pending-item__field">
                 <label>uebrig</label>
-                <input type="number" step="0.1" min="0" class="pending-item__remaining" value="${item.remaining_amount || ''}" aria-label="Remaining for ${item.name || 'product'}">
+                <input type="number" step="0.1" min="0" class="pending-item__remaining" value="${escHtml(item.remaining_amount || '')}" aria-label="Remaining for ${escHtml(item.name || 'product')}">
               </div>
-              <button type="button" class="clear-x-button pending-item__remove" aria-label="Remove ${item.name || 'product'}">×</button>
+              <button type="button" class="clear-x-button pending-item__remove" aria-label="Remove ${escHtml(item.name || 'product')}">×</button>
             </div>
           </div>
         `).join('');
@@ -497,11 +497,11 @@
         results.innerHTML = items.map((item, index) => `
           <div class="search-item" data-idx="${index}">
             <div class="search-item__top">
-              <strong>${item.name || '(no name)'}</strong>
+              <strong>${escHtml(item.name || '(no name)')}</strong>
               <span class="search-item__badge ${item.ai ? 'is-ai' : 'is-off'}">${item.ai ? 'AI' : 'OFF'}</span>
             </div>
-            <div class="search-item__brand muted">${item.brand || ''}</div>
-            <small>${item.ai ? 'AI estimate' : 'Open Food Facts'} · ${item.kcal_per_100g || ''} kcal/100g</small>
+            <div class="search-item__brand muted">${escHtml(item.brand || '')}</div>
+            <small>${item.ai ? 'AI estimate' : 'Open Food Facts'} · ${escHtml(item.kcal_per_100g || '')} kcal/100g</small>
           </div>
         `).join('');
 
@@ -521,10 +521,10 @@
             };
             selectedDiv.innerHTML = `
               <div class="selected-product-panel__title">
-                <strong>${currentSelection.name}</strong>
+                <strong>${escHtml(currentSelection.name)}</strong>
                 <span class="selected-product-panel__badge ${currentSelection.ai ? 'is-ai' : 'is-off'}">${currentSelection.ai ? 'AI' : 'OFF'}</span>
               </div>
-              <div class="selected-product-panel__meta">${currentSelection.brand ? currentSelection.brand + ' · ' : ''}${currentSelection.ai ? 'AI estimate' : 'Open Food Facts'} · ${currentSelection.kcal_per_100g || ''} kcal / 100g</div>
+              <div class="selected-product-panel__meta">${currentSelection.brand ? escHtml(currentSelection.brand) + ' · ' : ''}${currentSelection.ai ? 'AI estimate' : 'Open Food Facts'} · ${escHtml(currentSelection.kcal_per_100g || '')} kcal / 100g</div>
               <div class="selected-product-panel__actions">
                 <button type="button" class="search-action-button" id="log-selected-button">Add</button>
                 <button type="button" class="clear-x-button" id="reset-selected-button" aria-label="Clear selected product">×</button>

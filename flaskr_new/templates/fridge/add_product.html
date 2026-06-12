@@ -50,8 +50,8 @@
         results.style.display='block';
         results.innerHTML = items.map((i, idx) => `
           <div class="search-item" data-idx="${idx}" style="padding:.5rem; border-bottom:1px solid #f0f0f0; cursor:pointer;">
-            <strong>${i.name || '(no name)'}${i.ai? ' — <em style="color:#0b6;">AI estimate</em>': ''}</strong> — <span class="muted">${i.brand || ''}</span><br>
-            <small>Barcode: ${i.barcode || ''} · ${i.kcal_per_100g || ''} kcal/100g</small>
+            <strong>${escHtml(i.name || '(no name)')}${i.ai? ' — <em style="color:#0b6;">AI estimate</em>': ''}</strong> — <span class="muted">${escHtml(i.brand || '')}</span><br>
+            <small>Barcode: ${escHtml(i.barcode || '')} · ${escHtml(i.kcal_per_100g || '')} kcal/100g</small>
           </div>
         `).join('');
         Array.from(results.querySelectorAll('.search-item')).forEach((el) => {

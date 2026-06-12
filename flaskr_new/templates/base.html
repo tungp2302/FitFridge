@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}FitFridge{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('frontend.static', filename='style.css') }}">
+  <script>
+    // HTML-Escaping fuer alles, was per innerHTML gerendert wird,
+    // damit Namen mit Sonderzeichen (&, <, ") sauber dargestellt werden.
+    window.escHtml = function (value) {
+      return String(value ?? '').replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    };
+  </script>
 </head>
 <body>
   <div class="app-shell">

@@ -3,24 +3,33 @@
 import functools
 import json
 
-from flask import Blueprint, flash, g, redirect, render_template, request, session, url_for
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    g,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from werkzeug.exceptions import abort
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .db import get_db
 from .meal_tracker_service import (
-    add_meal_entry,
     build_daily_summary,
-    delete_meal_entry,
+    delete_meal_action,
+    edit_meal_amount_action,
     get_recent_meals,
     get_settings,
     get_today_totals,
-    log_meal_from_product,
-    normalize_macro_percentages,
-    resolve_product_from_barcode,
-    save_settings,
+    save_settings_action,
+    track_meal_from_form,
+    track_meals_from_payload,
 )
-from .meal_tracker_repo import update_meal_entry_amount
 from .app_settings_repo import get_settings as get_app_settings, save_settings as save_app_settings
 from .asaai.ollama_client import OLLAMA_MODEL_CHOICES, resolve_ollama_model, test_ollama_model
 from .fridge_service import (
@@ -34,9 +43,8 @@ from .fridge_service import (
     refill_amount,
     update_dashboard_item,
 )
-from .openfoodfacts_client import search_product, search_products
+from .openfoodfacts_client import ai_estimate, search_product, search_products
 from .product_repo import search_by_name
-from flask import jsonify
 
 bp = Blueprint("frontend", __name__, template_folder="templates", static_folder="static")
 
@@ -140,170 +148,30 @@ def settings():
 @bp.route("/meal-tracker", methods=("GET", "POST"))
 @login_required
 def meal_tracker():
-    settings = get_settings(g.user["id"])
     flash_message = None
 
     if request.method == "POST":
+        user_id = g.user["id"]
         action = request.form.get("action")
 
         if action == "save_settings":
-            daily_kcal = float(request.form.get("daily_kcal") or settings["daily_kcal"])
-            protein_pct = float(request.form.get("protein_pct") or settings["protein_pct"])
-            carbs_pct = float(request.form.get("carbs_pct") or settings["carbs_pct"])
-            fat_pct = float(request.form.get("fat_pct") or settings["fat_pct"])
-            normalized = normalize_macro_percentages(protein_pct, carbs_pct, fat_pct)
-            save_settings(
-                g.user["id"],
-                daily_kcal=daily_kcal,
-                protein_pct=normalized["protein_pct"],
-                carbs_pct=normalized["carbs_pct"],
-                fat_pct=normalized["fat_pct"],
-            )
-            flash_message = "Tagesziel und Macroverteilung gespeichert."
-
+            flash_message = save_settings_action(user_id, request.form)
         elif action == "delete_meal":
-            entry_id = request.form.get("meal_entry_id")
-            if not entry_id:
-                flash_message = "Mahlzeit konnte nicht geloescht werden."
-            else:
-                try:
-                    deleted = delete_meal_entry(int(entry_id), g.user["id"])
-                except ValueError:
-                    deleted = False
-                flash_message = "Mahlzeit geloescht." if deleted else "Mahlzeit konnte nicht geloescht werden."
-
+            flash_message = delete_meal_action(user_id, request.form.get("meal_entry_id"))
         elif action == "edit_meal_amount":
-            entry_id = request.form.get("meal_entry_id")
-            new_amount = request.form.get("new_amount")
-            if not entry_id or not new_amount:
-                flash_message = "Neue Menge konnte nicht gespeichert werden."
-            else:
-                try:
-                    updated = update_meal_entry_amount(int(entry_id), g.user["id"], float(new_amount))
-                except ValueError:
-                    updated = False
-                flash_message = "Menge aktualisiert." if updated else "Neue Menge konnte nicht gespeichert werden."
-
+            flash_message = edit_meal_amount_action(
+                user_id,
+                request.form.get("meal_entry_id"),
+                request.form.get("new_amount"),
+            )
         elif action == "track_meal":
             selected_payload_raw = request.form.get("selected_payload", "").strip()
             if selected_payload_raw:
-                try:
-                    selected_payload = json.loads(selected_payload_raw)
-                except json.JSONDecodeError:
-                    selected_payload = None
-
-                if not isinstance(selected_payload, list) or not selected_payload:
-                    flash_message = "Bitte mindestens ein Produkt in die Liste aufnehmen."
-                else:
-                    logged_names = []
-                    fridge_saved = 0
-                    for item in selected_payload:
-                        if not isinstance(item, dict):
-                            continue
-                        try:
-                            amount = float(item.get("amount") or 0)
-                        except (TypeError, ValueError):
-                            amount = 0
-                        if amount <= 0:
-                            continue
-                        unit = item.get("unit") or "g"
-                        selected_product = {
-                            "name": item.get("name") or "Product",
-                            "barcode": item.get("barcode") or item.get("name") or "selected-product",
-                            "kcal_per_100g": float(item.get("kcal_per_100g") or 0.0),
-                            "protein_per_100g": float(item.get("protein_per_100g") or 0.0),
-                            "fat_per_100g": float(item.get("fat_per_100g") or 0.0),
-                            "carbs_per_100g": float(item.get("carbs_per_100g") or 0.0),
-                        }
-                        log_meal_from_product(
-                            g.user["id"],
-                            selected_product,
-                            amount,
-                            unit,
-                            fridge_item_id=None,
-                            section=None,
-                        )
-                        try:
-                            remaining_amount = float(item.get("remaining_amount") or 0)
-                        except (TypeError, ValueError):
-                            remaining_amount = 0
-                        if remaining_amount > 0:
-                            fridge_payload = {
-                                "name": item.get("name") or "Product",
-                                "brand": item.get("brand") or "",
-                                "barcode": item.get("barcode") or item.get("name") or "selected-product",
-                                "kcal_per_100g": float(item.get("kcal_per_100g") or 0.0),
-                                "protein_per_100g": float(item.get("protein_per_100g") or 0.0),
-                                "fat_per_100g": float(item.get("fat_per_100g") or 0.0),
-                                "carbs_per_100g": float(item.get("carbs_per_100g") or 0.0),
-                                "unit": unit,
-                                "total_amount": remaining_amount,
-                            }
-                            create_dashboard_item_from_data(fridge_payload, g.user["id"])
-                            fridge_saved += 1
-                        logged_names.append(selected_product["name"])
-
-                    if logged_names:
-                        flash_message = f"{len(logged_names)} Produkt(e) gespeichert."
-                        if fridge_saved:
-                            flash_message += f" {fridge_saved} Produkt(e) als uebrig in den Kuehlschrank uebernommen."
-                    else:
-                        flash_message = "Bitte mindestens eine Menge groesser als 0 angeben."
+                flash_message = track_meals_from_payload(user_id, selected_payload_raw)
             else:
-                amount = float(request.form.get("amount") or 0)
-                if amount <= 0:
-                    flash_message = "Bitte eine Menge groesser als 0 angeben."
-                else:
-                    fridge_item_id = request.form.get("fridge_item_id")
-                    barcode = request.form.get("barcode", "").strip()
-                    selected_product = None
-                    selected_fridge_item_id = None
+                flash_message = track_meal_from_form(user_id, request.form)
 
-                    if fridge_item_id:
-                        fridge_item = next((item for item in list_dashboard_items() if str(item["id"]) == str(fridge_item_id)), None)
-                        if fridge_item is None:
-                            flash_message = "Ausgewaehltes Fridge-Item wurde nicht gefunden."
-                        else:
-                            selected_product = {
-                                "id": fridge_item["product_id"],
-                                "name": fridge_item["name"],
-                                "barcode": fridge_item["barcode"],
-                                "kcal_per_100g": fridge_item["kcal_per_100g"],
-                                "protein_per_100g": fridge_item["protein_per_100g"],
-                                "fat_per_100g": fridge_item["fat_per_100g"],
-                                "carbs_per_100g": fridge_item["carbs_per_100g"],
-                            }
-                            selected_fridge_item_id = fridge_item["id"]
-                            unit = fridge_item["unit"]
-                    elif barcode:
-                        selected_product, fridge_item = resolve_product_from_barcode(barcode, g.user["id"])
-                        if selected_product is None:
-                            flash_message = "Barcode konnte keinem Produkt zugeordnet werden."
-                        else:
-                            unit = "g"
-                            if fridge_item is not None:
-                                selected_fridge_item_id = fridge_item["id"]
-                                unit = fridge_item["unit"]
-                    else:
-                        flash_message = "Bitte ein Barcode oder ein Fridge-Item auswaehlen."
-
-                    if flash_message is None and selected_product is not None:
-                        section = request.form.get("meal_section") or request.form.get("section")
-                        result = log_meal_from_product(
-                            g.user["id"],
-                            selected_product,
-                            amount,
-                            unit,
-                            fridge_item_id=selected_fridge_item_id,
-                            section=section,
-                        )
-                        flash_message = (
-                            f"{selected_product['name']} mit {amount} {unit} gespeichert."
-                            + (" Bestand im Kuehlschrank wurde reduziert." if result["deducted"] else "")
-                        )
-
-        settings = get_settings(g.user["id"])
-
+    settings = get_settings(g.user["id"])
     recent_meals = get_recent_meals(g.user["id"], days=1)
     consumed = get_today_totals(g.user["id"])
     summary = build_daily_summary(settings, consumed)
@@ -413,7 +281,8 @@ def api_products_search():
     if q.isdigit():
         try:
             product = search_product(q)
-        except Exception:
+        except (RuntimeError, ValueError) as exc:
+            current_app.logger.warning("OFF-Barcode-Lookup fehlgeschlagen: %s", exc)
             product = None
         if not product or not product.get("name"):
             return jsonify([])
@@ -444,13 +313,22 @@ def api_products_search():
                 }
             )
     except Exception:
+        current_app.logger.exception("Lokale Produktsuche fehlgeschlagen")
         local = []
 
-    # Fallback to OpenFoodFacts search
+    # OpenFoodFacts-Textsuche
     try:
         results = search_products(q)
     except Exception:
+        current_app.logger.exception("OFF-Textsuche fehlgeschlagen")
         results = []
+
+    # KI-Schaetzung als zusaetzliche Option daneben
+    try:
+        ai_result = ai_estimate(q)
+    except Exception:
+        current_app.logger.exception("KI-Schaetzung fehlgeschlagen")
+        ai_result = None
 
     ai_items = []
     off_items = []
@@ -481,13 +359,6 @@ def api_products_search():
     for row in (results or []):
         append_item(off_items, row, "off")
 
-    try:
-        from .openfoodfacts_client import ai_estimate
-
-        ai_result = ai_estimate(q)
-    except Exception:
-        ai_result = None
-
     if ai_result:
         append_item(ai_items, ai_result, "ai")
 
@@ -503,10 +374,9 @@ def api_products_ai():
         return jsonify({})
 
     try:
-        from .openfoodfacts_client import ai_estimate
-
         prod = ai_estimate(q)
     except Exception:
+        current_app.logger.exception("KI-Schaetzung fehlgeschlagen")
         prod = None
 
     if not prod:
@@ -598,97 +468,66 @@ def logout():
     session.clear()
     return redirect(url_for("frontend.dashboard"))
 
-@bp.route("/fridge/<int:item_id>/consume", methods=("POST",))
-@login_required
-def consume_product(item_id):
-    """Verbraucht eine Menge eines Fridge-Items.
+def _parse_amount_input(amount_raw):
+    """Validiert eine Mengen-Eingabe aus dem Formular.
 
-    Validiert robust:
+    Regeln:
     - amount muss vorhanden sein
-    - amount muss eine Zahl sein
+    - amount muss eine Zahl sein (Komma als Dezimaltrenner erlaubt)
     - amount muss > 0 sein
     - amount muss <= 10000 sein (Tippfehler-Schutz)
+
+    Returns:
+        (amount, None, None) bei Erfolg,
+        (None, fehlermeldung, flash_kategorie) bei ungueltiger Eingabe.
     """
-    amount_raw = request.form.get("amount", "").strip()
+    amount_raw = (amount_raw or "").strip()
 
-    # Validierung 1: Leere Eingabe
     if not amount_raw:
-        flash("Bitte gib eine Menge an.", "error")
-        return redirect(url_for("frontend.product_detail", item_id=item_id))
+        return None, "Bitte gib eine Menge an.", "error"
 
-    # Validierung 2: Komma durch Punkt ersetzen (deutsche Eingabe)
+    # Komma durch Punkt ersetzen (deutsche Eingabe)
     amount_raw = amount_raw.replace(",", ".")
 
-    # Validierung 3: Muss eine Zahl sein
     try:
         amount = float(amount_raw)
     except ValueError:
-        flash(f"'{amount_raw}' ist keine gültige Zahl.", "error")
-        return redirect(url_for("frontend.product_detail", item_id=item_id))
+        return None, f"'{amount_raw}' ist keine gültige Zahl.", "error"
 
-    # Validierung 4: Muss positiv sein
     if amount <= 0:
-        flash("Die Menge muss größer als 0 sein.", "error")
-        return redirect(url_for("frontend.product_detail", item_id=item_id))
+        return None, "Die Menge muss größer als 0 sein.", "error"
 
-    # Validierung 5: Plausibilitäts-Check (Tippfehler-Schutz)
     if amount > 10000:
-        flash(
-            f"Die Menge {amount} scheint sehr hoch. "
-            "Bitte prüfe deine Eingabe (max. 10000).",
-            "warning"
+        return (
+            None,
+            f"Die Menge {amount} scheint sehr hoch. Bitte prüfe deine Eingabe (max. 10000).",
+            "warning",
         )
+
+    return amount, None, None
+
+
+def _handle_amount_change(item_id, service_fn):
+    """Gemeinsamer Ablauf fuer consume/refill: validieren, Service, Flash."""
+    amount, error, category = _parse_amount_input(request.form.get("amount", ""))
+    if error is not None:
+        flash(error, category)
         return redirect(url_for("frontend.product_detail", item_id=item_id))
 
-    # Alles ok → Service aufrufen
-    result = consume_amount(item_id, amount, user_id=g.user["id"])
-
-    if result["success"]:
-        flash(result["message"], "success")
-    else:
-        flash(result["message"], "error")
-
+    result = service_fn(item_id, amount, user_id=g.user["id"])
+    flash(result["message"], "success" if result["success"] else "error")
     return redirect(url_for("frontend.product_detail", item_id=item_id))
+
+
+@bp.route("/fridge/<int:item_id>/consume", methods=("POST",))
+@login_required
+def consume_product(item_id):
+    """Verbraucht eine Menge eines Fridge-Items."""
+    return _handle_amount_change(item_id, consume_amount)
 
 
 @bp.route("/fridge/<int:item_id>/refill", methods=("POST",))
 @login_required
 def refill_product(item_id):
-    """Füllt eine Menge zu einem Fridge-Item hinzu.
-
-    Validiert gleich wie consume_product.
-    """
-    amount_raw = request.form.get("amount", "").strip()
-
-    if not amount_raw:
-        flash("Bitte gib eine Menge an.", "error")
-        return redirect(url_for("frontend.product_detail", item_id=item_id))
-
-    amount_raw = amount_raw.replace(",", ".")
-
-    try:
-        amount = float(amount_raw)
-    except ValueError:
-        flash(f"'{amount_raw}' ist keine gültige Zahl.", "error")
-        return redirect(url_for("frontend.product_detail", item_id=item_id))
-
-    if amount <= 0:
-        flash("Die Menge muss größer als 0 sein.", "error")
-        return redirect(url_for("frontend.product_detail", item_id=item_id))
-
-    if amount > 10000:
-        flash(
-            f"Die Menge {amount} scheint sehr hoch. "
-            "Bitte prüfe deine Eingabe (max. 10000).",
-            "warning"
-        )
-        return redirect(url_for("frontend.product_detail", item_id=item_id))
-
-    result = refill_amount(item_id, amount, user_id=g.user["id"])
-
-    if result["success"]:
-        flash(result["message"], "success")
-    else:
-        flash(result["message"], "error")
-
-    return redirect(url_for("frontend.product_detail", item_id=item_id))
+    """Füllt eine Menge zu einem Fridge-Item hinzu."""
+    return _handle_amount_change(item_id, refill_amount)

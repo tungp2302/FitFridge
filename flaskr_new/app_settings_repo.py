@@ -24,7 +24,6 @@ def ensure_schema():
 
 
 def get_settings(user_id: int) -> dict:
-    ensure_schema()
     row = get_db().execute(
         "SELECT llm_model FROM app_settings WHERE user_id = ?",
         (user_id,),
@@ -35,7 +34,6 @@ def get_settings(user_id: int) -> dict:
 
 
 def save_settings(user_id: int, *, llm_model: str) -> dict:
-    ensure_schema()
     model = (llm_model or DEFAULT_LLM_MODEL).strip() or DEFAULT_LLM_MODEL
     get_db().execute(
         """

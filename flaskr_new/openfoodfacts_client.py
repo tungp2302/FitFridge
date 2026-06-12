@@ -1,17 +1,18 @@
-# flaskr/api_db/external/openfoodfacts_client.py
 """OpenFoodFacts-Client fuer Barcode-Lookups mit Mengen-Parsing und Fallbacks."""
 
 from __future__ import annotations
 
 import json
+import logging
 import re
 import ssl
-import time
 import unicodedata
 from typing import Optional, Tuple, Dict
 from urllib.parse import quote
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+logger = logging.getLogger(__name__)
 
 try:
     import certifi
@@ -91,8 +92,12 @@ def _parse_llm_json_object(response: str) -> dict:
     return {}
 
 
-def _llm_ai_macro_estimate(query: str, canonical_query: str) -> dict:
-    """Ask Ollama for a best-effort nutrition estimate for an arbitrary food."""
+def _llm_ai_macro_estimate(query: str, canonical_query: str, model: Optional[str] = None) -> dict:
+    """Ask Ollama for a best-effort nutrition estimate for an arbitrary food.
+
+    ``model`` erlaubt es Aufrufern (z.B. Worker-Threads ohne App-Kontext),
+    das bereits aufgeloeste Nutzermodell durchzureichen.
+    """
     from .asaai.ollama_client import generate_from_ollama
 
     prompt = (
@@ -113,8 +118,9 @@ def _llm_ai_macro_estimate(query: str, canonical_query: str) -> dict:
     )
 
     try:
-        response = generate_from_ollama(prompt=prompt, timeout=10, num_predict=220, format_json=True)
+        response = generate_from_ollama(prompt=prompt, model=model, timeout=10, num_predict=220, format_json=True)
     except Exception:
+        logger.warning("Ollama-Makro-Schaetzung fehlgeschlagen fuer %r", query, exc_info=True)
         return {}
 
     return _parse_llm_json_object(response)
@@ -130,10 +136,6 @@ def _has_complete_macro_estimate(meta: dict) -> bool:
         except (KeyError, TypeError, ValueError):
             return False
     return True
-
-
-def _build_generic_ingredient_product(query: str) -> Optional[Dict]:
-    return None
 
 
 def _score_off_product(query: str, product: dict) -> float:
@@ -353,6 +355,7 @@ def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_stagin
         with urlopen(request, timeout=10, context=_make_ssl_context()) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except Exception:
+        logger.warning("OFF-Textsuche fehlgeschlagen fuer %r", query, exc_info=True)
         return []
 
     hits = payload.get("hits") or []
@@ -366,6 +369,7 @@ def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_stagin
         try:
             full = search_product(code, user_agent=user_agent, use_staging=use_staging)
         except Exception:
+            logger.warning("OFF-Barcode-Detail fehlgeschlagen fuer %s", code, exc_info=True)
             full = None
         if full and full.get("name"):
             results.append(full)
@@ -375,11 +379,13 @@ def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_stagin
     return _rank_off_products(query, results)
 
 
-def ai_estimate(query: str) -> Optional[dict]:
+def ai_estimate(query: str, model: Optional[str] = None) -> Optional[dict]:
     """Return an AI-generated estimate for any food query.
 
     This path is independent from OpenFoodFacts search results and is
     intended to stay visible as a separate selectable option in the UI.
+    ``model`` kann ein vorab aufgeloestes Ollama-Modell sein (siehe
+    ``_llm_ai_macro_estimate``).
     """
     if not query:
         return None
@@ -389,8 +395,9 @@ def ai_estimate(query: str) -> Optional[dict]:
     canonical = _normalize_text(query)
 
     try:
-        llm_meta = _llm_ai_macro_estimate(query, canonical) or {}
+        llm_meta = _llm_ai_macro_estimate(query, canonical, model=model) or {}
     except Exception:
+        logger.warning("ai_estimate fehlgeschlagen fuer %r", query, exc_info=True)
         llm_meta = {}
 
     if not _has_complete_macro_estimate(llm_meta):

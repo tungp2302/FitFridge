@@ -38,11 +38,15 @@ def ensure_schema():
 
 
 def get_item(item_id, user_id=None):
-    """Ein spezifisches FridgeItem mit Produktdetails abrufen."""
+    """Ein spezifisches FridgeItem mit Produktdetails abrufen.
+
+    Mit ``user_id`` werden nur eigene Items oder besitzerlose Alt-Items
+    (user_id IS NULL) gefunden - niemals Items anderer Nutzer.
+    """
     if user_id is None:
         return get_db().execute(f"{_FRIDGE_ITEM_SELECT} WHERE f.id = ?", (item_id,)).fetchone()
     return get_db().execute(
-        f"{_FRIDGE_ITEM_SELECT} WHERE f.id = ? AND f.user_id = ?",
+        f"{_FRIDGE_ITEM_SELECT} WHERE f.id = ? AND (f.user_id = ? OR f.user_id IS NULL)",
         (item_id, user_id),
     ).fetchone()
 

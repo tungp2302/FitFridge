@@ -27,6 +27,7 @@ def create_app(test_config=None):
     from .fridge_repo import ensure_schema as ensure_fridge_schema
     from .app_settings_repo import ensure_schema as ensure_app_settings_schema
     with app.app_context():
+        db.ensure_core_schema()
         ensure_fridge_schema()
         ensure_meal_tracker_schema()
         ensure_app_settings_schema()

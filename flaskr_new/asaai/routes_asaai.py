@@ -33,6 +33,9 @@ def _selected_ollama_model(data=None):
 @asaai_bp.route("/recipes/freestyle", methods=("POST",))
 def freestyle_recipe():
     """Generate several recipe suggestions directly from fridge contents."""
+    if getattr(g, "user", None) is None:
+        return jsonify({"error": "Anmeldung erforderlich.", "recipes": []}), 401
+
     data = request.get_json(silent=True) or {}
     daily_goal = data.get("daily_goal") if isinstance(data, dict) else None
     recipe_category = data.get("recipe_category") if isinstance(data, dict) else None
