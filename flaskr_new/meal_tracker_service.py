@@ -39,22 +39,6 @@ def calculate_macro_targets(daily_kcal: float, protein_pct: float, carbs_pct: fl
     }
 
 
-def calculate_open_targets(settings: Dict, consumed: Dict) -> Dict[str, float]:
-    targets = calculate_macro_targets(
-        settings["daily_kcal"],
-        settings["protein_pct"],
-        settings["carbs_pct"],
-        settings["fat_pct"],
-    )
-    open_targets = {
-        "kcal": round(targets["kcal"] - consumed.get("kcal", 0.0), 1),
-        "protein_g": round(targets["protein_g"] - consumed.get("protein_g", 0.0), 1),
-        "carbs_g": round(targets["carbs_g"] - consumed.get("carbs_g", 0.0), 1),
-        "fat_g": round(targets["fat_g"] - consumed.get("fat_g", 0.0), 1),
-    }
-    return {**targets, **{f"remaining_{key}": value for key, value in open_targets.items()}}
-
-
 def build_daily_summary(settings: Dict, consumed: Dict) -> Dict:
     targets = calculate_macro_targets(
         settings["daily_kcal"],
@@ -172,7 +156,6 @@ __all__ = [
     "log_meal_from_product",
     "normalize_macro_percentages",
     "calculate_macro_targets",
-    "calculate_open_targets",
     "resolve_product_from_barcode",
     "get_recent_meals",
     "get_settings",

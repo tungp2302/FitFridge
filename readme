@@ -88,10 +88,7 @@ FitFridge keeps only these local Ollama features for the current project scope:
     - Add Food with AI estimate
     - Freestyle recipe in the recipe planner
 
-The removed ASaAI hub, forecast, nutrition, shopping, matcher, and insight files are archived in:
-    Asaai-Nicht-Nutzen/
-
-The active recipe LLM code is now in:
+The active recipe LLM code is in:
     flaskr_new/asaai/freestyle_recipe.py
 
 Demo data:

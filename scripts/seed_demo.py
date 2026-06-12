@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 from pathlib import Path
 import sys
 
@@ -141,23 +140,8 @@ def seed_demo_data() -> None:
             add_item(product_id, product["current_amount"], product["unit"], user_id=user_id)
             product_ids[product["name"]] = product_id
 
-        now = datetime.now()
-        for day_offset in range(30):
-            log_consume(
-                product_ids["Nutella"],
-                4,
-                "g",
-                timestamp=now - timedelta(days=day_offset),
-                note="demo consumption",
-            )
-
-        log_refill(
-            product_ids["Parmesan"],
-            150,
-            "g",
-            timestamp=now - timedelta(days=2),
-            note="demo refill",
-        )
+        log_consume(product_ids["Nutella"], 20, "g", note="demo consumption")
+        log_refill(product_ids["Parmesan"], 150, "g", note="demo refill")
 
         save_settings(user_id, daily_kcal=2200, protein_pct=30, carbs_pct=40, fat_pct=30)
 

@@ -97,75 +97,150 @@ function freestyleMacroLabel(macros){
   return parts.length ? parts.join(' · ') : 'Macros n/a';
 }
 
-function renderFreestyle(result){
-  const rail = document.getElementById('rail');
-  const recipe = result.recipe || {};
+let currentRecipes = [];
+let selectedIdx = 0;
+let loadingMore = false;
+
+function recipeStateLabel(recipe){
+  if(recipe.warning === true) return 'Warnung';
+  if(recipe.fallback === true) return 'Fallback';
+  return 'LLM';
+}
+
+// Fuellt die rechte Detailspalte mit dem gewaehlten Rezept.
+function renderDetail(recipe){
   const isWarning = recipe.warning === true;
   const isFallback = recipe.fallback === true;
-  const stateLabel = isWarning ? 'Warnung' : (isFallback ? 'Fallback' : 'LLM');
   const ingredients = recipe.ingredients || [];
   const instructions = recipe.instructions || [];
-  rail.innerHTML = `
-    <article class="recipe-card active" data-idx="0">
-      <div class="recipe-meta">
-        <strong>${recipe.title || 'Freestyle recipe'}</strong>
-        <span>${stateLabel}</span>
-      </div>
-      <p class="muted" style="margin:.45rem 0 .75rem;">${isWarning || isFallback ? 'Modellantwort nicht brauchbar' : 'Generated from your fridge'}</p>
-      <div style="margin-bottom:.5rem;">${(recipe.used_fridge_items || []).map(item => `<span class="pill">${item}</span>`).join('') || '<span class="muted">No fridge items used</span>'}</div>
-      <div class="muted" style="font-size:.92rem;">Pantry assumptions: ${(recipe.pantry_assumptions || []).join(', ') || 'None'}</div>
-    </article>
-  `;
 
-  document.getElementById('detail-title').textContent = recipe.title || 'Freestyle recipe';
-  document.getElementById('detail-subtitle').textContent = isWarning || isFallback ? 'LLM-Anbindung oder Modellleistung prüfen' : 'AI-generated from your fridge contents';
+  document.getElementById('detail-title').textContent = recipe.title || 'Freestyle-Rezept';
+  document.getElementById('detail-subtitle').textContent = isWarning || isFallback ? 'LLM-Anbindung oder Modellleistung prüfen' : 'Aus deinem Kühlschrank generiert';
   document.getElementById('detail-body').innerHTML = `
     <div class="recipe-meta" style="margin-bottom:10px;">
       <span>${freestyleMacroLabel(recipe.estimated_macros)}</span>
-      <span>${stateLabel}</span>
+      <span>${recipeStateLabel(recipe)}</span>
+    </div>
+    <div style="margin-bottom:10px;">${(recipe.used_fridge_items || []).map(item => `<span class="pill">${item}</span>`).join('') || '<span class="muted">No fridge items used</span>'}</div>
+    <div class="muted-box" style="margin-bottom:10px;">
+      <strong>Warum</strong>
+      <p style="white-space:pre-wrap;margin:.5rem 0 0;">${recipe.why_this_works || 'Keine Begründung verfügbar.'}</p>
     </div>
     <div class="muted-box" style="margin-bottom:10px;">
-      <strong>Why this works</strong>
-      <p style="white-space:pre-wrap;margin:.5rem 0 0;">${recipe.why_this_works || 'No explanation available.'}</p>
-    </div>
-    <div class="muted-box" style="margin-bottom:10px;">
-      <strong>Ingredients</strong>
-      <pre style="white-space:pre-wrap;margin:.5rem 0 0;">${ingredients.length ? ingredients.join('\n') : 'No ingredients listed.'}</pre>
+      <strong>Zutaten</strong>
+      <pre style="white-space:pre-wrap;margin:.5rem 0 0;">${ingredients.length ? ingredients.join('\n') : 'Keine Zutaten angegeben.'}</pre>
     </div>
     <div class="muted-box">
-      <strong>Cooking instructions</strong>
-      <pre style="white-space:pre-wrap;margin:.5rem 0 0;">${instructions.length ? instructions.map((step, idx) => `${idx + 1}. ${step}`).join('\n\n') : 'No instructions available.'}</pre>
+      <strong>Zubereitung</strong>
+      <pre style="white-space:pre-wrap;margin:.5rem 0 0;">${instructions.length ? instructions.map((step, idx) => `${idx + 1}. ${step}`).join('\n\n') : 'Keine Zubereitung angegeben.'}</pre>
     </div>
   `;
-  document.getElementById('status').textContent = isWarning ? 'LLM warning' : (isFallback ? 'Fallback recipe ready' : 'Freestyle recipe ready');
+}
+
+function normTitle(title){
+  return (title || '').trim().toLowerCase();
+}
+
+// Zeichnet die Vorschlagskarten (plus optional einen "lädt"-Hinweis).
+function renderRail(){
+  const rail = document.getElementById('rail');
+  let html = currentRecipes.map((recipe, idx) => `
+    <article class="recipe-card${idx === selectedIdx ? ' active' : ''}" data-idx="${idx}" style="cursor:pointer;">
+      <div class="recipe-meta">
+        <strong>${recipe.title || 'Freestyle-Rezept'}</strong>
+        <span>${recipeStateLabel(recipe)}</span>
+      </div>
+      <p class="muted" style="margin:.35rem 0 .5rem;">${freestyleMacroLabel(recipe.estimated_macros)}</p>
+      <div>${(recipe.used_fridge_items || []).map(item => `<span class="pill">${item}</span>`).join('') || '<span class="muted">No fridge items used</span>'}</div>
+    </article>
+  `).join('');
+  if(loadingMore){
+    html += '<div class="muted-box" id="more-loading">Weitere Vorschläge werden geladen…</div>';
+  }
+  if(!html){
+    html = '<div class="muted-box">Kein Rezept erhalten.</div>';
+  }
+  rail.innerHTML = html;
+  Array.from(rail.querySelectorAll('.recipe-card')).forEach(card => {
+    card.addEventListener('click', () => selectRecipe(Number(card.getAttribute('data-idx'))));
+  });
+}
+
+// Markiert die angetippte Karte und zeigt ihre Details.
+function selectRecipe(idx){
+  selectedIdx = idx;
+  Array.from(document.querySelectorAll('.recipe-card')).forEach(card => {
+    card.classList.toggle('active', Number(card.getAttribute('data-idx')) === idx);
+  });
+  if(currentRecipes[idx]) renderDetail(currentRecipes[idx]);
+}
+
+async function postRecipes(body){
+  const response = await fetch('/asaai/recipes/freestyle', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await response.json();
+  if(!response.ok) throw new Error(data.error || 'Freestyle generation failed');
+  return data.recipes || (data.recipe ? [data.recipe] : []);
 }
 
 async function loadFreestyleRecipe(){
   const dailyGoal = buildDailyGoal();
   const recipeCategory = document.getElementById('recipe-category').value.trim();
   const status = document.getElementById('status');
+  const btn = document.getElementById('run-freestyle');
   const token = ++requestToken;
-  status.textContent = 'Generating freestyle recipe...';
-  document.getElementById('run-freestyle').disabled = true;
+
+  currentRecipes = [];
+  selectedIdx = 0;
+  loadingMore = false;
+  btn.disabled = true;
+  status.textContent = 'Erster Vorschlag wird erstellt…';
+
   try {
-    const response = await fetch('/asaai/recipes/freestyle', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ daily_goal: dailyGoal, recipe_category: recipeCategory })
-    });
-    const data = await response.json();
-    if (token !== requestToken) return;
-    if (!response.ok) {
-      throw new Error(data.error || 'Freestyle generation failed');
+    // Phase 1: ein schneller Vorschlag, sofort anzeigen.
+    const first = await postRecipes({ daily_goal: dailyGoal, recipe_category: recipeCategory, count: 1 });
+    if(token !== requestToken) return;
+
+    currentRecipes = first;
+    selectedIdx = 0;
+    const lead = currentRecipes[0] || {};
+    const degraded = lead.warning === true || lead.fallback === true;
+    loadingMore = !degraded;            // bei LLM-Problemen keine weiteren laden
+    renderRail();
+    if(currentRecipes.length) selectRecipe(0);
+    btn.disabled = false;               // erstes Rezept ist schon nutzbar
+    status.textContent = degraded ? recipeStateLabel(lead) : '1 Vorschlag · weitere laden…';
+    if(degraded) return;
+
+    // Phase 2: zwei weitere im Hintergrund nachladen.
+    const exclude = currentRecipes.map(r => r.title).filter(Boolean);
+    let more = [];
+    try {
+      more = await postRecipes({ daily_goal: dailyGoal, recipe_category: recipeCategory, count: 2, exclude });
+    } catch(e){ more = []; }
+    if(token !== requestToken) return;
+
+    const seen = new Set(currentRecipes.map(r => normTitle(r.title)));
+    for(const recipe of more){
+      if(recipe.warning || recipe.fallback) continue;
+      if(seen.has(normTitle(recipe.title))) continue;
+      seen.add(normTitle(recipe.title));
+      currentRecipes.push(recipe);
     }
-    renderFreestyle(data);
+    loadingMore = false;
+    renderRail();
+    selectRecipe(selectedIdx);          // aktuelle Auswahl beibehalten
+    status.textContent = `${currentRecipes.length} Vorschlag(e) · tippe zum Anzeigen`;
   } catch (error) {
-    if (token === requestToken) {
+    if(token === requestToken){
       status.textContent = error.message || 'Freestyle generation failed';
+      document.getElementById('rail').innerHTML = `<div class="muted-box">${error.message || 'Freestyle generation failed. Please try again.'}</div>`;
     }
-    document.getElementById('rail').innerHTML = `<div class="muted-box">${error.message || 'Freestyle generation failed. Please try again.'}</div>`;
   } finally {
-    document.getElementById('run-freestyle').disabled = false;
+    if(token === requestToken) btn.disabled = false;
   }
 }
 

@@ -25,14 +25,16 @@ from .app_settings_repo import get_settings as get_app_settings, save_settings a
 from .asaai.ollama_client import OLLAMA_MODEL_CHOICES, resolve_ollama_model, test_ollama_model
 from .fridge_service import (
     calculate_total_nutrition,
+    consume_amount,
     create_dashboard_item,
     create_dashboard_item_from_data,
     delete_dashboard_item,
     get_dashboard_item,
     list_dashboard_items,
+    refill_amount,
     update_dashboard_item,
 )
-from .openfoodfacts_client import search_products
+from .openfoodfacts_client import search_product, search_products
 from .product_repo import search_by_name
 from flask import jsonify
 
@@ -406,7 +408,29 @@ def api_products_search():
     q = request.args.get("q", "").strip()
     if not q:
         return jsonify([])
-    # First try local DB matches
+
+    # Barcode (nur Ziffern): immer die OFF-Barcode-API nutzen, keine KI-Schaetzung.
+    if q.isdigit():
+        try:
+            product = search_product(q)
+        except Exception:
+            product = None
+        if not product or not product.get("name"):
+            return jsonify([])
+        return jsonify([{
+            "name": product.get("name"),
+            "brand": product.get("brand"),
+            "barcode": product.get("barcode"),
+            "kcal_per_100g": product.get("kcal_per_100g"),
+            "protein_per_100g": product.get("protein_per_100g"),
+            "fat_per_100g": product.get("fat_per_100g"),
+            "carbs_per_100g": product.get("carbs_per_100g"),
+            "total_amount": product.get("total_amount"),
+            "unit": product.get("unit"),
+            "ai": False,
+        }])
+
+    # Text-Suche: lokale Treffer + OFF-Textsuche, KI-Schaetzung daneben.
     local = []
     try:
         rows = search_by_name(q, limit=10)
@@ -446,6 +470,8 @@ def api_products_search():
             "protein_per_100g": item.get("protein_per_100g"),
             "fat_per_100g": item.get("fat_per_100g"),
             "carbs_per_100g": item.get("carbs_per_100g"),
+            "total_amount": item.get("total_amount"),
+            "unit": item.get("unit"),
             "ai": source == "ai",
         })
 

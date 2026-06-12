@@ -166,6 +166,7 @@ def generate_from_ollama(
     system: Optional[str] = None,
     num_predict: Optional[int] = None,
     format_json: bool = False,
+    temperature: float = 0.2,
     **_: Any,
 ) -> str:
     """Generate a response via a locally running Ollama instance.
@@ -200,7 +201,7 @@ def generate_from_ollama(
         "stream": False,
         "think": False,
         "options": {
-            "temperature": 0.2,
+            "temperature": temperature,
             "num_predict": int(num_predict or int(os.getenv("OLLAMA_NUM_PREDICT", "160"))),
         },
     }

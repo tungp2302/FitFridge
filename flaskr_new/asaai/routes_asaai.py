@@ -4,7 +4,7 @@ from __future__ import annotations
 from flask import Blueprint, g, jsonify, render_template, request
 
 from .. import fridge_repo
-from .freestyle_recipe import generate_freestyle_recipe
+from .freestyle_recipe import generate_freestyle_recipes
 from .ollama_client import resolve_ollama_model
 
 
@@ -32,18 +32,25 @@ def _selected_ollama_model(data=None):
 
 @asaai_bp.route("/recipes/freestyle", methods=("POST",))
 def freestyle_recipe():
-    """Generate one realistic recipe directly from fridge contents."""
+    """Generate several recipe suggestions directly from fridge contents."""
     data = request.get_json(silent=True) or {}
     daily_goal = data.get("daily_goal") if isinstance(data, dict) else None
     recipe_category = data.get("recipe_category") if isinstance(data, dict) else None
     selected_model = _selected_ollama_model(data)
 
     try:
+        count = int(data.get("count", 3))
+    except (TypeError, ValueError):
+        count = 3
+    count = max(1, min(count, 5))
+    exclude = data.get("exclude") if isinstance(data.get("exclude"), list) else None
+
+    try:
         items = _current_fridge_items()
     except Exception as exc:
         return jsonify({
             "error": f"Kühlschrank konnte nicht geladen werden: {exc}",
-            "recipe": None,
+            "recipes": [],
         }), 500
 
     fridge_items = [
@@ -58,11 +65,13 @@ def freestyle_recipe():
         }
         for item in items
     ]
-    result = generate_freestyle_recipe(
+    result = generate_freestyle_recipes(
         fridge_items=fridge_items,
         daily_goal=daily_goal,
         recipe_category=recipe_category,
         model=selected_model,
+        count=count,
+        exclude=exclude,
     )
     return jsonify(result)
 

@@ -20,6 +20,8 @@ except ModuleNotFoundError:  # pragma: no cover - depends on local environment
 
 OFF_API_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
 OFF_STAGING_API_URL = "https://world.openfoodfacts.net/api/v2/product/{barcode}.json"
+# Text-Suche laeuft ueber die Search-a-licious-API (liefert nur Barcodes).
+OFF_SEARCH_API_URL = "https://search.openfoodfacts.org/search"
 
 DEFAULT_USER_AGENT = "FitFridge/1.0 (university project; contact: you@example.com)"
 
@@ -325,51 +327,39 @@ def lookup_product(query: str, user_agent: str = DEFAULT_USER_AGENT, use_staging
 
 def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_staging: bool = False, limit: int = 10) -> Optional[list]:
     """
-    Search OpenFoodFacts for multiple products matching `query`.
+    Sucht per Text bei Open Food Facts nach passenden Produkten.
 
-    Returns a list of product dicts (same shape as `search_product` returns)
-    or an empty list if nothing found.
+    Nutzt die Search-a-licious-API (search.openfoodfacts.org), die nur
+    Barcodes (`code`) liefert. Fuer jeden Treffer holen wir die vollen
+    Naehrwerte ueber die Barcode-API (`search_product`).
+
+    Returns: Liste von Produkt-Dicts (gleiche Form wie `search_product`)
+    oder eine leere Liste, wenn nichts gefunden wurde.
     """
     if not query:
         raise ValueError("query is required")
 
-    base_url = OFF_STAGING_API_URL.rsplit("/api/v2/product/{barcode}.json", 1)[0] if use_staging else OFF_API_URL.rsplit("/api/v2/product/{barcode}.json", 1)[0]
-    # Request JSON results (json=1)
     search_url = (
-        f"{base_url}/cgi/search.pl?"
-        f"search_terms={quote(query)}&search_simple=1&action=process&json=1"
+        f"{OFF_SEARCH_API_URL}?q={quote(query)}"
+        f"&page_size={max(1, min(limit, 20))}"
+        "&fields=code,product_name,brands"
     )
-
     request = Request(
         search_url,
-        headers={
-            "User-Agent": user_agent,
-            "Accept": "application/json",
-        },
+        headers={"User-Agent": user_agent, "Accept": "application/json"},
     )
 
-    https_context = _make_ssl_context()
-
-    body = None
     try:
-        with urlopen(request, timeout=10, context=https_context) as response:
-            body = response.read().decode("utf-8")
+        with urlopen(request, timeout=10, context=_make_ssl_context()) as response:
+            payload = json.loads(response.read().decode("utf-8"))
     except Exception:
         return []
 
-    if not body:
-        return []
-
-    try:
-        payload = json.loads(body)
-    except Exception:
-        return []
-
-    products = payload.get("products") or []
+    hits = payload.get("hits") or []
     results = []
     seen = set()
-    for prod in products:
-        code = prod.get("code") or prod.get("_id")
+    for hit in hits:
+        code = hit.get("code")
         if not code or code in seen:
             continue
         seen.add(code)
@@ -377,15 +367,12 @@ def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_stagin
             full = search_product(code, user_agent=user_agent, use_staging=use_staging)
         except Exception:
             full = None
-        if full:
+        if full and full.get("name"):
             results.append(full)
+        if len(results) >= limit:
+            break
 
-    ranked = _rank_off_products(query, results)
-
-    if limit:
-        ranked = ranked[:limit]
-
-    return ranked
+    return _rank_off_products(query, results)
 
 
 def ai_estimate(query: str) -> Optional[dict]:

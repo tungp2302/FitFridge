@@ -1,32 +1,4 @@
-"""Hilfsfunktionen für Nährwert- und Mengenberechnungen.
-
-Dieses Modul stellt allgemeine Berechnungshilfen bereit, die in
-verschiedenen Teilen der App benötigt werden:
-- Prozentuale Anteile (z.B. Anteil an Tageskalorien)
-- Einheiten-Konvertierung (z.B. kg zu g, l zu ml)
-"""
-
-def to_percentage(part, total):
-    """
-    Berechnet den prozentualen Anteil von `part` an `total`.
-
-    Beispiel:
-        to_percentage(30, 200) → 15.0
-        Bedeutet: 30 sind 15% von 200.
-
-    Parameter:
-        part (float): Teilmenge
-        total (float): Gesamtmenge
-
-    Returns:
-        float: Prozentualer Anteil (0 bis 100)
-
-    Hinweise:
-        - Wenn total == 0, wird 0.0 zurückgegeben (kein Division-Fehler)
-    """
-    if total == 0:
-        return 0.0
-    return (part / total) * 100
+"""Hilfsfunktion für Einheiten-Umrechnung (z.B. kg zu g, l zu ml)."""
 
 def convert_units(amount, from_unit, to_unit):
     """

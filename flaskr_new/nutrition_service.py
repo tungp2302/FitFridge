@@ -1,14 +1,10 @@
 """Service für Nährwert-Berechnungen.
 
-Dieses Modul kümmert sich um alle Berechnungen rund um Nährwerte:
-- Wie viele Kalorien/Protein/Fett/Carbs hat eine konkrete Menge?
-- Wie viel hat der gesamte Kühlschrank?
-- Wie viel Prozent eines Tagesziels wurden erreicht?
-
-Es nutzt calculations.py für allgemeine Hilfsberechnungen.
+Rechnet die "pro 100g"-Nährwerte eines Produkts auf eine konkrete Menge um.
+Nutzt calculations.py für die Einheiten-Umrechnung.
 """
 
-from .calculations import to_percentage, convert_units
+from .calculations import convert_units
 
 
 def calculate_for_amount(product, amount, unit):
@@ -81,91 +77,4 @@ def calculate_for_amount(product, amount, unit):
         "protein": round(product["protein_per_100g"] * multiplier, 1),
         "fat": round(product["fat_per_100g"] * multiplier, 1),
         "carbs": round(product["carbs_per_100g"] * multiplier, 1),
-    }
-
-def calculate_total_for_fridge(items):
-    """
-    Berechnet die Gesamt-Nährwerte aller Produkte im Kühlschrank.
-
-    Geht durch alle Items, berechnet pro Item die Nährwerte für die
-    aktuelle Menge, und summiert alles auf.
-
-    Beispiel:
-        items = [
-            {"name": "Nutella", "current_amount": 30, "unit": "g",
-             "kcal_per_100g": 539.0, "protein_per_100g": 6.3, ...},
-            {"name": "Butter", "current_amount": 200, "unit": "g",
-             "kcal_per_100g": 717.0, "protein_per_100g": 0.9, ...},
-        ]
-        calculate_total_for_fridge(items)
-        → {"kcal": 1595.7, "protein": 3.7, "fat": 171.3, "carbs": 17.5}
-
-    Parameter:
-        items (list): Liste von Fridge-Items (dicts mit current_amount,
-                      unit und den Nährwert-Feldern pro 100g)
-
-    Returns:
-        dict: Summe der Nährwerte über alle Items.
-              Bei leerer Liste: alle Werte 0.0
-    """
-    # Start: alle Summen auf 0
-    total = {
-        "kcal": 0.0,
-        "protein": 0.0,
-        "fat": 0.0,
-        "carbs": 0.0,
-    }
-
-    # Edge Case: Leere Liste
-    if not items:
-        return total
-
-    # Durch jedes Item gehen und die Nährwerte aufsummieren
-    for item in items:
-        nutrition = calculate_for_amount(
-            product=item,
-            amount=item["current_amount"],
-            unit=item["unit"],
-        )
-
-        total["kcal"] += nutrition["kcal"]
-        total["protein"] += nutrition["protein"]
-        total["fat"] += nutrition["fat"]
-        total["carbs"] += nutrition["carbs"]
-
-    # Am Ende noch sauber runden
-    return {
-        "kcal": round(total["kcal"], 1),
-        "protein": round(total["protein"], 1),
-        "fat": round(total["fat"], 1),
-        "carbs": round(total["carbs"], 1),
-    }
-
-def calculate_daily_percentage(consumed, daily_target):
-    """
-    Berechnet, wie viel Prozent des Tagesziels für jeden Nährwert
-    erreicht wurden.
-
-    Beispiel:
-        consumed = {"kcal": 1200, "protein": 80, "fat": 50, "carbs": 150}
-        target = {"kcal": 2000, "protein": 120, "fat": 70, "carbs": 250}
-        calculate_daily_percentage(consumed, target)
-        → {"kcal": 60.0, "protein": 66.7, "fat": 71.4, "carbs": 60.0}
-
-    Parameter:
-        consumed (dict): Bereits verbrauchte Nährwerte
-                         mit Schlüsseln kcal, protein, fat, carbs
-        daily_target (dict): Tagesziel für jeden Nährwert
-                             mit denselben Schlüsseln
-
-    Returns:
-        dict: Prozentuale Anteile pro Nährwert (0 bis 100+).
-              Auf 1 Nachkommastelle gerundet.
-              Werte über 100% sind möglich (= Tagesziel überschritten).
-    """
-    return {
-        "kcal": round(to_percentage(consumed["kcal"], daily_target["kcal"]), 1),
-        "protein": round(to_percentage(consumed["protein"], daily_target["protein"]), 1),
-        "fat": round(to_percentage(consumed["fat"], daily_target["fat"]), 1),
-        "carbs": round(to_percentage(consumed["carbs"], daily_target["carbs"]), 1),
     }

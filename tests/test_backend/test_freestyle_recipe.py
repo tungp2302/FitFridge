@@ -1,22 +1,38 @@
-from flaskr_new.asaai.freestyle_recipe import generate_freestyle_recipe
+"""Tests fuer die Freestyle-Rezept-Logik (ein und mehrere Rezepte)."""
+from flaskr_new.asaai.freestyle_recipe import (
+    generate_freestyle_recipe,
+    generate_freestyle_recipes,
+)
 
 
-def test_missing_llm_returns_warning_instead_of_fake_recipe(monkeypatch):
-    def fake_generate_from_ollama(**kwargs):
+def _patch_llm(monkeypatch, func):
+    monkeypatch.setattr("flaskr_new.asaai.freestyle_recipe.generate_from_ollama", func)
+
+
+VALID_RESPONSE = """
+{
+  "title": "Protein-Pfannkuchen",
+  "why_this_works": "Mehl und Eier ergeben einen Teig.",
+  "ingredients": ["Dinkel Mehl", "Frische Eier", "Wasser"],
+  "instructions": ["Mehl und Eier verruehren.", "Teig ruhen lassen.", "Pfannkuchen ausbacken."],
+  "estimated_macros": {"kcal": 500, "protein": 35, "fat": 12, "carbs": 60},
+  "used_fridge_item_ids": [1, 2],
+  "pantry_assumptions": ["Wasser"]
+}
+"""
+
+BASIC_FRIDGE = [
+    {"name": "Dinkel Mehl", "amount": 120},
+    {"name": "Frische Eier", "amount": 100},
+]
+
+
+def test_missing_llm_returns_warning(monkeypatch):
+    def boom(**kwargs):
         raise RuntimeError("Ollama is not running")
 
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        fake_generate_from_ollama,
-    )
-
-    result = generate_freestyle_recipe(
-        [
-            {"name": "Dinkel Mehl", "amount": 120},
-            {"name": "Frische Eier", "amount": 100},
-            {"name": "Bulk Pure Whey Protein Powder- neutral", "amount": 40},
-        ]
-    )
+    _patch_llm(monkeypatch, boom)
+    result = generate_freestyle_recipe(BASIC_FRIDGE)
 
     recipe = result["recipe"]
     assert recipe["warning"] is True
@@ -25,19 +41,9 @@ def test_missing_llm_returns_warning_instead_of_fake_recipe(monkeypatch):
     assert "Ollama is not running" in result["error"]
 
 
-def test_empty_llm_response_returns_model_failed_fallback(monkeypatch):
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        lambda **kwargs: "",
-    )
-
-    result = generate_freestyle_recipe(
-        [
-            {"name": "Dinkel Mehl", "amount": 120},
-            {"name": "Frische Eier", "amount": 100},
-            {"name": "Bulk Pure Whey Protein Powder- neutral", "amount": 40},
-        ]
-    )
+def test_empty_response_returns_fallback(monkeypatch):
+    _patch_llm(monkeypatch, lambda **kwargs: "")
+    result = generate_freestyle_recipe(BASIC_FRIDGE)
 
     recipe = result["recipe"]
     assert recipe["fallback"] is True
@@ -45,68 +51,15 @@ def test_empty_llm_response_returns_model_failed_fallback(monkeypatch):
     assert "kein brauchbares Rezept" in recipe["why_this_works"]
 
 
-def test_low_quality_llm_recipe_returns_model_failed_fallback(monkeypatch):
-    bad_response = """
-    {
-      "title": "Dinkel Mehl + Frische Eier + Bulk Pure Whey Protein Powder- neutral",
-      "why_this_works": "Dieses Rezept kombiniert die ersten passenden Kühlschrank-Zutaten zu einer einfachen Mahlzeit.",
-      "ingredients": ["Dinkel Mehl", "Frische Eier", "Bulk Pure Whey Protein Powder- neutral"],
-      "instructions": [
-        "Zutaten vorbereiten und bei Bedarf klein schneiden.",
-        "Pfanne erhitzen, würzen und die Zutaten nacheinander garen.",
-        "Abschmecken und direkt servieren."
-      ],
-      "estimated_macros": {"kcal": 0, "protein": 0, "fat": 0, "carbs": 0},
-      "used_fridge_item_ids": [1, 2, 3],
-      "pantry_assumptions": ["Öl", "Salz", "Pfeffer"]
-    }
-    """
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        lambda **kwargs: bad_response,
-    )
-
-    result = generate_freestyle_recipe(
-        [
-            {"name": "Dinkel Mehl", "amount": 120},
-            {"name": "Frische Eier", "amount": 100},
-            {"name": "Bulk Pure Whey Protein Powder- neutral", "amount": 40},
-        ]
-    )
-
-    recipe = result["recipe"]
-    assert recipe["fallback"] is True
-    assert recipe["title"] == "Modell fehlgeschlagen - lokaler Fallback"
-
-
-def test_freestyle_requests_ollama_json_mode(monkeypatch):
+def test_valid_recipe_is_returned_with_json_mode(monkeypatch):
     captured = {}
 
-    def fake_generate_from_ollama(**kwargs):
+    def fake(**kwargs):
         captured.update(kwargs)
-        return """
-        {
-          "title": "Protein-Pfannkuchen",
-          "why_this_works": "Mehl und Eier ergeben einen Teig.",
-          "ingredients": ["Dinkel Mehl", "Frische Eier", "Wasser"],
-          "instructions": ["Mehl und Eier verrühren.", "Teig kurz ruhen lassen.", "Pfannkuchen ausbacken."],
-          "estimated_macros": {"kcal": 500, "protein": 35, "fat": 12, "carbs": 60},
-          "used_fridge_item_ids": [1, 2],
-          "pantry_assumptions": ["Wasser"]
-        }
-        """
+        return VALID_RESPONSE
 
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        fake_generate_from_ollama,
-    )
-
-    result = generate_freestyle_recipe(
-        [
-            {"name": "Dinkel Mehl", "amount": 120},
-            {"name": "Frische Eier", "amount": 100},
-        ]
-    )
+    _patch_llm(monkeypatch, fake)
+    result = generate_freestyle_recipe(BASIC_FRIDGE)
 
     assert result["recipe"]["title"] == "Protein-Pfannkuchen"
     assert result["recipe"]["used_fridge_items"] == ["Dinkel Mehl", "Frische Eier"]
@@ -114,494 +67,375 @@ def test_freestyle_requests_ollama_json_mode(monkeypatch):
     assert captured["num_predict"] == 900
 
 
-def test_tiny_model_uses_short_budget_and_local_fallback(monkeypatch):
-    calls = []
-
-    def fake_generate_from_ollama(**kwargs):
-        calls.append(kwargs)
-        return ""
-
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        fake_generate_from_ollama,
-    )
-
-    result = generate_freestyle_recipe(
-        [
-            {"name": "Paprika", "amount": 100},
-            {"name": "Tofu Natur", "amount": 200},
-            {"name": "Tomaten", "amount": 150},
-            {"name": "Jasmin Reis", "amount": 200},
-            {"name": "Frische Eier", "amount": 100},
-            {"name": "Dinkel Mehl", "amount": 120},
-            {"name": "Magerquark", "amount": 250},
-            {"name": "Haferflocken", "amount": 80},
-        ],
-        recipe_category="hauptspeise",
-        model="gemma3:1b",
-    )
-
-    assert len(calls) == 1
-    assert calls[0]["num_predict"] == 420
-    assert calls[0]["format_json"] is True
-    assert "Haferflocken" not in calls[0]["prompt"]
-    assert "--- retry ---" not in result["raw_response"]
-    assert result["recipe"]["fallback"] is True
-    assert result["recipe"]["title"] == "Modell fehlgeschlagen - lokaler Fallback"
-    assert result["recipe"]["used_fridge_items"] == ["Tofu Natur", "Jasmin Reis", "Paprika"]
-
-
-def test_tiny_model_repairs_usable_sloppy_recipe_instead_of_fallback(monkeypatch):
-    sloppy_response = """
+def test_structured_amounts_compute_macros_instead_of_trusting_llm(monkeypatch):
+    response = """
     {
-      "name": "Tofu-Reis-Pfanne",
-      "why": "Tofu, Reis und Tomaten ergeben eine einfache Hauptspeise.",
-      "ingredients": ["Tofu Natur", "Jasmin Reis", "Tomaten", "Olivenöl", "Salz"],
-      "instructions": "Reis garen. Tofu und Tomaten in Öl braten. Alles würzen und servieren.",
-      "macros": {"calories": 620, "protein_g": 31, "fat_g": 12, "carbohydrates": 82},
-      "used_fridge_items": ["Tofu Natur", "Jasmin Reis", "Tomaten"]
+      "title": "Mehl-Ei-Pfannkuchen",
+      "why_this_works": "Mehl und Eier ergeben einen einfachen Teig.",
+      "ingredients": ["100g Dinkel Mehl", "100g Frische Eier", "Wasser"],
+      "fridge_ingredients": [
+        {"id": 1, "amount_g": 100, "label": "100g Dinkel Mehl"},
+        {"id": 2, "amount_g": 100, "label": "100g Frische Eier"}
+      ],
+      "pantry_ingredients": [{"name": "Wasser", "label": "etwas Wasser"}],
+      "instructions": ["Teig verruehren.", "Kurz ruhen lassen.", "Pfannkuchen ausbacken."],
+      "estimated_macros": {"kcal": 999, "protein": 999, "fat": 999, "carbs": 999},
+      "used_fridge_item_ids": [1, 2],
+      "pantry_assumptions": ["Wasser"]
     }
     """
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        lambda **kwargs: sloppy_response,
-    )
-
-    result = generate_freestyle_recipe(
-        [
-            {"name": "Tofu Natur", "amount": 200},
-            {"name": "Jasmin Reis", "amount": 200},
-            {"name": "Tomaten", "amount": 150},
-        ],
-        daily_goal={"protein": 45, "fat": 20},
-        recipe_category="hauptspeise",
-        model="gemma3:1b",
-    )
+    _patch_llm(monkeypatch, lambda **kwargs: response)
+    result = generate_freestyle_recipe([
+        {"name": "Dinkel Mehl", "amount": 500, "kcal_per_100g": 344, "protein_per_100g": 10, "fat_per_100g": 1, "carbs_per_100g": 72.3},
+        {"name": "Frische Eier", "amount": 6, "kcal_per_100g": 143, "protein_per_100g": 12.6, "fat_per_100g": 9.5, "carbs_per_100g": 0.7},
+    ])
 
     recipe = result["recipe"]
-    assert "fallback" not in recipe
-    assert recipe["title"] == "Tofu-Reis-Pfanne"
-    assert recipe["used_fridge_items"] == ["Tofu Natur", "Jasmin Reis", "Tomaten"]
-    assert recipe["estimated_macros"]["protein"] == 45
-    assert recipe["estimated_macros"]["fat"] == 20
+    assert recipe["macro_source"] == "computed_from_fridge_amounts"
+    assert recipe["estimated_macros"] == {"kcal": 487.0, "protein": 22.6, "fat": 10.5, "carbs": 73.0}
+    assert recipe["ingredients"] == ["100g Dinkel Mehl", "100g Frische Eier", "etwas Wasser"]
 
 
-def test_tiny_model_accepts_single_sensible_product(monkeypatch):
-    yogurt_response = """
+def test_legacy_used_ids_must_match_ingredient_text(monkeypatch):
+    response = """
     {
-      "title": "Greek Yogurt Snack",
-      "why_this_works": "Greek Yogurt can be eaten directly as a simple protein snack.",
-      "ingredients": ["Greek Yogurt"],
-      "instructions": ["Spoon yogurt into a bowl.", "Stir until creamy.", "Serve chilled."],
-      "estimated_macros": {"protein": 30, "fat": 6, "calories": 240, "carbs": 10},
-      "used_fridge_item_ids": ["1"],
+      "title": "Haferbrei mit Banane",
+      "why_this_works": "Hafer und Banane passen zusammen.",
+      "ingredients": ["100g Haferflocken", "1 Banane", "250ml Milch"],
+      "instructions": ["Kochen.", "Ruehren.", "Servieren."],
+      "estimated_macros": {"kcal": 780, "protein": 62, "fat": 24, "carbs": 92},
+      "used_fridge_item_ids": [1, 2, 3],
       "pantry_assumptions": []
     }
     """
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        lambda **kwargs: yogurt_response,
-    )
+    _patch_llm(monkeypatch, lambda **kwargs: response)
+    result = generate_freestyle_recipe([
+        {"name": "Milch 1,5%", "amount": 1000},
+        {"name": "Frischkäse", "amount": 100},
+        {"name": "Banane", "amount": 200},
+        {"name": "Haferflocken", "amount": 500},
+    ])
 
-    result = generate_freestyle_recipe(
-        [{"name": "Greek Yogurt", "amount": 300}],
-        daily_goal={"protein": 30, "fat": 6},
-        recipe_category="snack",
-        model="gemma3:1b",
-    )
-
-    recipe = result["recipe"]
-    assert "fallback" not in recipe
-    assert recipe["title"] == "Greek Yogurt Snack"
-    assert recipe["used_fridge_items"] == ["Greek Yogurt"]
+    assert result["recipe"]["fallback"] is True
 
 
-def test_tiny_model_replaces_hallucinated_core_food_in_title(monkeypatch):
-    hallucinated_title_response = """
+def test_savory_title_with_sweet_structured_body_is_rejected(monkeypatch):
+    response = """
     {
-      "title": "Parmesan Greek Yogurt Salmon Bake",
-      "why_this_works": "Salmon makes this high protein.",
-      "ingredients": ["Parmesan", "Greek Yogurt", "Eggs", "Oil", "Salt", "Pepper"],
-      "instructions": ["Whisk eggs.", "Mix yogurt and parmesan.", "Bake until set."],
-      "estimated_macros": {"protein": 60, "fat": 25, "calories": 800},
-      "used_fridge_item_ids": ["1", "2", "3"],
-      "pantry_assumptions": "oil and salt"
-    }
-    """
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        lambda **kwargs: hallucinated_title_response,
-    )
-
-    result = generate_freestyle_recipe(
-        [
-            {"name": "Parmesan", "amount": 150},
-            {"name": "Greek Yogurt", "amount": 300},
-            {"name": "Eggs", "amount": 6},
-        ],
-        daily_goal={"protein": 60, "fat": 25},
-        recipe_category="hauptspeise",
-        model="gemma3:1b",
-    )
-
-    recipe = result["recipe"]
-    assert "fallback" not in recipe
-    assert "Salmon" not in recipe["title"]
-    assert "Salmon" not in recipe["why_this_works"]
-    assert recipe["used_fridge_items"] == ["Parmesan", "Greek Yogurt", "Eggs"]
-
-
-def test_laptop_model_uses_compact_profile(monkeypatch):
-    captured = {}
-
-    def fake_generate_from_ollama(**kwargs):
-        captured.update(kwargs)
-        return """
-        {
-          "title": "Tofu-Reis-Pfanne",
-          "why_this_works": "Tofu und Reis passen als einfache Hauptspeise.",
-          "ingredients": ["Tofu Natur", "Jasmin Reis", "Öl"],
-          "instructions": ["Reis garen.", "Tofu anbraten.", "Alles würzen und servieren."],
-          "estimated_macros": {"kcal": 520, "protein": 28, "fat": 16, "carbs": 65},
-          "used_fridge_item_ids": [1, 2],
-          "pantry_assumptions": ["Öl"]
-        }
-        """
-
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        fake_generate_from_ollama,
-    )
-
-    result = generate_freestyle_recipe(
-        [
-            {"name": "Tofu Natur", "amount": 200},
-            {"name": "Jasmin Reis", "amount": 200},
-        ],
-        recipe_category="hauptspeise",
-        model="qwen3:4b",
-    )
-
-    assert result["recipe"]["title"] == "Tofu-Reis-Pfanne"
-    assert captured["num_predict"] == 320
-    assert "Return ONLY JSON" in captured["prompt"]
-    assert "fridge IDs" in captured["prompt"]
-
-
-def test_tiny_model_keeps_targeted_main_dish_items_in_prompt(monkeypatch):
-    captured = {}
-
-    def fake_generate_from_ollama(**kwargs):
-        captured.update(kwargs)
-        return """
-        {
-          "title": "Steak mit Kartoffeln und Gemüse",
-          "why_this_works": "Steak, Kartoffeln und Gemüse ergeben ein klassisches Hauptgericht.",
-          "ingredients": ["Steak", "Kartoffeln", "Brokkoli", "Öl", "Salz"],
-          "instructions": ["Kartoffeln garen.", "Steak braten.", "Gemüse garen und alles servieren."],
-          "estimated_macros": {"kcal": 760, "protein": 60, "fat": 25, "carbs": 65},
-          "used_fridge_item_ids": [1, 2, 3],
-          "pantry_assumptions": ["Öl", "Salz"]
-        }
-        """
-
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        fake_generate_from_ollama,
-    )
-
-    result = generate_freestyle_recipe(
-        [
-            {"name": "Steak", "amount": 250},
-            {"name": "Kartoffeln", "amount": 400},
-            {"name": "Brokkoli", "amount": 250},
-        ],
-        daily_goal={"protein": 60, "fat": 25},
-        recipe_category="hauptspeise",
-        model="gemma3:1b",
-    )
-
-    assert "Steak" in captured["prompt"]
-    assert "Kartoffeln" in captured["prompt"]
-    assert "Brokkoli" in captured["prompt"]
-    assert result["recipe"]["title"] == "Steak mit Kartoffeln und Gemüse"
-
-
-def test_tiny_model_repair_adds_quantities_and_specific_cooking_steps(monkeypatch):
-    messy_main_dish = """
-    {
-      "title": "Hearty Steak & Kartoffel with Parmesan & Yogurt",
-      "why_this_works": "This dish combines a lean steak with hearty potatoes and broccoli.",
-      "ingredients": ["Steak", "Kartoffeln", "Brokkoli", "Parmesan", "Greek Yogurt"],
-      "instructions": ["Combine everything and serve.", "Season.", "Enjoy."],
-      "estimated_macros": {"protein": 60, "fat": 25, "calories": 800},
-      "used_fridge_item_ids": ["1"]
-    }
-    """
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        lambda **kwargs: messy_main_dish,
-    )
-
-    result = generate_freestyle_recipe(
-        [
-            {"name": "Steak", "amount": 250, "unit": "g", "kcal_per_100g": 217, "protein_per_100g": 26.0, "fat_per_100g": 12.0, "carbs_per_100g": 0.0},
-            {"name": "Kartoffeln", "amount": 500, "unit": "g", "kcal_per_100g": 77, "protein_per_100g": 2.0, "fat_per_100g": 0.1, "carbs_per_100g": 17.0},
-            {"name": "Brokkoli", "amount": 300, "unit": "g", "kcal_per_100g": 34, "protein_per_100g": 2.8, "fat_per_100g": 0.4, "carbs_per_100g": 7.0},
-            {"name": "Parmesan", "amount": 150, "unit": "g"},
-            {"name": "Greek Yogurt", "amount": 300, "unit": "g"},
-        ],
-        daily_goal={"protein": 60, "fat": 25, "kcal": 800},
-        recipe_category="hauptspeise",
-        model="gemma3:1b",
-    )
-
-    recipe = result["recipe"]
-    assert recipe["title"] == "Steak mit Kartoffeln und Brokkoli"
-    assert recipe["ingredients"] == ["185g Steak", "300g Kartoffeln", "200g Brokkoli"]
-    assert recipe["macro_source"] == "computed_from_ingredient_quantities"
-    assert recipe["estimated_macros"] == {"kcal": 700.5, "protein": 59.7, "fat": 23.3, "carbs": 65.0}
-    assert "15-20 Minuten" in recipe["instructions"][0]
-    assert "5-7 Minuten" in recipe["instructions"][1]
-    assert "2-4 Minuten pro Seite" in recipe["instructions"][2]
-
-
-def test_quantity_plan_computes_macros_from_recipe_amounts_not_full_stock(monkeypatch):
-    messy_main_dish = """
-    {
-      "title": "Steak Kartoffel Brokkoli",
-      "why_this_works": "Steak, Kartoffeln und Brokkoli ergeben ein einfaches Hauptgericht.",
-      "ingredients": ["500g Kartoffeln", "250g Steak", "300g Brokkoli"],
-      "instructions": ["Kartoffeln kochen.", "Steak braten.", "Brokkoli garen."],
-      "estimated_macros": {"kcal": 540, "protein": 80, "fat": 130, "carbs": 130},
-      "used_fridge_item_ids": [1, 2, 3]
-    }
-    """
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        lambda **kwargs: messy_main_dish,
-    )
-
-    result = generate_freestyle_recipe(
-        [
-            {"name": "Steak", "amount": 250, "unit": "g", "kcal_per_100g": 217, "protein_per_100g": 26.0, "fat_per_100g": 12.0, "carbs_per_100g": 0.0},
-            {"name": "Kartoffeln", "amount": 500, "unit": "g", "kcal_per_100g": 77, "protein_per_100g": 2.0, "fat_per_100g": 0.1, "carbs_per_100g": 17.0},
-            {"name": "Brokkoli", "amount": 300, "unit": "g", "kcal_per_100g": 34, "protein_per_100g": 2.8, "fat_per_100g": 0.4, "carbs_per_100g": 7.0},
-        ],
-        daily_goal={"protein": 80, "fat": 25, "kcal": 1300},
-        recipe_category="hauptspeise",
-        model="gemma3:1b",
-    )
-
-    recipe = result["recipe"]
-    assert "fallback" not in recipe
-    assert recipe["ingredients"] == ["250g Steak", "300g Kartoffeln", "200g Brokkoli"]
-    assert "500g Kartoffeln" not in recipe["ingredients"]
-    assert recipe["estimated_macros"] == {"kcal": 841.5, "protein": 76.6, "fat": 31.1, "carbs": 65.0}
-    assert recipe["macro_source"] == "computed_from_ingredient_quantities"
-
-
-def test_laptop_model_repair_prefers_main_course_core_over_extra_dairy(monkeypatch):
-    qwen_response = """
-    {
-      "title": "Pan-Seared Steak with Broccoli and Yogurt",
-      "why_this_works": "Uses steak, broccoli, yogurt and eggs for balanced macros.",
-      "ingredients": ["1 Steak (250g)", "3 Brokkoli (300g)", "5 Greek Yogurt (300g)", "6 Eggs (6pcs)"],
-      "instructions": [
-        "Pan-sear steak.",
-        "Sauté broccoli.",
-        "Mix yogurt with eggs and serve over steak."
+      "title": "Scharfe Spinat-Reis-Pfanne mit Ei",
+      "why_this_works": "Ein suesses Fruehstueck mit Haferflocken, Whey und Banane.",
+      "ingredients": ["60g Haferflocken", "30g Whey", "150ml Milch", "1 Banane"],
+      "fridge_ingredients": [
+        {"id": 1, "amount_g": 30, "label": "30g Whey"},
+        {"id": 2, "amount_g": 60, "label": "60g Haferflocken"},
+        {"id": 3, "amount_g": 120, "label": "1 Banane"},
+        {"id": 4, "amount_g": 50, "label": "50g Frischkaese"}
       ],
-      "estimated_macros": {"protein": 82, "fat": 24, "kcal": 1305},
-      "used_fridge_item_ids": ["1", "3", "5", "6"],
-      "pantry_assumptions": ["Oil", "Salt"]
+      "instructions": ["Mischen.", "Erhitzen.", "Servieren."],
+      "estimated_macros": {"kcal": 810, "protein": 62, "fat": 18, "carbs": 115},
+      "used_fridge_item_ids": [1, 2, 3, 4],
+      "pantry_assumptions": []
     }
     """
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        lambda **kwargs: qwen_response,
-    )
-
+    _patch_llm(monkeypatch, lambda **kwargs: response)
     result = generate_freestyle_recipe(
         [
-            {"name": "Steak", "amount": 250, "unit": "g", "kcal_per_100g": 217, "protein_per_100g": 26.0, "fat_per_100g": 12.0, "carbs_per_100g": 0.0},
-            {"name": "Kartoffeln", "amount": 500, "unit": "g", "kcal_per_100g": 77, "protein_per_100g": 2.0, "fat_per_100g": 0.1, "carbs_per_100g": 17.0},
-            {"name": "Brokkoli", "amount": 300, "unit": "g", "kcal_per_100g": 34, "protein_per_100g": 2.8, "fat_per_100g": 0.4, "carbs_per_100g": 7.0},
-            {"name": "Parmesan", "amount": 150, "unit": "g", "kcal_per_100g": 431, "protein_per_100g": 38.0, "fat_per_100g": 29.0, "carbs_per_100g": 4.1},
-            {"name": "Greek Yogurt", "amount": 300, "unit": "g", "kcal_per_100g": 72, "protein_per_100g": 9.5, "fat_per_100g": 2.0, "carbs_per_100g": 3.5},
-            {"name": "Eggs", "amount": 6, "unit": "pcs", "kcal_per_100g": 143, "protein_per_100g": 12.6, "fat_per_100g": 9.5, "carbs_per_100g": 0.7},
+            {"name": "ESN Whey Protein Cinnamon", "amount": 300, "kcal_per_100g": 375, "protein_per_100g": 73, "fat_per_100g": 5.2, "carbs_per_100g": 9.2},
+            {"name": "Haferflocken", "amount": 500, "kcal_per_100g": 361, "protein_per_100g": 14, "fat_per_100g": 6.7, "carbs_per_100g": 56},
+            {"name": "Banane", "amount": 200, "kcal_per_100g": 89, "protein_per_100g": 1.1, "fat_per_100g": 0.3, "carbs_per_100g": 23},
+            {"name": "Frischkaese", "amount": 100, "kcal_per_100g": 252, "protein_per_100g": 4.5, "fat_per_100g": 24.5, "carbs_per_100g": 3},
+            {"name": "Spinat", "amount": 300, "kcal_per_100g": 22, "protein_per_100g": 3.3, "fat_per_100g": 0.4, "carbs_per_100g": 0.3},
+            {"name": "Jasmin Reis", "amount": 500, "kcal_per_100g": 351, "protein_per_100g": 7.3, "fat_per_100g": 1.3, "carbs_per_100g": 77},
         ],
-        daily_goal={"protein": 80, "fat": 25, "kcal": 1300},
+        daily_goal={"protein": 60, "kcal": 800},
         recipe_category="hauptspeise",
-        model="qwen3:4b",
     )
 
-    recipe = result["recipe"]
-    assert recipe["title"] == "Steak mit Kartoffeln und Brokkoli"
-    assert recipe["used_fridge_items"] == ["Steak", "Kartoffeln", "Brokkoli"]
-    assert recipe["ingredients"] == ["250g Steak", "300g Kartoffeln", "200g Brokkoli"]
-    assert recipe["estimated_macros"] == {"kcal": 841.5, "protein": 76.6, "fat": 31.1, "carbs": 65.0}
+    assert result["recipe"]["fallback"] is True
 
 
-def test_macro_targets_reject_recipe_more_than_10g_off_and_retry(monkeypatch):
+def test_supplement_name_in_title_is_rejected_even_when_recipe_matches(monkeypatch):
+    response = """
+    {
+      "title": "Kraeuter-Hafer-Whey-Pfannkuchen mit Banane",
+      "why_this_works": "Hafer, Banane und Ei ergeben einen weichen Teig, das Proteinpulver ergaenzt die Struktur.",
+      "ingredients": ["100g Haferflocken", "30g Whey", "1 Ei", "150ml Milch", "1 Banane"],
+      "fridge_ingredients": [
+        {"id": 1, "amount_g": 100, "label": "100g Haferflocken"},
+        {"id": 2, "amount_g": 30, "label": "30g Whey"},
+        {"id": 3, "amount_g": 100, "label": "1 Ei"},
+        {"id": 4, "amount_g": 150, "label": "150ml Milch"},
+        {"id": 5, "amount_g": 120, "label": "1 Banane"}
+      ],
+      "instructions": ["Teig ruehren.", "Pfannkuchen ausbacken.", "Warm servieren."],
+      "estimated_macros": {"kcal": 780, "protein": 62, "fat": 28, "carbs": 85},
+      "used_fridge_item_ids": [1, 2, 3, 4, 5],
+      "pantry_assumptions": []
+    }
+    """
+    _patch_llm(monkeypatch, lambda **kwargs: response)
+    result = generate_freestyle_recipe(
+        [
+            {"name": "Haferflocken", "amount": 500, "kcal_per_100g": 361, "protein_per_100g": 14, "fat_per_100g": 6.7, "carbs_per_100g": 56},
+            {"name": "ESN Whey Protein Cinnamon", "amount": 300, "kcal_per_100g": 375, "protein_per_100g": 73, "fat_per_100g": 5.2, "carbs_per_100g": 9.2},
+            {"name": "Eier", "amount": 300, "kcal_per_100g": 143, "protein_per_100g": 12.6, "fat_per_100g": 9.5, "carbs_per_100g": 0.7},
+            {"name": "Milch 1,5%", "amount": 1000, "kcal_per_100g": 47, "protein_per_100g": 3.4, "fat_per_100g": 1.5, "carbs_per_100g": 4.9},
+            {"name": "Banane", "amount": 200, "kcal_per_100g": 89, "protein_per_100g": 1.1, "fat_per_100g": 0.3, "carbs_per_100g": 23},
+        ],
+        recipe_category="fruehstueck",
+    )
+
+    assert result["recipe"]["fallback"] is True
+
+
+def test_whey_oat_pancakes_with_carrot_are_rejected(monkeypatch):
+    response = """
+    {
+      "title": "Protein-Pfannkuchen",
+      "why_this_works": "Haferflocken, Whey, Ei und Karotte ergeben ein sättigendes Frühstück.",
+      "ingredients": ["150g Haferflocken", "30g Whey", "2 Eier", "100ml Milch", "50g Karotte"],
+      "fridge_ingredients": [
+        {"id": 1, "amount_g": 150, "label": "150g Haferflocken"},
+        {"id": 2, "amount_g": 30, "label": "30g Whey"},
+        {"id": 3, "amount_g": 100, "label": "2 Eier"},
+        {"id": 4, "amount_g": 100, "label": "100ml Milch"},
+        {"id": 5, "amount_g": 50, "label": "50g Karotte"}
+      ],
+      "instructions": ["Teig ruehren.", "Pfannkuchen ausbacken.", "Warm servieren."],
+      "estimated_macros": {"kcal": 785, "protein": 62, "fat": 18, "carbs": 95},
+      "used_fridge_item_ids": [1, 2, 3, 4, 5],
+      "pantry_assumptions": []
+    }
+    """
+    _patch_llm(monkeypatch, lambda **kwargs: response)
+    result = generate_freestyle_recipe(
+        [
+            {"name": "Kölln Haferflocken Blütenzarte Haferflocken", "amount": 500, "kcal_per_100g": 361, "protein_per_100g": 14, "fat_per_100g": 6.7, "carbs_per_100g": 56},
+            {"name": "ESN whey protein connamon", "amount": 300, "kcal_per_100g": 375, "protein_per_100g": 73, "fat_per_100g": 5.2, "carbs_per_100g": 9.2},
+            {"name": "Eier", "amount": 300, "kcal_per_100g": 143, "protein_per_100g": 12.6, "fat_per_100g": 9.5, "carbs_per_100g": 0.7},
+            {"name": "Milch 1,5%", "amount": 1000, "kcal_per_100g": 47, "protein_per_100g": 3.4, "fat_per_100g": 1.5, "carbs_per_100g": 4.9},
+            {"name": "Karotte", "amount": 200, "kcal_per_100g": 35, "protein_per_100g": 0.9, "fat_per_100g": 0.2, "carbs_per_100g": 8},
+        ],
+        recipe_category="fruehstueck",
+    )
+
+    assert result["recipe"]["fallback"] is True
+
+
+def test_whey_in_savory_chicken_rice_dish_is_rejected(monkeypatch):
+    response = """
+    {
+      "title": "Haehnchen-Reis-Pfanne",
+      "why_this_works": "Haehnchen, Reis und Karotte werden mit Whey zu einer proteinreichen Hauptspeise.",
+      "ingredients": ["150g Haehnchenbrust", "30g Whey", "80g Jasmin Reis", "80g Karotte"],
+      "fridge_ingredients": [
+        {"id": 1, "amount_g": 150, "label": "150g Haehnchenbrust"},
+        {"id": 2, "amount_g": 30, "label": "30g Whey"},
+        {"id": 3, "amount_g": 80, "label": "80g Jasmin Reis"},
+        {"id": 4, "amount_g": 80, "label": "80g Karotte"}
+      ],
+      "instructions": ["Reis kochen.", "Haehnchen anbraten.", "Alles mit Whey mischen."],
+      "estimated_macros": {"kcal": 650, "protein": 62, "fat": 12, "carbs": 85},
+      "used_fridge_item_ids": [1, 2, 3, 4],
+      "pantry_assumptions": []
+    }
+    """
+    _patch_llm(monkeypatch, lambda **kwargs: response)
+    result = generate_freestyle_recipe(
+        [
+            {"name": "Haehnchenbrust", "amount": 300, "kcal_per_100g": 165, "protein_per_100g": 31, "fat_per_100g": 3.6, "carbs_per_100g": 0},
+            {"name": "ESN whey protein connamon", "amount": 300, "kcal_per_100g": 375, "protein_per_100g": 73, "fat_per_100g": 5.2, "carbs_per_100g": 9.2},
+            {"name": "Jasmin Reis", "amount": 500, "kcal_per_100g": 351, "protein_per_100g": 7.3, "fat_per_100g": 1.3, "carbs_per_100g": 77},
+            {"name": "Karotte", "amount": 200, "kcal_per_100g": 35, "protein_per_100g": 0.9, "fat_per_100g": 0.2, "carbs_per_100g": 8},
+        ],
+        daily_goal={"kcal": 650, "protein": 62, "fat": 12, "carbs": 85},
+        recipe_category="hauptspeise",
+    )
+
+    assert result["recipe"]["fallback"] is True
+
+
+def test_computed_macros_too_far_from_target_are_retried(monkeypatch):
     responses = iter([
         """
         {
-          "title": "Zu mageres Omelett",
-          "why_this_works": "Passt fast.",
-          "ingredients": ["Frische Eier", "Öl"],
-          "instructions": ["Eier verquirlen.", "In Öl stocken lassen.", "Servieren."],
-          "estimated_macros": {"kcal": 360, "protein": 20, "fat": 8, "carbs": 4},
-          "used_fridge_item_ids": [1],
-          "pantry_assumptions": ["Öl"]
+          "title": "Kleine Reis-Gemuese-Pfanne",
+          "why_this_works": "Reis und Gemuese passen zusammen.",
+          "ingredients": ["100g Reis", "100g Brokkoli"],
+          "fridge_ingredients": [
+            {"id": 1, "amount_g": 100, "label": "100g Reis"},
+            {"id": 2, "amount_g": 100, "label": "100g Brokkoli"}
+          ],
+          "instructions": ["Reis garen.", "Brokkoli braten.", "Zusammen servieren."],
+          "estimated_macros": {"kcal": 800, "protein": 60, "fat": 25, "carbs": 90},
+          "used_fridge_item_ids": [1, 2],
+          "pantry_assumptions": []
         }
         """,
         """
         {
-          "title": "Zielgenaues Eiergericht",
-          "why_this_works": "Protein und Fett liegen im Zielbereich.",
-          "ingredients": ["Frische Eier", "Öl"],
-          "instructions": ["Eier verquirlen.", "In Öl stocken lassen.", "Servieren."],
-          "estimated_macros": {"kcal": 520, "protein": 47, "fat": 23, "carbs": 4},
-          "used_fridge_item_ids": [1],
-          "pantry_assumptions": ["Öl"]
+          "title": "Huhn-Reis-Brokkoli-Pfanne",
+          "why_this_works": "Huhn, Reis und Brokkoli ergeben eine stimmige Hauptspeise.",
+          "ingredients": ["160g Huhn", "150g Reis", "150g Brokkoli"],
+          "fridge_ingredients": [
+            {"id": 3, "amount_g": 160, "label": "160g Huhn"},
+            {"id": 1, "amount_g": 150, "label": "150g Reis"},
+            {"id": 2, "amount_g": 150, "label": "150g Brokkoli"}
+          ],
+          "instructions": ["Reis garen.", "Huhn und Brokkoli braten.", "Alles zusammen servieren."],
+          "estimated_macros": {"kcal": 800, "protein": 60, "fat": 25, "carbs": 90},
+          "used_fridge_item_ids": [3, 1, 2],
+          "pantry_assumptions": []
         }
         """,
     ])
-
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        lambda **kwargs: next(responses),
-    )
-
+    _patch_llm(monkeypatch, lambda **kwargs: next(responses))
     result = generate_freestyle_recipe(
-        [{"name": "Frische Eier", "amount": 300}],
-        daily_goal={"protein": 50, "fat": 25},
+        [
+            {"name": "Reis", "amount": 500, "kcal_per_100g": 351, "protein_per_100g": 7.3, "fat_per_100g": 1.3, "carbs_per_100g": 77},
+            {"name": "Brokkoli", "amount": 300, "kcal_per_100g": 34, "protein_per_100g": 2.8, "fat_per_100g": 0.4, "carbs_per_100g": 7},
+            {"name": "Huhn", "amount": 300, "kcal_per_100g": 165, "protein_per_100g": 31, "fat_per_100g": 3.6, "carbs_per_100g": 0},
+        ],
+        daily_goal={"protein": 60, "kcal": 800},
+        recipe_category="hauptspeise",
     )
 
-    assert result["recipe"]["title"] == "Zielgenaues Eiergericht"
-    assert result["recipe"]["estimated_macros"]["protein"] == 47
-    assert result["recipe"]["estimated_macros"]["fat"] == 23
+    assert result["recipe"]["title"] == "Huhn-Reis-Brokkoli-Pfanne"
+    assert result["recipe"]["macro_source"] == "computed_from_fridge_amounts"
     assert "--- retry ---" in result["raw_response"]
 
 
-def test_small_model_fallback_macros_stay_within_protein_and_fat_goal(monkeypatch):
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        lambda **kwargs: "",
-    )
-
-    result = generate_freestyle_recipe(
-        [
-            {"name": "Paprika", "amount": 100},
-            {"name": "Tofu Natur", "amount": 200},
-        ],
-        daily_goal={"protein": 62, "fat": 18},
-        model="gemma3:1b",
-    )
-
-    recipe = result["recipe"]
-    assert recipe["title"] == "Modell fehlgeschlagen - lokaler Fallback"
-    assert recipe["estimated_macros"]["protein"] == 62
-    assert recipe["estimated_macros"]["fat"] == 18
-
-
-def test_hallucinated_ingredients_return_model_failed_fallback(monkeypatch):
-    hallucinated_response = """
-    {
-      "title": "Gemischte Kartoffel-Gemüse-Pfanne",
-      "why_this_works": "Eine einfache Mahlzeit.",
-      "ingredients": ["Kartoffeln", "Brokkoli", "Karotten", "Zwiebel", "Olivenöl"],
-      "instructions": ["Kartoffeln schneiden.", "Gemüse braten.", "Würzen und servieren."],
-      "estimated_macros": {"kcal": 600, "protein": 25, "fat": 30, "carbs": 80},
-      "used_fridge_item_ids": [99],
-      "pantry_assumptions": ["Wasser", "Salz", "Pfeffer"]
-    }
-    """
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        lambda **kwargs: hallucinated_response,
-    )
-
-    result = generate_freestyle_recipe(
-        [
-            {"name": "Dinkel Mehl", "amount": 120},
-            {"name": "Frische Eier", "amount": 100},
-            {"name": "Bulk Pure Whey Protein Powder- neutral", "amount": 40},
-        ]
-    )
-
-    recipe = result["recipe"]
-    assert recipe["fallback"] is True
-    assert recipe["title"] == "Modell fehlgeschlagen - lokaler Fallback"
-
-
-def test_bad_first_response_retries_and_accepts_corrected_recipe(monkeypatch):
+def test_realistic_retry_is_kept_when_only_targets_are_impossible(monkeypatch):
     responses = iter([
         """
         {
-          "title": "Kartoffelpfanne",
-          "why_this_works": "Passt.",
-          "ingredients": ["Kartoffeln", "Brokkoli"],
+          "title": "Hackfleisch-Bananen-Bowl",
+          "why_this_works": "Hackfleisch, Salat und Banane ergeben einen unpassenden suess-herzhaften Mix.",
+          "ingredients": ["150g Rinderhackfleisch", "50g Banane", "100g Eisbergsalat"],
+          "fridge_ingredients": [
+            {"id": 1, "amount_g": 150, "label": "150g Rinderhackfleisch"},
+            {"id": 4, "amount_g": 50, "label": "50g Banane"},
+            {"id": 3, "amount_g": 100, "label": "100g Eisbergsalat"}
+          ],
+          "instructions": ["Hackfleisch braten.", "Salat schneiden.", "Mit Banane servieren."],
+          "estimated_macros": {"kcal": 620, "protein": 58, "fat": 28, "carbs": 65},
+          "used_fridge_item_ids": [1, 4, 3],
+          "pantry_assumptions": []
+        }
+        """,
+        """
+        {
+          "title": "Burger-Bowl mit Salat",
+          "why_this_works": "Hackfleisch, Bun, Salat und etwas Cheddar ergeben eine einfache Burger-Bowl.",
+          "ingredients": ["150g Rinderhackfleisch", "80g Burger Bun", "100g Eisbergsalat", "20g Cheddar"],
+          "fridge_ingredients": [
+            {"id": 1, "amount_g": 150, "label": "150g Rinderhackfleisch"},
+            {"id": 2, "amount_g": 80, "label": "80g Burger Bun"},
+            {"id": 3, "amount_g": 100, "label": "100g Eisbergsalat"},
+            {"id": 5, "amount_g": 20, "label": "20g Cheddar"}
+          ],
+          "instructions": ["Hackfleisch mit Salz und Pfeffer anbraten.", "Bun wuerfeln und kurz anroesten.", "Mit Salat und Cheddar als Bowl servieren."],
+          "estimated_macros": {"kcal": 800, "protein": 60, "fat": 25, "carbs": 90},
+          "used_fridge_item_ids": [1, 2, 3, 5],
+          "pantry_assumptions": []
+        }
+        """,
+    ])
+    _patch_llm(monkeypatch, lambda **kwargs: next(responses))
+    result = generate_freestyle_recipe(
+        [
+            {"name": "Rinderhackfleisch", "amount": 600, "kcal_per_100g": 193, "protein_per_100g": 19, "fat_per_100g": 13, "carbs_per_100g": 0},
+            {"name": "Lean Burger Buns Sesame Seeds", "amount": 200, "kcal_per_100g": 206, "protein_per_100g": 13, "fat_per_100g": 3.8, "carbs_per_100g": 27},
+            {"name": "Eisbergsalat", "amount": 300, "kcal_per_100g": 14, "protein_per_100g": 1, "fat_per_100g": 0.5, "carbs_per_100g": 1.6},
+            {"name": "Banane", "amount": 400, "kcal_per_100g": 89, "protein_per_100g": 1.1, "fat_per_100g": 0.3, "carbs_per_100g": 23},
+            {"name": "Cheddar mild", "amount": 400, "kcal_per_100g": 416, "protein_per_100g": 25, "fat_per_100g": 35, "carbs_per_100g": 0.5},
+        ],
+        daily_goal={"kcal": 800, "protein": 60, "fat": 25, "carbs": 90},
+        recipe_category="hauptspeise",
+    )
+
+    recipe = result["recipe"]
+    assert recipe["title"] == "Burger-Bowl mit Salat"
+    assert "fallback" not in recipe
+    assert recipe["macro_source"] == "computed_from_fridge_amounts"
+    assert recipe["estimated_macros"]["carbs"] < 40
+    assert "--- retry ---" in result["raw_response"]
+
+
+def test_hallucinated_ingredients_fall_back(monkeypatch):
+    hallucinated = """
+    {
+      "title": "Gemuese-Pfanne",
+      "why_this_works": "Eine einfache Mahlzeit.",
+      "ingredients": ["Kartoffeln", "Brokkoli", "Karotten"],
+      "instructions": ["Schneiden.", "Braten.", "Servieren."],
+      "estimated_macros": {"kcal": 600, "protein": 25, "fat": 30, "carbs": 80},
+      "used_fridge_item_ids": [99],
+      "pantry_assumptions": ["Salz"]
+    }
+    """
+    _patch_llm(monkeypatch, lambda **kwargs: hallucinated)
+    result = generate_freestyle_recipe(BASIC_FRIDGE)
+
+    assert result["recipe"]["fallback"] is True
+
+
+def test_translated_ingredient_names_are_accepted(monkeypatch):
+    # Modell schreibt "3 Eier", obwohl das Kuehlschrank-Item "Eggs" heisst.
+    response = """
+    {
+      "title": "Brokkoli-Ei-Omelett",
+      "why_this_works": "Eier und Brokkoli ergeben ein einfaches Gericht.",
+      "ingredients": ["3 Eier", "150g Brokkoli", "15g Parmesan", "1 TL Öl"],
+      "instructions": ["Brokkoli duensten.", "Eier verquirlen und braten.", "Mit Parmesan servieren."],
+      "estimated_macros": {"kcal": 400, "protein": 30, "fat": 22, "carbs": 8},
+      "used_fridge_item_ids": [1, 2, 3],
+      "pantry_assumptions": ["Öl"]
+    }
+    """
+    _patch_llm(monkeypatch, lambda **kwargs: response)
+    result = generate_freestyle_recipe([
+        {"name": "Eggs", "amount": 6},
+        {"name": "Brokkoli", "amount": 300},
+        {"name": "Parmesan", "amount": 150},
+    ])
+
+    recipe = result["recipe"]
+    assert "fallback" not in recipe
+    assert recipe["title"] == "Brokkoli-Ei-Omelett"
+    assert recipe["used_fridge_items"] == ["Eggs", "Brokkoli", "Parmesan"]
+
+
+def test_bad_first_response_retries_and_accepts_second(monkeypatch):
+    responses = iter([
+        """
+        {
+          "title": "Falsches Rezept",
+          "why_this_works": "Nutzt erfundene Zutaten.",
+          "ingredients": ["Kartoffeln"],
           "instructions": ["Schneiden.", "Braten.", "Servieren."],
           "estimated_macros": {"kcal": 500, "protein": 20, "fat": 10, "carbs": 80},
           "used_fridge_item_ids": [99],
-          "pantry_assumptions": ["Salz"]
+          "pantry_assumptions": []
         }
         """,
-        """
-        {
-          "title": "Protein-Pfannkuchen",
-          "why_this_works": "Mehl, Eier und Whey ergeben einen proteinreichen Teig.",
-          "ingredients": ["Dinkel Mehl", "Frische Eier", "Bulk Pure Whey Protein Powder- neutral", "Wasser"],
-          "instructions": ["Zutaten verrühren.", "Teig kurz ruhen lassen.", "Pfannkuchen ausbacken."],
-          "estimated_macros": {"kcal": 620, "protein": 48, "fat": 16, "carbs": 70},
-          "used_fridge_item_ids": [1, 2, 3],
-          "pantry_assumptions": ["Wasser"]
-        }
-        """,
+        VALID_RESPONSE,
     ])
+    _patch_llm(monkeypatch, lambda **kwargs: next(responses))
+    result = generate_freestyle_recipe(BASIC_FRIDGE)
 
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        lambda **kwargs: next(responses),
-    )
-
-    result = generate_freestyle_recipe(
-        [
-            {"name": "Dinkel Mehl", "amount": 120},
-            {"name": "Frische Eier", "amount": 100},
-            {"name": "Bulk Pure Whey Protein Powder- neutral", "amount": 40},
-        ]
-    )
-
-    recipe = result["recipe"]
-    assert recipe["title"] == "Protein-Pfannkuchen"
-    assert recipe["used_fridge_items"] == [
-        "Dinkel Mehl",
-        "Frische Eier",
-        "Bulk Pure Whey Protein Powder- neutral",
-    ]
+    assert result["recipe"]["title"] == "Protein-Pfannkuchen"
     assert "--- retry ---" in result["raw_response"]
 
 
-def test_recipe_can_use_many_fridge_items_when_they_fit(monkeypatch):
-    coherent_response = """
-    {
-      "title": "Tofu-Reis-Bowl mit Paprika und Tomaten",
-      "why_this_works": "Reis, Tofu und Gemüse ergeben eine stimmige herzhafte Bowl.",
-      "ingredients": ["Paprika", "Tofu Natur", "Tomaten", "Jasmin Reis", "Frische Eier"],
-      "instructions": ["Reis garen.", "Tofu, Paprika und Tomaten anbraten.", "Ei stocken lassen und alles als Bowl servieren."],
-      "estimated_macros": {"kcal": 720, "protein": 42, "fat": 18, "carbs": 90},
-      "used_fridge_item_ids": [1, 2, 3, 4, 5],
-      "pantry_assumptions": ["Salz", "Pfeffer"]
-    }
-    """
-    monkeypatch.setattr(
-        "flaskr_new.asaai.freestyle_recipe.generate_from_ollama",
-        lambda **kwargs: coherent_response,
-    )
+def test_tiny_model_uses_short_budget_and_fallback(monkeypatch):
+    captured = {}
 
+    def fake(**kwargs):
+        captured.update(kwargs)
+        return ""
+
+    _patch_llm(monkeypatch, fake)
     result = generate_freestyle_recipe(
         [
             {"name": "Paprika", "amount": 100},
@@ -609,15 +443,221 @@ def test_recipe_can_use_many_fridge_items_when_they_fit(monkeypatch):
             {"name": "Tomaten", "amount": 150},
             {"name": "Jasmin Reis", "amount": 200},
             {"name": "Frische Eier", "amount": 100},
+            {"name": "Haferflocken", "amount": 80},
         ],
-        recipe_category="hauptspeise",
+        model="gemma3:1b",
     )
 
-    assert result["recipe"]["title"] == "Tofu-Reis-Bowl mit Paprika und Tomaten"
-    assert result["recipe"]["used_fridge_items"] == [
-        "Paprika",
-        "Tofu Natur",
-        "Tomaten",
-        "Jasmin Reis",
-        "Frische Eier",
+    assert captured["num_predict"] == 420
+    assert captured["format_json"] is True
+    # max_items=5 fuer das kleine Modell -> die 6. Zutat faellt raus.
+    assert "Haferflocken" not in captured["prompt"]
+    assert result["recipe"]["fallback"] is True
+    assert result["recipe"]["used_fridge_items"] == ["Tofu Natur", "Jasmin Reis", "Paprika", "Tomaten"]
+
+
+def test_breakfast_fallback_prefers_sweet_breakfast_items(monkeypatch):
+    _patch_llm(monkeypatch, lambda **kwargs: "")
+    result = generate_freestyle_recipe(
+        [
+            {"name": "Spinat", "amount": 300},
+            {"name": "Jasmin Reis", "amount": 500},
+            {"name": "Haferflocken", "amount": 500},
+            {"name": "Milch 1,5%", "amount": 1000},
+            {"name": "Banane", "amount": 200},
+            {"name": "ESN Whey Protein Cinnamon", "amount": 300},
+        ],
+        recipe_category="fruehstueck",
+    )
+
+    assert result["recipe"]["fallback"] is True
+    assert result["recipe"]["used_fridge_items"] == ["Haferflocken", "Milch 1,5%", "Banane", "ESN Whey Protein Cinnamon"]
+
+
+def test_laptop_model_uses_short_token_budget(monkeypatch):
+    captured = {}
+
+    def fake(**kwargs):
+        captured.update(kwargs)
+        return VALID_RESPONSE
+
+    _patch_llm(monkeypatch, fake)
+    generate_freestyle_recipe(BASIC_FRIDGE, model="qwen3:4b")
+
+    assert captured["num_predict"] == 320
+    assert captured["format_json"] is True
+    assert "Dinkel Mehl" in captured["prompt"]
+
+
+def test_empty_fridge_returns_hint(monkeypatch):
+    _patch_llm(monkeypatch, lambda **kwargs: VALID_RESPONSE)
+    result = generate_freestyle_recipe([])
+
+    assert result["recipe"]["title"] == "Keine Zutaten verfügbar"
+    assert result["recipe"]["ingredients"] == []
+
+
+# --- mehrere Rezepte (Vorschlagsliste) ------------------------------------
+
+THREE_RECIPES = """
+[
+  {"title": "Rezept A", "why_this_works": "x", "ingredients": ["Dinkel Mehl", "Wasser"],
+   "instructions": ["a", "b", "c"], "estimated_macros": {"kcal": 400, "protein": 20, "fat": 8, "carbs": 60},
+   "used_fridge_item_ids": [1], "pantry_assumptions": ["Wasser"]},
+  {"title": "Rezept B", "why_this_works": "x", "ingredients": ["Frische Eier"],
+   "instructions": ["a", "b", "c"], "estimated_macros": {"kcal": 200, "protein": 18, "fat": 12, "carbs": 2},
+   "used_fridge_item_ids": [2], "pantry_assumptions": []},
+  {"title": "Rezept C", "why_this_works": "x", "ingredients": ["Dinkel Mehl", "Frische Eier"],
+   "instructions": ["a", "b", "c"], "estimated_macros": {"kcal": 500, "protein": 30, "fat": 15, "carbs": 55},
+   "used_fridge_item_ids": [1, 2], "pantry_assumptions": []}
+]
+"""
+
+
+def test_generate_three_recipes_from_array(monkeypatch):
+    captured = {}
+
+    def fake(**kwargs):
+        captured.update(kwargs)
+        return THREE_RECIPES
+
+    _patch_llm(monkeypatch, fake)
+    result = generate_freestyle_recipes(BASIC_FRIDGE, count=3)
+
+    assert [r["title"] for r in result["recipes"]] == ["Rezept A", "Rezept B", "Rezept C"]
+    assert captured["num_predict"] == 900 * 3
+    assert captured["temperature"] == 0.7
+    assert captured["format_json"] is True
+
+
+def test_multi_prompt_requests_array_of_three(monkeypatch):
+    captured = {}
+
+    def fake(**kwargs):
+        captured.update(kwargs)
+        return "[]"
+
+    _patch_llm(monkeypatch, fake)
+    generate_freestyle_recipes(BASIC_FRIDGE, count=3)
+
+    assert "3" in captured["prompt"]
+    assert "Array" in captured["prompt"]
+
+
+def test_recipes_under_foreign_wrapper_key_are_found(monkeypatch):
+    # Modell verpackt die Liste unter einem deutschen Schluessel "rezepte".
+    wrapped = (
+        '{"rezepte": ['
+        '{"title": "Rezept A", "ingredients": ["Dinkel Mehl"], "instructions": ["a", "b", "c"], "used_fridge_item_ids": [1]},'
+        '{"title": "Rezept B", "ingredients": ["Frische Eier"], "instructions": ["a", "b", "c"], "used_fridge_item_ids": [2]}'
+        ']}'
+    )
+    _patch_llm(monkeypatch, lambda **kwargs: wrapped)
+    result = generate_freestyle_recipes(BASIC_FRIDGE, count=3)
+
+    assert [r["title"] for r in result["recipes"]] == ["Rezept A", "Rezept B"]
+
+
+def test_duplicate_titles_are_deduped(monkeypatch):
+    resp = (
+        '[{"title": "Gleich", "ingredients": ["Dinkel Mehl"], "instructions": ["a", "b", "c"], "used_fridge_item_ids": [1]},'
+        ' {"title": "Gleich", "ingredients": ["Frische Eier"], "instructions": ["a", "b", "c"], "used_fridge_item_ids": [2]}]'
+    )
+    _patch_llm(monkeypatch, lambda **kwargs: resp)
+    result = generate_freestyle_recipes(BASIC_FRIDGE, count=3)
+
+    assert len(result["recipes"]) == 1
+
+
+def test_multi_invalid_response_returns_single_fallback(monkeypatch):
+    _patch_llm(monkeypatch, lambda **kwargs: "")
+    result = generate_freestyle_recipes(BASIC_FRIDGE, count=3)
+
+    assert len(result["recipes"]) == 1
+    assert result["recipes"][0]["fallback"] is True
+
+
+def test_supplement_allowed_in_sensible_dish(monkeypatch):
+    # Protein-Pfannkuchen mit Whey + Mehl + Ei -> sinnvoll, wird akzeptiert.
+    pancakes = """
+    {
+      "title": "Protein-Pfannkuchen",
+      "why_this_works": "Whey, Mehl und Ei ergeben einen proteinreichen Teig.",
+      "ingredients": ["40g Whey", "120g Dinkel Mehl", "2 Eier"],
+      "instructions": ["Zutaten verruehren.", "Teig ausbacken.", "Servieren."],
+      "estimated_macros": {"kcal": 520, "protein": 45, "fat": 12, "carbs": 60},
+      "used_fridge_item_ids": [1, 2, 3],
+      "pantry_assumptions": []
+    }
+    """
+    _patch_llm(monkeypatch, lambda **kwargs: pancakes)
+    fridge = [
+        {"name": "Bulk Pure Whey Protein Powder- neutral", "amount": 1000},
+        {"name": "Dinkel Mehl", "amount": 500},
+        {"name": "Frische Eier", "amount": 6},
     ]
+    result = generate_freestyle_recipes(fridge, recipe_category="hauptspeise", count=3)
+
+    assert result["recipes"][0]["title"] == "Protein-Pfannkuchen"
+    assert "fallback" not in result["recipes"][0]
+    assert result["recipes"][0]["used_fridge_items"] == ["Bulk Pure Whey Protein Powder- neutral", "Dinkel Mehl", "Frische Eier"]
+
+
+def test_vegetable_with_supplement_is_rejected(monkeypatch):
+    # Whey + Spinat/Karotte im selben Gericht -> inkohaerent -> abgelehnt (Fallback).
+    bad = """
+    {
+      "title": "Whey-Pfannkuchen mit Spinat und Karotten",
+      "why_this_works": "Herzhaft-suess.",
+      "ingredients": ["30g Whey", "Spinat", "Karotte"],
+      "instructions": ["Mischen.", "Ausbacken.", "Servieren."],
+      "estimated_macros": {"kcal": 500, "protein": 40, "fat": 10, "carbs": 50},
+      "used_fridge_item_ids": [1, 2, 3],
+      "pantry_assumptions": []
+    }
+    """
+    _patch_llm(monkeypatch, lambda **kwargs: bad)
+    fridge = [
+        {"name": "ESN Whey Protein Cinnamon", "amount": 300},
+        {"name": "Spinat", "amount": 200},
+        {"name": "Karotte", "amount": 400},
+    ]
+    result = generate_freestyle_recipes(fridge, recipe_category="fruehstueck", count=3)
+
+    assert result["recipes"][0]["fallback"] is True
+
+
+def test_vegetables_without_sweet_are_fine(monkeypatch):
+    # Reines Gemuese-Gericht ohne Supplement/Suesses -> erlaubt.
+    savory = """
+    {
+      "title": "Spinat-Karotten-Pfanne mit Ei",
+      "why_this_works": "Einfaches herzhaftes Gericht.",
+      "ingredients": ["100g Spinat", "100g Karotte", "2 Eier"],
+      "instructions": ["Gemuese anbraten.", "Eier zugeben.", "Wuerzen und servieren."],
+      "estimated_macros": {"kcal": 300, "protein": 18, "fat": 16, "carbs": 14},
+      "used_fridge_item_ids": [1, 2, 3],
+      "pantry_assumptions": []
+    }
+    """
+    _patch_llm(monkeypatch, lambda **kwargs: savory)
+    fridge = [
+        {"name": "Spinat", "amount": 200},
+        {"name": "Karotte", "amount": 400},
+        {"name": "Frische Eier", "amount": 6},
+    ]
+    result = generate_freestyle_recipes(fridge, recipe_category="hauptspeise", count=3)
+
+    assert result["recipes"][0]["title"] == "Spinat-Karotten-Pfanne mit Ei"
+    assert "fallback" not in result["recipes"][0]
+
+
+def test_multi_llm_error_returns_warning(monkeypatch):
+    def boom(**kwargs):
+        raise RuntimeError("ollama down")
+
+    _patch_llm(monkeypatch, boom)
+    result = generate_freestyle_recipes(BASIC_FRIDGE, count=3)
+
+    assert result["recipes"][0]["warning"] is True
+    assert "ollama down" in result["error"]
