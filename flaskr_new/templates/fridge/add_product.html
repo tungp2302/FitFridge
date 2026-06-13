@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}New Food{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <div class="page-card" style="max-width:760px;">
+    <form method="post" id="add-product-form">
+      <label for="query">Barcode or product name</label>
+      <input
+        name="query"
+        id="query"
+        value="{{ request.form.get('query', '') }}"
+        placeholder="e.g. 3017620422003 or Nutella"
+        required
+      >
+      <input type="hidden" name="selected_payload" id="selected-payload" value="">
+      <div id="search-results" class="search-results" style="display:none; max-height:220px; overflow:auto; border:1px solid #e5e7eb; margin-top:.5rem; border-radius:12px; background:#fff;"></div>
+      <p class="muted">OpenFoodFacts provides the official matches. An AI estimate is shown separately when available, so you can still add a food even if OFF finds nothing.</p>
+      <div style="display:flex; gap:.75rem; align-items:center; margin-top:.5rem; flex-wrap:wrap;">
+        <input type="submit" id="save-btn" value="Search">
+        <button type="button" id="create-anyway" class="secondary" style="display:none;">Create anyway</button>
+      </div>
+      <div id="add-loading" class="muted" style="display:none; margin-top:.75rem;">Adding food to your fridge...</div>
+    </form>
+  </div>
+
+  <script>
+    (function(){
+      const input = document.getElementById('query');
+      const results = document.getElementById('search-results');
+      const form = document.getElementById('add-product-form');
+      const createAnyway = document.getElementById('create-anyway');
+      const saveBtn = document.getElementById('save-btn');
+      const loading = document.getElementById('add-loading');
+      const selectedPayload = document.getElementById('selected-payload');
+      let lastItems = [];
+
+      function setLoadingState(active){
+        saveBtn.disabled = active;
+        saveBtn.value = active ? 'Adding...' : 'Save';
+        loading.style.display = active ? 'block' : 'none';
+      }
+
+      function render(items){
+        lastItems = items || [];
+        if(!items || items.length === 0){ results.style.display='none'; results.innerHTML=''; createAnyway.style.display='inline-block'; return; }
+        createAnyway.style.display='inline-block';
+        results.style.display='block';
+        results.innerHTML = items.map((i, idx) => `
+          <div class="search-item" data-idx="${idx}" style="padding:.5rem; border-bottom:1px solid #f0f0f0; cursor:pointer;">
+            <strong>${escHtml(i.name || '(no name)')}${i.ai? ' — <em style="color:#0b6;">AI estimate</em>': ''}</strong> — <span class="muted">${escHtml(i.brand || '')}</span><br>
+            <small>Barcode: ${escHtml(i.barcode || '')} · ${escHtml(i.kcal_per_100g || '')} kcal/100g</small>
+          </div>
+        `).join('');
+        Array.from(results.querySelectorAll('.search-item')).forEach((el) => {
+          el.addEventListener('click', ()=>{
+            const idx = Number(el.getAttribute('data-idx'));
+            const item = lastItems[idx];
+            selectedPayload.value = JSON.stringify(item);
+            setLoadingState(true);
+            form.submit();
+          });
+        });
+      }
+
+      // Do not look up while typing. Only search after submit / Enter.
+      input.addEventListener('input', ()=>{
+        selectedPayload.value = '';
+        results.style.display='none';
+        results.innerHTML='';
+        createAnyway.style.display='none';
+      });
+
+      // intercept submit: fetch matches first and show them instead of immediate create
+      form.addEventListener('submit', (ev)=>{
+        ev.preventDefault();
+        if(selectedPayload.value){
+          setLoadingState(true);
+          form.submit();
+          return;
+        }
+        const q = input.value.trim();
+        if(!q){ return; }
+        setLoadingState(true);
+        fetch(`/api/products/search?q=${encodeURIComponent(q)}`).then(r=>r.json()).then((items)=>{
+          if(!Array.isArray(items) || items.length === 0){
+            // no matches -> proceed to create using current query
+            form.submit();
+            return;
+          }
+          // show matches for selection
+          setLoadingState(false);
+          render(items);
+        }).catch(()=>{ form.submit(); });
+      });
+
+      // 'Create anyway' button: submit form using current query
+      createAnyway.addEventListener('click', ()=>{
+        selectedPayload.value = '';
+        setLoadingState(true);
+        form.submit();
+      });
+    })();
+  </script>
+{% endblock %}
