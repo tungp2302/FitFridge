@@ -1,6 +1,5 @@
 :root{
   --bg:#f6f7fb;
-  --panel:#ffffff;
   --muted:#6b7280;
   --accent:#16a34a; /* green */
   --accent-2:#059669;
@@ -12,14 +11,10 @@
 html,body{
   height:100%;
   margin:0;
+  padding:0;
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
   background:var(--bg);
   color:#0f172a;
-}
-
-body{
-  margin:0;
-  padding:0;
 }
 
 .app-shell{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:100vh}
@@ -74,11 +69,8 @@ body{
 
 a{color:var(--accent-2);text-decoration:none}
 
-.container{background:transparent}
-
 h1{color:#0f172a;margin:6px 0 12px 0}
 
-.card,
 .page-card,
 .insight-card,
 .post,
@@ -91,12 +83,7 @@ form,
 
 .page-card{padding:18px}
 
-.card{padding:14px}
-.card h3{margin:0 0 8px 0;color:#0f172a}
-.card-body{color:var(--muted);min-height:60px;white-space:pre-wrap}
-
-button.btn{background:var(--accent);color:white;border:none;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
-button.btn.secondary{background:#e6f6ef;color:var(--accent);border:1px solid rgba(5,150,105,0.08)}
+button.btn{border-radius:10px;font-weight:600}
 
 button,
 input[type=submit]{font-family:inherit}
@@ -106,9 +93,7 @@ input,
 textarea,select{font-size:1rem}
 
 button,
-input[type=submit],
-.button,
-.section-btn{
+input[type=submit]{
   border:none;
   border-radius:12px;
   background:var(--accent);
@@ -117,9 +102,6 @@ input[type=submit],
   font-weight:700;
   cursor:pointer;
 }
-
-.button.primary{background:var(--accent-2)}
-.section-btn{background:#e5f3eb;color:#047857}
 
 input,
 textarea,
@@ -144,45 +126,17 @@ fieldset{border:1px solid #dbe3ee;border-radius:12px;padding:14px;margin:0 0 14p
 
 hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 
-#results{margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
-
-/* Hub special */
-.hub-actions{display:flex;gap:12px;flex-wrap:wrap}
-
 /* small utilities */
 .muted{color:var(--muted)}
 
-/* adjusted insight styles fallback */
-.insight-text{background:#fafafa;padding:10px;border-radius:8px;border:1px solid #eef2f7}
-
 .post{padding:16px;margin-bottom:14px;position:relative;overflow:hidden}
-.post > header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .post > header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;position:relative}
 .post > header .header-actions{position:absolute;right:12px;top:12px;z-index:90;display:flex;gap:8px;align-items:center}
 /* Inline delete style for fridge header */
 .inline-delete{background:transparent;border:none;color:#111827;font-size:1.05rem;padding:0;margin-left:6px;cursor:pointer}
 .inline-delete:hover{color:#b91c1c}
 
-/* Ensure any clear-x-button inside a post header/card is rendered as a simple X (no white box/shadow) */
-.post .clear-x-button,
-.post > header .clear-x-button{
-  background:transparent !important;
-  box-shadow:none !important;
-  border:none !important;
-  width:auto !important;
-  height:auto !important;
-  padding:0 !important;
-  margin:0 !important;
-  border-radius:0 !important;
-}
-
-/* Safety: hide stray floating panels/backdrops remnants inside posts */
-.post .settings-modal__panel,
-.post .settings-modal__backdrop{
-  display:none !important;
-}
-
-/* Remove global card styling from inline forms inside post headers (they were getting background+shadow) */
+/* Remove global form styling from inline forms inside post headers. */
 .post > header form{
   background:transparent !important;
   box-shadow:none !important;
@@ -250,8 +204,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   gap:10px;
 }
 
-.today-text-button,
-.today-inline-text-button{
+.today-text-button{
   background:transparent;
   color:#111827;
   box-shadow:none;
@@ -260,8 +213,6 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   font-size:1rem;
   font-weight:700;
 }
-
-.today-inline-text-button{font-size:.95rem}
 
 .today-dashboard__body{
   display:grid;
@@ -386,21 +337,6 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   color:#111827;
 }
 
-.today-settings-trigger{
-  width:42px;
-  height:42px;
-  border-radius:50%;
-  display:grid;
-  place-items:center;
-  background:#eef2f7;
-  color:#111827;
-  font-size:1.1rem;
-  font-weight:900;
-  line-height:1;
-  box-shadow:none;
-  flex:0 0 auto;
-}
-
 .settings-modal{
   position:fixed;
   inset:0;
@@ -410,8 +346,12 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 
 .settings-modal.is-open{display:block;}
 
-.settings-modal__backdrop{
+.settings-modal__backdrop,
+.settings-modal__panel{
   display:none;
+}
+
+.settings-modal__backdrop{
   position:absolute;
   inset:0;
   background:rgba(15,23,42,.44);
@@ -419,7 +359,6 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 }
 
 .settings-modal__panel{
-  display:none;
   position:relative;
   z-index:1;
   width:min(92vw, 460px);
@@ -430,7 +369,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   padding:18px;
 }
 
-.settings-modal.is-open .settings-modal__backdrop{display:block}
+.settings-modal.is-open .settings-modal__backdrop,
 .settings-modal.is-open .settings-modal__panel{display:block}
 
 .settings-modal__header{
@@ -441,15 +380,20 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   margin-bottom:1rem;
 }
 
-.settings-modal__close{
-  width:40px;
-  height:40px;
+.settings-modal__close,
+.clear-x-button,
+.today-food-card__edit{
   border-radius:50%;
   background:#eef2f7;
   color:#111827;
-  font-size:1.35rem;
   line-height:1;
   padding:0;
+}
+
+.settings-modal__close{
+  width:40px;
+  height:40px;
+  font-size:1.35rem;
 }
 
 .goal-slider{
@@ -464,14 +408,13 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   margin-bottom:6px;
 }
 
-.goal-slider__label{
+.goal-slider__label,
+.goal-slider__value{
   font-weight:700;
   color:#111827;
 }
 
 .goal-slider__value{
-  font-weight:700;
-  color:#111827;
   white-space:nowrap;
 }
 
@@ -480,7 +423,8 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   margin-bottom:14px;
 }
 
-.settings-modal__actions{
+.settings-modal__actions,
+.add-modal__actions{
   display:flex;
   justify-content:flex-end;
   gap:10px;
@@ -572,11 +516,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   text-transform:lowercase;
 }
 
-.pending-item__amount{
-  width:84px;
-  margin-bottom:0;
-}
-
+.pending-item__amount,
 .pending-item__remaining{
   width:84px;
   margin-bottom:0;
@@ -585,14 +525,9 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 .clear-x-button{
   width:36px;
   height:36px;
-  border-radius:50%;
   display:grid;
   place-items:center;
-  background:#eef2f7;
-  color:#111827;
-  padding:0;
   font-size:1.25rem;
-  line-height:1;
   box-shadow:none;
 }
 
@@ -626,7 +561,6 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 .search-item:last-child{border-bottom:none}
 
 .search-item__top,
-.selected-product-panel__title,
 .today-food-card__side{
   display:flex;
   align-items:center;
@@ -689,20 +623,6 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   margin-top:10px;
 }
 
-.meal-section-row{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  align-items:center;
-  margin:4px 0 10px;
-}
-
-.add-modal__actions{
-  display:flex;
-  justify-content:flex-end;
-  gap:10px;
-}
-
 .fridge-picker-grid{
   display:grid;
   grid-template-columns:repeat(auto-fit, minmax(190px, 1fr));
@@ -755,14 +675,14 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 .today-food-card__side{flex-direction:column;align-items:flex-end}
 
 .today-food-card__meta,
-.today-food-card__nutri,
-.today-food-card__kcal{
+.today-food-card__nutri{
   color:#6b7280;
   font-size:.95rem;
 }
 
 .today-food-card__kcal{
   color:#111827;
+  font-size:.95rem;
   font-weight:700;
 }
 
@@ -781,14 +701,9 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 .today-food-card__edit{
   width:28px;
   height:28px;
-  border-radius:50%;
   display:grid;
   place-items:center;
-  background:#eef2f7;
-  color:#111827;
-  padding:0;
   font-size:.95rem;
-  line-height:1;
   box-shadow:none;
 }
 
@@ -816,13 +731,13 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   .today-progress__percent{font-size:1.25rem}
   .settings-modal__panel{width:min(94vw, 460px);margin-top:3vh;padding:16px}
   .goal-slider__meta{flex-direction:column;align-items:flex-start}
-  .settings-modal__actions{flex-direction:column}
-  .settings-modal__actions input[type=submit],
-  .settings-modal__secondary{width:100%}
-  .search-row{grid-template-columns:1fr}
+  .settings-modal__actions,
   .add-modal__actions{flex-direction:column}
+  .settings-modal__actions input[type=submit],
+  .settings-modal__secondary,
   .add-modal__actions input[type=submit],
   .add-modal__actions button{width:100%}
+  .search-row{grid-template-columns:1fr}
   .today-food-card{grid-template-columns:1fr}
   .today-food-card__side{align-items:flex-start}
 }

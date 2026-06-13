@@ -1,27 +1,34 @@
 """Freestyle recipe generation from fridge items.
 
 This module stays intentionally small: it builds the LLM prompt, calls Ollama,
-and delegates parsing, validation, macro calculation, and fallback recipes to
+and delegates parsing, validation, macro calculation, and warning responses to
 ``freestyle_recipe_support``.
 """
 from __future__ import annotations
 
 from .freestyle_recipe_support import (
     empty_fridge_recipe,
-    fallback_recipe,
+    has_term,
+    invalid_recipe_warning,
+    is_savory_category,
+    is_supplement,
     item_label,
     limit_items,
+    macro_target_ranges,
+    macros_within_targets,
     numbered_items,
+    safe_float,
+    validation_feedback,
     valid_recipes,
     warning_recipe,
 )
 from .ollama_client import generate_from_ollama, resolve_ollama_model
 
 
-DEFAULT_PROFILE = {"num_predict": 900, "max_items": None}
+DEFAULT_PROFILE = {"num_predict": 1200, "max_items": None}
 MODEL_PROFILES = {
-    "qwen3:4b": {"num_predict": 320, "max_items": 7},
-    "gemma3:1b": {"num_predict": 420, "max_items": 5},
+    "qwen3:4b": {"num_predict": 520, "max_items": 7},
+    "gemma3:1b": {"num_predict": 560, "max_items": 5},
 }
 
 _SCHEMA = (
@@ -40,12 +47,66 @@ def _profile(model):
 
 def _goal_hint(daily_goal):
     parts = [f"{k}={v}" for k, v in (daily_goal or {}).items() if v not in (None, "")]
-    return f" Zielwerte: {', '.join(parts)}." if parts else ""
+    if not parts:
+        return ""
+    ranges = macro_target_ranges(daily_goal)
+    range_parts = []
+    for key in ("kcal", "protein", "fat", "carbs"):
+        if key not in ranges:
+            continue
+        low, high = ranges[key]
+        if high is None:
+            range_parts.append(f"{key}>={low}")
+        else:
+            range_parts.append(f"{key}={low}-{high}")
+    range_hint = f" Erlaubte berechnete Bereiche: {', '.join(range_parts)}." if range_parts else ""
+    return f" Zielwerte: {', '.join(parts)}.{range_hint} Diese Zielbereiche sind harte Validierungsregeln."
 
 
 def _exclude_hint(exclude):
     titles = ", ".join(str(title).strip() for title in (exclude or []) if str(title).strip())
     return f" Vermeide diese bereits vorgeschlagenen Gerichte: {titles}." if titles else ""
+
+
+def _macro_strategy_hint(fridge_items, daily_goal, recipe_category=None):
+    if not macro_target_ranges(daily_goal):
+        return ""
+    savory = is_savory_category(recipe_category)
+    starch_terms = ("reis", "rice", "nudel", "noodle", "pasta", "spaghetti", "bun", "buns", "broetchen", "brötchen", "brot", "bread", "wrap", "tortilla")
+    secondary_protein_terms = ("kaese", "käse", "cheddar", "parmesan", "acciughe", "sardelle", "anchovy", "olive", "oliven")
+    protein_items, starch_items, fat_items = [], [], []
+    for item in numbered_items(fridge_items):
+        name = item["name"]
+        protein = safe_float(item.get("protein_per_100g")) or 0.0
+        carbs = safe_float(item.get("carbs_per_100g")) or 0.0
+        fat = safe_float(item.get("fat_per_100g")) or 0.0
+        if protein >= 15 and (not savory or not is_supplement(name)) and not has_term(name, secondary_protein_terms):
+            protein_items.append((protein, name))
+        if carbs >= 20 and has_term(name, starch_terms):
+            starch_items.append((carbs, name))
+        if fat >= 10 and not is_supplement(name):
+            fat_items.append((fat, name))
+
+    def names(rows, limit=3):
+        return ", ".join(name for _, name in sorted(rows, reverse=True)[:limit])
+
+    parts = []
+    protein_target = safe_float((daily_goal or {}).get("protein")) or 0.0
+    if protein_target >= 50:
+        parts.append("bei Protein-Ziel ab 50g ist 150g Hauptprotein meist zu wenig; fuer Rumpsteak, Haehnchen oder Hack eher ca. 200g verwenden")
+    if protein_items:
+        parts.append(f"Protein eher ueber {names(protein_items)} erreichen, meist 180-260g")
+    if starch_items:
+        parts.append(f"fuer kcal/carbs eher {names(starch_items)} nutzen, bei Reis/Nudeln meist 100-130g trocken; nicht Kartoffeln oder Gemuese allein")
+    if fat_items:
+        parts.append(f"Fett bei Bedarf ueber 10-20g Oel und passende Fettquellen wie {names(fat_items)} erhoehen")
+    else:
+        parts.append("Fett bei Bedarf ueber 10-20g Oel erhoehen")
+    return f" Makro-Strategie fuer diese Zutaten: {'; '.join(parts)}." if parts else ""
+
+
+def _target_fit_recipes(recipes, daily_goal):
+    return [recipe for recipe in (recipes or []) if macros_within_targets(recipe.get("estimated_macros"), daily_goal)]
 
 
 def build_prompt(fridge_items, daily_goal=None, recipe_category=None, retry_reason=None, count=1, exclude=None):
@@ -57,20 +118,23 @@ def build_prompt(fridge_items, daily_goal=None, recipe_category=None, retry_reas
     return (
     f"Erzeuge genau {count} verschiedene, einfache und realistisch kochbare FitFridge-Rezepte als JSON-Array. "
     f"{retry_hint}"
-    f"Rezeptart: {category}.{_goal_hint(daily_goal)}{_exclude_hint(exclude)} "
+    f"Rezeptart: {category}.{_goal_hint(daily_goal)}{_macro_strategy_hint(fridge_items, daily_goal, recipe_category)}{_exclude_hint(exclude)} "
 
     f"Kuehlschrank-Zutaten, nur diese IDs erlaubt: {fridge_list}. "
     "Zusaetzlich erlaubt sind nur Wasser, Oel, Salz, Pfeffer, Gewuerze und Saucen wie Ketchup, Mayonnaise und Senf. "
     "Keine anderen Lebensmittel verwenden. "
+    "Pantry-Zutaten nur auffuehren, wenn sie wirklich verwendet werden; nicht die erlaubte Pantry-Liste als Zutaten kopieren. "
 
     "REZEPTLOGIK: "
     "Waehle zuerst ein real existierendes, kulinarisch plausibles Gericht, das eine Person freiwillig essen wuerde. "
-    "Geschmack, Textur und Kuechenlogik haben Vorrang vor Makrooptimierung; Zielwerte duerfen verfehlt werden, "
-    "wenn sie nur durch unpassende Zutaten erreichbar waeren. "
+    "Geschmack, Textur und Kuechenlogik haben Vorrang vor kuenstlichen Makro-Konstruktionen. "
     "Vermeide kuenstliche Fitness-Rezepte, fragwuerdige Zutatenkombinationen und reine Makro-Konstruktionen. "
     "Verwende nur Zutaten, die sinnvoll zum gewaehlten Gericht beitragen. "
     "Verwende weder unnoetig viele noch unnoetig wenige Zutaten. "
-    "Makroziele sind zweitrangig, wenn sie mit den vorhandenen Lebensmitteln nicht sinnvoll erreichbar sind. "
+    "Wenn Zielwerte angegeben sind, muss die berechnete Summe aus amount_g innerhalb der erlaubten Bereiche liegen. "
+    "Kalorien duerfen niemals ueber dem Zielwert liegen. "
+    "Protein darf ueber dem Zielwert liegen, aber nicht deutlich darunter. "
+    "Fett und Kohlenhydrate muessen innerhalb der angegebenen Toleranzen bleiben. "
 
     "GERICHTSART: "
     "Fuer Hauptspeise oder Abendessen bevorzuge herzhafte Gerichte. "
@@ -93,10 +157,12 @@ def build_prompt(fridge_items, daily_goal=None, recipe_category=None, retry_reas
 
     "MENGEN: "
     "Waehle realistische Portionsgroessen fuer eine Person. "
-    "Typische Mengen sind 50-100g Getreide oder Mehl, 100-250g Beilage oder Gemuese, "
-    "80-220g Proteinquelle, ca. 30g Proteinpulver und 50-100g Ei. "
-    "Kaese und sehr fettreiche Toppings meist nur 15-40g verwenden; Saucen meist 5-20g. "
+    "Typische Mengen sind 50-160g trockenes Getreide, Reis, Nudeln oder Mehl, 100-300g Kartoffeln oder Gemuese, "
+    "120-300g Proteinquelle, ca. 30g Proteinpulver und 50-100g Ei. "
+    "Kaese, Oliven und sehr fettreiche Toppings meist 15-50g verwenden; Oel meist 5-20g. "
+    "Salz, Pfeffer und Gewuerze nur ohne Menge oder mit 1-2g angeben, niemals 10g. "
     "Broetchen, Buns, Wraps und Brot immer als realistische Grammmenge angeben, nicht als 1g. "
+    "Reis und Nudeln als trockene Grammmenge passend zu den /100g-Naehrwerten angeben, nicht als gekocht deklarieren. "
     "Nicht den gesamten Vorrat verbrauchen. "
 
     "KONSISTENZREGELN: "
@@ -114,12 +180,17 @@ def build_prompt(fridge_items, daily_goal=None, recipe_category=None, retry_reas
 
     "NAEHRWERTE: "
     "FitFridge berechnet Naehrwerte aus amount_g. "
+    "Rechne vor der Ausgabe mit den angegebenen /100g-Werten nach. "
+    "Wenn kcal oder Protein zu niedrig sind, erhoehe zuerst eine passende Proteinquelle und eine passende Staerke. "
+    "Wenn Fett zu niedrig ist, erhoehe Oel, Oliven, Kaese, Hackfleisch oder andere passende Fettquellen. "
+    "Prioritaet: kcal nie ueber Ziel, protein mindestens nahe Ziel, fat und carbs innerhalb Toleranz. "
     "estimated_macros nur plausibel fuellen und niemals schoenrechnen. "
 
     "AUSGABE: "
     "why_this_works soll auf Deutsch in genau einem kurzen Satz erklaeren, warum Geschmack, Textur und Zubereitung zusammenpassen. "
     "Kein Marketingtext und keine reine Makro-Begruendung. "
     "Schreibe genau 3 kurze instructions, keine vierte oder weitere Schritte. "
+    "Instructions duerfen keine Makroberechnung, Kalorienzeile, Anpassungsnotiz oder Erklaerung enthalten. "
     "Jedes Objekt muss vollstaendig valides JSON sein. "
     "Keine Kommentare. "
     "Keine Markdown-Formatierung. "
@@ -129,7 +200,7 @@ def build_prompt(fridge_items, daily_goal=None, recipe_category=None, retry_reas
 )
 
 def _run(fridge_items, daily_goal, recipe_category, model, base_url, timeout, count, exclude=None):
-    """Common flow. Returns ``{recipes, error, prompt, raw, items}``."""
+    """Common flow. Returns ``{recipes, error, prompt, raw, items, feedback}``."""
     profile = _profile(model)
     prompt_items = limit_items(fridge_items, profile["max_items"])
     temperature = 0.7 if count > 1 else 0.15
@@ -157,7 +228,7 @@ def _run(fridge_items, daily_goal, recipe_category, model, base_url, timeout, co
     try:
         prompt, response = ask()
     except Exception as exc:
-        return {"recipes": None, "error": str(exc), "prompt": "", "raw": "", "items": prompt_items}
+        return {"recipes": None, "error": str(exc), "prompt": "", "raw": "", "items": prompt_items, "feedback": ""}
 
     raw_responses = [response]
     recipes = valid_recipes(
@@ -169,11 +240,13 @@ def _run(fridge_items, daily_goal, recipe_category, model, base_url, timeout, co
         daily_goal=daily_goal,
     )
     if not recipes:
+        feedback = validation_feedback(response, prompt_items, daily_goal)
         try:
             _, retry_response = ask(
                 retry_reason=(
                     "Titel/Zutaten widersprechen sich, falsche IDs, unpassende Rezeptart, "
                     "unrealistische Mengen, Zielwerte stark verfehlt oder fehlende Schritte"
+                    + (f"; {feedback}" if feedback else "")
                 )
             )
         except Exception:
@@ -188,19 +261,7 @@ def _run(fridge_items, daily_goal, recipe_category, model, base_url, timeout, co
                 recipe_category=recipe_category,
                 daily_goal=daily_goal,
             )
-
-    if not recipes and daily_goal:
-        for raw_response in reversed(raw_responses):
-            recipes = valid_recipes(
-                raw_response,
-                prompt_items,
-                count,
-                exclude=exclude,
-                recipe_category=recipe_category,
-                daily_goal=None,
-            )
-            if recipes:
-                break
+            feedback = validation_feedback(retry_response, prompt_items, daily_goal) or feedback
 
     return {
         "recipes": recipes,
@@ -208,6 +269,7 @@ def _run(fridge_items, daily_goal, recipe_category, model, base_url, timeout, co
         "prompt": prompt,
         "raw": "\n\n--- retry ---\n\n".join(raw_responses),
         "items": prompt_items,
+        "feedback": feedback if not recipes else "",
     }
 
 
@@ -220,7 +282,14 @@ def generate_freestyle_recipes(fridge_items, daily_goal=None, recipe_category=No
     if result["recipes"] is None:
         message = f"Die lokale LLM-Anbindung konnte nicht genutzt werden: {result['error']}"
         return {"recipes": [warning_recipe("LLM nicht erreichbar", message)], "prompt_used": "", "raw_response": "", "error": result["error"]}
-    recipes = result["recipes"] or [fallback_recipe(result["items"], recipe_category=recipe_category)]
+    recipes = _target_fit_recipes(result["recipes"], daily_goal)
+    if not recipes:
+        detail = result.get("feedback") or "Die Antwort war leer, kein valides JSON oder hat die Rezept-/Makro-Regeln nicht eingehalten."
+        recipes = [invalid_recipe_warning(
+            "Kein valides Rezept",
+            "Das Modell hat keinen Rezeptvorschlag erzeugt, dessen berechnete Naehrwerte und Zutaten die Regeln einhalten. "
+            f"{detail}",
+        )]
     return {"recipes": recipes, "prompt_used": result["prompt"], "raw_response": result["raw"]}
 
 

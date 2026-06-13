@@ -1,12 +1,22 @@
 """Tests fuer die Freestyle-Rezept-Logik (ein und mehrere Rezepte)."""
 from flaskr_new.asaai.freestyle_recipe import (
+    build_prompt,
     generate_freestyle_recipe,
     generate_freestyle_recipes,
 )
+from flaskr_new.asaai.freestyle_recipe_support import computed_macros, valid_recipes
 
 
 def _patch_llm(monkeypatch, func):
     monkeypatch.setattr("flaskr_new.asaai.freestyle_recipe.generate_from_ollama", func)
+
+
+def _assert_invalid_warning(recipe):
+    assert recipe["warning"] is True
+    assert recipe["title"] == "Kein valides Rezept"
+    assert recipe["ingredients"] == []
+    assert recipe["instructions"] == []
+    assert "fallback" not in recipe
 
 
 VALID_RESPONSE = """
@@ -41,14 +51,12 @@ def test_missing_llm_returns_warning(monkeypatch):
     assert "Ollama is not running" in result["error"]
 
 
-def test_empty_response_returns_fallback(monkeypatch):
+def test_empty_response_returns_clear_warning(monkeypatch):
     _patch_llm(monkeypatch, lambda **kwargs: "")
     result = generate_freestyle_recipe(BASIC_FRIDGE)
 
-    recipe = result["recipe"]
-    assert recipe["fallback"] is True
-    assert recipe["title"] == "Modell fehlgeschlagen - lokaler Fallback"
-    assert "kein brauchbares Rezept" in recipe["why_this_works"]
+    _assert_invalid_warning(result["recipe"])
+    assert "kein valides JSON" in result["recipe"]["why_this_works"]
 
 
 def test_valid_recipe_is_returned_with_json_mode(monkeypatch):
@@ -96,6 +104,135 @@ def test_structured_amounts_compute_macros_instead_of_trusting_llm(monkeypatch):
     assert recipe["ingredients"] == ["100g Dinkel Mehl", "100g Frische Eier", "etwas Wasser"]
 
 
+def test_pantry_olive_oil_counts_toward_computed_macros():
+    recipe = {
+        "fridge_ingredients": [{"id": 1, "amount_g": 100, "label": "100g Huhn"}],
+        "pantry_ingredients": [{"name": "Olivenöl", "amount_g": 10, "label": "10g Olivenöl"}],
+    }
+
+    macros = computed_macros(
+        recipe,
+        [{"name": "Huhn", "kcal_per_100g": 100, "protein_per_100g": 20, "fat_per_100g": 2, "carbs_per_100g": 0}],
+    )
+
+    assert macros == {"kcal": 190.0, "protein": 20.0, "fat": 12.0, "carbs": 0.0}
+
+
+def test_excessive_salt_or_spice_amounts_are_rejected():
+    response = """
+    {
+      "title": "Huhn-Reis-Pfanne",
+      "why_this_works": "Huhn und Reis passen als einfache Hauptspeise zusammen.",
+      "ingredients": ["200g Huhn", "100g Reis", "10g Salz"],
+      "fridge_ingredients": [
+        {"id": 1, "amount_g": 200, "label": "200g Huhn"},
+        {"id": 2, "amount_g": 100, "label": "100g Reis"}
+      ],
+      "pantry_ingredients": [{"name": "Salz", "amount_g": 10, "label": "10g Salz"}],
+      "instructions": ["Reis garen.", "Huhn braten.", "Zusammen servieren."],
+      "used_fridge_item_ids": [1, 2],
+      "pantry_assumptions": ["Salz"]
+    }
+    """
+
+    recipes = valid_recipes(
+        response,
+        [
+            {"name": "Huhn", "kcal_per_100g": 165, "protein_per_100g": 31, "fat_per_100g": 3.6, "carbs_per_100g": 0},
+            {"name": "Reis", "kcal_per_100g": 351, "protein_per_100g": 7.3, "fat_per_100g": 1.3, "carbs_per_100g": 77},
+        ],
+        count=1,
+        recipe_category="hauptspeise",
+    )
+
+    assert recipes == []
+
+
+def test_minor_kcal_overage_can_be_repaired_by_reducing_oil():
+    response = """
+    {
+      "title": "Rumpsteak-Reis-Bowl",
+      "why_this_works": "Steak, Reis und Brokkoli ergeben eine herzhafte Bowl.",
+      "ingredients": ["200g Rumpsteak", "100g Reis", "150g Brokkoli", "10g Oel"],
+      "fridge_ingredients": [
+        {"id": 1, "amount_g": 200, "label": "200g Rumpsteak"},
+        {"id": 2, "amount_g": 100, "label": "100g Reis"},
+        {"id": 3, "amount_g": 150, "label": "150g Brokkoli"}
+      ],
+      "pantry_ingredients": [{"name": "Oel", "amount_g": 10, "label": "10g Oel"}],
+      "instructions": ["Reis garen.", "Steak braten.", "Mit Brokkoli servieren."],
+      "used_fridge_item_ids": [1, 2, 3],
+      "pantry_assumptions": ["Oel"]
+    }
+    """
+
+    recipes = valid_recipes(
+        response,
+        [
+            {"name": "Rumpsteak", "kcal_per_100g": 120, "protein_per_100g": 21, "fat_per_100g": 4, "carbs_per_100g": 0},
+            {"name": "Reis", "kcal_per_100g": 351, "protein_per_100g": 7.3, "fat_per_100g": 1.3, "carbs_per_100g": 77},
+            {"name": "Brokkoli", "kcal_per_100g": 34, "protein_per_100g": 2.8, "fat_per_100g": 0.4, "carbs_per_100g": 7},
+        ],
+        count=1,
+        recipe_category="hauptspeise",
+        daily_goal={"kcal": 725, "protein": 50, "fat": 18, "carbs": 80},
+    )
+
+    assert recipes[0]["estimated_macros"]["kcal"] <= 725
+    assert recipes[0]["estimated_macros"]["fat"] >= 10
+
+
+def test_cleaned_recipe_keeps_only_three_instructions(monkeypatch):
+    response = """
+    {
+      "title": "Huhn-Reis-Pfanne",
+      "why_this_works": "Huhn und Reis passen als einfache Hauptspeise zusammen.",
+      "ingredients": ["200g Huhn", "100g Reis"],
+      "fridge_ingredients": [
+        {"id": 1, "amount_g": 200, "label": "200g Huhn"},
+        {"id": 2, "amount_g": 100, "label": "100g Reis"}
+      ],
+      "instructions": ["Reis garen.", "Huhn braten.", "Gemuese garen.", "Alles mischen.", "Servieren."],
+      "used_fridge_item_ids": [1, 2],
+      "pantry_assumptions": []
+    }
+    """
+    _patch_llm(monkeypatch, lambda **kwargs: response)
+    result = generate_freestyle_recipe([
+        {"name": "Huhn", "kcal_per_100g": 165, "protein_per_100g": 31, "fat_per_100g": 3.6, "carbs_per_100g": 0},
+        {"name": "Reis", "kcal_per_100g": 351, "protein_per_100g": 7.3, "fat_per_100g": 1.3, "carbs_per_100g": 77},
+    ])
+
+    assert result["recipe"]["instructions"] == ["Reis garen.", "Huhn braten.", "Gemuese garen."]
+
+
+def test_macro_targets_are_not_prompted_as_optional():
+    prompt = build_prompt(BASIC_FRIDGE, daily_goal={"kcal": 800, "protein": 60}, recipe_category="hauptspeise")
+
+    assert "harte Validierungsregeln" in prompt
+    assert "Zielwerte duerfen verfehlt werden" not in prompt
+
+
+def test_macro_strategy_hint_prefers_dense_starches_for_targets():
+    prompt = build_prompt(
+        [
+            {"name": "Kartoffeln", "kcal_per_100g": 71, "protein_per_100g": 2, "fat_per_100g": 0.1, "carbs_per_100g": 15},
+            {"name": "Jasmin Reis", "kcal_per_100g": 351, "protein_per_100g": 7.3, "fat_per_100g": 1.3, "carbs_per_100g": 77},
+            {"name": "Rumpsteak", "kcal_per_100g": 120, "protein_per_100g": 21, "fat_per_100g": 4, "carbs_per_100g": 0},
+            {"name": "Cheddar", "kcal_per_100g": 416, "protein_per_100g": 25, "fat_per_100g": 35, "carbs_per_100g": 0.5},
+        ],
+        daily_goal={"kcal": 800, "protein": 60, "carbs": 90, "fat": 25},
+        recipe_category="hauptspeise",
+    )
+
+    assert "Makro-Strategie" in prompt
+    assert "150g Hauptprotein meist zu wenig" in prompt
+    assert "Jasmin Reis" in prompt
+    assert "180-260g" in prompt
+    assert "100-130g trocken" in prompt
+    assert "nicht Kartoffeln oder Gemuese allein" in prompt
+
+
 def test_legacy_used_ids_must_match_ingredient_text(monkeypatch):
     response = """
     {
@@ -116,7 +253,7 @@ def test_legacy_used_ids_must_match_ingredient_text(monkeypatch):
         {"name": "Haferflocken", "amount": 500},
     ])
 
-    assert result["recipe"]["fallback"] is True
+    _assert_invalid_warning(result["recipe"])
 
 
 def test_savory_title_with_sweet_structured_body_is_rejected(monkeypatch):
@@ -151,7 +288,8 @@ def test_savory_title_with_sweet_structured_body_is_rejected(monkeypatch):
         recipe_category="hauptspeise",
     )
 
-    assert result["recipe"]["fallback"] is True
+    assert result["recipe"]["warning"] is True
+    assert result["recipe"]["title"] == "Kein valides Rezept"
 
 
 def test_supplement_name_in_title_is_rejected_even_when_recipe_matches(monkeypatch):
@@ -185,7 +323,7 @@ def test_supplement_name_in_title_is_rejected_even_when_recipe_matches(monkeypat
         recipe_category="fruehstueck",
     )
 
-    assert result["recipe"]["fallback"] is True
+    _assert_invalid_warning(result["recipe"])
 
 
 def test_whey_oat_pancakes_with_carrot_are_rejected(monkeypatch):
@@ -219,7 +357,7 @@ def test_whey_oat_pancakes_with_carrot_are_rejected(monkeypatch):
         recipe_category="fruehstueck",
     )
 
-    assert result["recipe"]["fallback"] is True
+    _assert_invalid_warning(result["recipe"])
 
 
 def test_whey_in_savory_chicken_rice_dish_is_rejected(monkeypatch):
@@ -252,7 +390,8 @@ def test_whey_in_savory_chicken_rice_dish_is_rejected(monkeypatch):
         recipe_category="hauptspeise",
     )
 
-    assert result["recipe"]["fallback"] is True
+    _assert_invalid_warning(result["recipe"])
+    assert result["recipe"]["title"] != "Haehnchen-Reis-Pfanne"
 
 
 def test_computed_macros_too_far_from_target_are_retried(monkeypatch):
@@ -276,11 +415,11 @@ def test_computed_macros_too_far_from_target_are_retried(monkeypatch):
         {
           "title": "Huhn-Reis-Brokkoli-Pfanne",
           "why_this_works": "Huhn, Reis und Brokkoli ergeben eine stimmige Hauptspeise.",
-          "ingredients": ["160g Huhn", "150g Reis", "150g Brokkoli"],
+          "ingredients": ["180g Huhn", "130g Reis", "100g Brokkoli"],
           "fridge_ingredients": [
-            {"id": 3, "amount_g": 160, "label": "160g Huhn"},
-            {"id": 1, "amount_g": 150, "label": "150g Reis"},
-            {"id": 2, "amount_g": 150, "label": "150g Brokkoli"}
+            {"id": 3, "amount_g": 180, "label": "180g Huhn"},
+            {"id": 1, "amount_g": 130, "label": "130g Reis"},
+            {"id": 2, "amount_g": 100, "label": "100g Brokkoli"}
           ],
           "instructions": ["Reis garen.", "Huhn und Brokkoli braten.", "Alles zusammen servieren."],
           "estimated_macros": {"kcal": 800, "protein": 60, "fat": 25, "carbs": 90},
@@ -305,7 +444,165 @@ def test_computed_macros_too_far_from_target_are_retried(monkeypatch):
     assert "--- retry ---" in result["raw_response"]
 
 
-def test_realistic_retry_is_kept_when_only_targets_are_impossible(monkeypatch):
+def test_protein_may_exceed_target(monkeypatch):
+    response = """
+    {
+      "title": "Huhn-Brokkoli-Teller",
+      "why_this_works": "Huhn und Brokkoli ergeben eine einfache Hauptspeise.",
+      "ingredients": ["170g Huhn", "100g Brokkoli"],
+      "fridge_ingredients": [
+        {"id": 1, "amount_g": 170, "label": "170g Huhn"},
+        {"id": 2, "amount_g": 100, "label": "100g Brokkoli"}
+      ],
+      "instructions": ["Huhn braten.", "Brokkoli garen.", "Zusammen servieren."],
+      "estimated_macros": {"kcal": 400, "protein": 30, "fat": 8, "carbs": 7},
+      "used_fridge_item_ids": [1, 2],
+      "pantry_assumptions": []
+    }
+    """
+    _patch_llm(monkeypatch, lambda **kwargs: response)
+    result = generate_freestyle_recipe(
+        [
+            {"name": "Huhn", "amount": 300, "kcal_per_100g": 165, "protein_per_100g": 31, "fat_per_100g": 3.6, "carbs_per_100g": 0},
+            {"name": "Brokkoli", "amount": 300, "kcal_per_100g": 34, "protein_per_100g": 2.8, "fat_per_100g": 0.4, "carbs_per_100g": 7},
+        ],
+        daily_goal={"protein": 30, "kcal": 400},
+        recipe_category="hauptspeise",
+    )
+
+    assert result["recipe"]["title"] == "Huhn-Brokkoli-Teller"
+    assert result["recipe"]["estimated_macros"]["protein"] > 30
+    assert result["recipe"]["estimated_macros"]["kcal"] <= 400
+
+
+def test_kcal_must_not_exceed_target(monkeypatch):
+    over_target = """
+    {
+      "title": "Huhn-Reis-Teller",
+      "why_this_works": "Huhn und Reis ergeben eine einfache Hauptspeise.",
+      "ingredients": ["200g Huhn", "20g Reis"],
+      "fridge_ingredients": [
+        {"id": 1, "amount_g": 200, "label": "200g Huhn"},
+        {"id": 2, "amount_g": 20, "label": "20g Reis"}
+      ],
+      "instructions": ["Reis garen.", "Huhn braten.", "Zusammen servieren."],
+      "estimated_macros": {"kcal": 400, "protein": 30, "fat": 8, "carbs": 15},
+      "used_fridge_item_ids": [1, 2],
+      "pantry_assumptions": []
+    }
+    """
+    responses = iter([over_target, over_target])
+    _patch_llm(monkeypatch, lambda **kwargs: next(responses))
+    result = generate_freestyle_recipe(
+        [
+            {"name": "Huhn", "amount": 300, "kcal_per_100g": 165, "protein_per_100g": 31, "fat_per_100g": 3.6, "carbs_per_100g": 0},
+            {"name": "Reis", "amount": 500, "kcal_per_100g": 351, "protein_per_100g": 7.3, "fat_per_100g": 1.3, "carbs_per_100g": 77},
+        ],
+        daily_goal={"protein": 30, "kcal": 400},
+        recipe_category="hauptspeise",
+    )
+
+    _assert_invalid_warning(result["recipe"])
+    assert result["recipe"]["title"] != "Huhn-Reis-Teller"
+
+
+def test_targeted_recipe_requires_computed_macros(monkeypatch):
+    no_amounts = """
+    {
+      "title": "Huhn-Reis-Teller",
+      "why_this_works": "Huhn und Reis ergeben eine einfache Hauptspeise.",
+      "ingredients": ["Huhn", "Reis"],
+      "instructions": ["Reis garen.", "Huhn braten.", "Zusammen servieren."],
+      "estimated_macros": {"kcal": 390, "protein": 45, "fat": 7, "carbs": 20},
+      "used_fridge_item_ids": [1, 2],
+      "pantry_assumptions": []
+    }
+    """
+    responses = iter([no_amounts, no_amounts])
+    _patch_llm(monkeypatch, lambda **kwargs: next(responses))
+    result = generate_freestyle_recipe(
+        [
+            {"name": "Huhn", "amount": 300, "kcal_per_100g": 165, "protein_per_100g": 31, "fat_per_100g": 3.6, "carbs_per_100g": 0},
+            {"name": "Reis", "amount": 500, "kcal_per_100g": 351, "protein_per_100g": 7.3, "fat_per_100g": 1.3, "carbs_per_100g": 77},
+        ],
+        daily_goal={"protein": 30, "kcal": 400},
+        recipe_category="hauptspeise",
+    )
+
+    _assert_invalid_warning(result["recipe"])
+    assert result["recipe"]["title"] != "Huhn-Reis-Teller"
+
+
+def test_first_suggestion_rejects_recipe_too_low_for_kcal_and_protein(monkeypatch):
+    too_low = """
+    {
+      "title": "Kleine Huhn-Reis-Bowl",
+      "why_this_works": "Huhn und Reis ergeben eine einfache Hauptspeise.",
+      "ingredients": ["110g Huhn", "100g Reis", "80g Brokkoli"],
+      "fridge_ingredients": [
+        {"id": 1, "amount_g": 110, "label": "110g Huhn"},
+        {"id": 2, "amount_g": 100, "label": "100g Reis"},
+        {"id": 3, "amount_g": 80, "label": "80g Brokkoli"}
+      ],
+      "instructions": ["Reis garen.", "Huhn braten.", "Mit Brokkoli servieren."],
+      "estimated_macros": {"kcal": 800, "protein": 60, "fat": 20, "carbs": 90},
+      "used_fridge_item_ids": [1, 2, 3],
+      "pantry_assumptions": []
+    }
+    """
+    responses = iter([too_low, too_low])
+    _patch_llm(monkeypatch, lambda **kwargs: next(responses))
+    result = generate_freestyle_recipes(
+        [
+            {"name": "Huhn", "amount": 300, "kcal_per_100g": 165, "protein_per_100g": 31, "fat_per_100g": 3.6, "carbs_per_100g": 0},
+            {"name": "Reis", "amount": 500, "kcal_per_100g": 351, "protein_per_100g": 7.3, "fat_per_100g": 1.3, "carbs_per_100g": 77},
+            {"name": "Brokkoli", "amount": 300, "kcal_per_100g": 34, "protein_per_100g": 2.8, "fat_per_100g": 0.4, "carbs_per_100g": 7},
+        ],
+        daily_goal={"protein": 60, "kcal": 800},
+        recipe_category="hauptspeise",
+        count=1,
+    )
+
+    assert len(result["recipes"]) == 1
+    _assert_invalid_warning(result["recipes"][0])
+    assert result["recipes"][0]["title"] != "Kleine Huhn-Reis-Bowl"
+
+
+def test_retries_still_reject_recipes_far_from_primary_targets(monkeypatch):
+    bad_response = """
+    {
+      "title": "Huhn-Reis-Pfanne",
+      "why_this_works": "Huhn, Reis und Brokkoli ergeben eine einfache Hauptspeise.",
+      "ingredients": ["110g Huhn", "100g Reis", "80g Brokkoli"],
+      "fridge_ingredients": [
+        {"id": 1, "amount_g": 110, "label": "110g Huhn"},
+        {"id": 2, "amount_g": 100, "label": "100g Reis"},
+        {"id": 3, "amount_g": 80, "label": "80g Brokkoli"}
+      ],
+      "instructions": ["Reis garen.", "Huhn und Brokkoli braten.", "Alles zusammen servieren."],
+      "estimated_macros": {"kcal": 800, "protein": 60, "fat": 25, "carbs": 90},
+      "used_fridge_item_ids": [1, 2, 3],
+      "pantry_assumptions": []
+    }
+    """
+    responses = iter([bad_response, bad_response])
+    _patch_llm(monkeypatch, lambda **kwargs: next(responses))
+    result = generate_freestyle_recipe(
+        [
+            {"name": "Huhn", "amount": 300, "kcal_per_100g": 165, "protein_per_100g": 31, "fat_per_100g": 3.6, "carbs_per_100g": 0},
+            {"name": "Reis", "amount": 500, "kcal_per_100g": 351, "protein_per_100g": 7.3, "fat_per_100g": 1.3, "carbs_per_100g": 77},
+            {"name": "Brokkoli", "amount": 300, "kcal_per_100g": 34, "protein_per_100g": 2.8, "fat_per_100g": 0.4, "carbs_per_100g": 7},
+        ],
+        daily_goal={"protein": 60, "kcal": 800, "fat": 25, "carbs": 90},
+        recipe_category="hauptspeise",
+    )
+
+    _assert_invalid_warning(result["recipe"])
+    assert result["recipe"]["title"] != "Huhn-Reis-Pfanne"
+    assert "--- retry ---" in result["raw_response"]
+
+
+def test_secondary_targets_are_enforced_for_all_suggestions(monkeypatch):
     responses = iter([
         """
         {
@@ -327,12 +624,12 @@ def test_realistic_retry_is_kept_when_only_targets_are_impossible(monkeypatch):
         {
           "title": "Burger-Bowl mit Salat",
           "why_this_works": "Hackfleisch, Bun, Salat und etwas Cheddar ergeben eine einfache Burger-Bowl.",
-          "ingredients": ["150g Rinderhackfleisch", "80g Burger Bun", "100g Eisbergsalat", "20g Cheddar"],
+          "ingredients": ["200g Rinderhackfleisch", "140g Burger Bun", "100g Eisbergsalat", "25g Cheddar"],
           "fridge_ingredients": [
-            {"id": 1, "amount_g": 150, "label": "150g Rinderhackfleisch"},
-            {"id": 2, "amount_g": 80, "label": "80g Burger Bun"},
+            {"id": 1, "amount_g": 200, "label": "200g Rinderhackfleisch"},
+            {"id": 2, "amount_g": 140, "label": "140g Burger Bun"},
             {"id": 3, "amount_g": 100, "label": "100g Eisbergsalat"},
-            {"id": 5, "amount_g": 20, "label": "20g Cheddar"}
+            {"id": 5, "amount_g": 25, "label": "25g Cheddar"}
           ],
           "instructions": ["Hackfleisch mit Salz und Pfeffer anbraten.", "Bun wuerfeln und kurz anroesten.", "Mit Salat und Cheddar als Bowl servieren."],
           "estimated_macros": {"kcal": 800, "protein": 60, "fat": 25, "carbs": 90},
@@ -355,10 +652,8 @@ def test_realistic_retry_is_kept_when_only_targets_are_impossible(monkeypatch):
     )
 
     recipe = result["recipe"]
-    assert recipe["title"] == "Burger-Bowl mit Salat"
-    assert "fallback" not in recipe
-    assert recipe["macro_source"] == "computed_from_fridge_amounts"
-    assert recipe["estimated_macros"]["carbs"] < 40
+    assert recipe["warning"] is True
+    assert recipe["title"] == "Kein valides Rezept"
     assert "--- retry ---" in result["raw_response"]
 
 
@@ -377,7 +672,7 @@ def test_hallucinated_ingredients_fall_back(monkeypatch):
     _patch_llm(monkeypatch, lambda **kwargs: hallucinated)
     result = generate_freestyle_recipe(BASIC_FRIDGE)
 
-    assert result["recipe"]["fallback"] is True
+    _assert_invalid_warning(result["recipe"])
 
 
 def test_translated_ingredient_names_are_accepted(monkeypatch):
@@ -428,7 +723,7 @@ def test_bad_first_response_retries_and_accepts_second(monkeypatch):
     assert "--- retry ---" in result["raw_response"]
 
 
-def test_tiny_model_uses_short_budget_and_fallback(monkeypatch):
+def test_tiny_model_uses_short_budget_and_warning(monkeypatch):
     captured = {}
 
     def fake(**kwargs):
@@ -448,15 +743,14 @@ def test_tiny_model_uses_short_budget_and_fallback(monkeypatch):
         model="gemma3:1b",
     )
 
-    assert captured["num_predict"] == 420
+    assert captured["num_predict"] == 560
     assert captured["format_json"] is True
     # max_items=5 fuer das kleine Modell -> die 6. Zutat faellt raus.
     assert "Haferflocken" not in captured["prompt"]
-    assert result["recipe"]["fallback"] is True
-    assert result["recipe"]["used_fridge_items"] == ["Tofu Natur", "Jasmin Reis", "Paprika", "Tomaten"]
+    _assert_invalid_warning(result["recipe"])
 
 
-def test_breakfast_fallback_prefers_sweet_breakfast_items(monkeypatch):
+def test_breakfast_invalid_response_returns_warning(monkeypatch):
     _patch_llm(monkeypatch, lambda **kwargs: "")
     result = generate_freestyle_recipe(
         [
@@ -470,8 +764,7 @@ def test_breakfast_fallback_prefers_sweet_breakfast_items(monkeypatch):
         recipe_category="fruehstueck",
     )
 
-    assert result["recipe"]["fallback"] is True
-    assert result["recipe"]["used_fridge_items"] == ["Haferflocken", "Milch 1,5%", "Banane", "ESN Whey Protein Cinnamon"]
+    _assert_invalid_warning(result["recipe"])
 
 
 def test_laptop_model_uses_short_token_budget(monkeypatch):
@@ -484,7 +777,7 @@ def test_laptop_model_uses_short_token_budget(monkeypatch):
     _patch_llm(monkeypatch, fake)
     generate_freestyle_recipe(BASIC_FRIDGE, model="qwen3:4b")
 
-    assert captured["num_predict"] == 320
+    assert captured["num_predict"] == 520
     assert captured["format_json"] is True
     assert "Dinkel Mehl" in captured["prompt"]
 
@@ -569,12 +862,12 @@ def test_duplicate_titles_are_deduped(monkeypatch):
     assert len(result["recipes"]) == 1
 
 
-def test_multi_invalid_response_returns_single_fallback(monkeypatch):
+def test_multi_invalid_response_returns_single_warning(monkeypatch):
     _patch_llm(monkeypatch, lambda **kwargs: "")
     result = generate_freestyle_recipes(BASIC_FRIDGE, count=3)
 
     assert len(result["recipes"]) == 1
-    assert result["recipes"][0]["fallback"] is True
+    _assert_invalid_warning(result["recipes"][0])
 
 
 def test_supplement_allowed_in_sensible_dish(monkeypatch):
@@ -604,7 +897,7 @@ def test_supplement_allowed_in_sensible_dish(monkeypatch):
 
 
 def test_vegetable_with_supplement_is_rejected(monkeypatch):
-    # Whey + Spinat/Karotte im selben Gericht -> inkohaerent -> abgelehnt (Fallback).
+    # Whey + Spinat/Karotte im selben Gericht -> inkohaerent -> abgelehnt.
     bad = """
     {
       "title": "Whey-Pfannkuchen mit Spinat und Karotten",
@@ -624,7 +917,7 @@ def test_vegetable_with_supplement_is_rejected(monkeypatch):
     ]
     result = generate_freestyle_recipes(fridge, recipe_category="fruehstueck", count=3)
 
-    assert result["recipes"][0]["fallback"] is True
+    _assert_invalid_warning(result["recipes"][0])
 
 
 def test_vegetables_without_sweet_are_fine(monkeypatch):
