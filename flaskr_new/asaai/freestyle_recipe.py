@@ -132,7 +132,7 @@ def build_prompt(fridge_items, daily_goal=None, recipe_category=None, retry_reas
     "Verwende nur Zutaten, die sinnvoll zum gewaehlten Gericht beitragen. "
     "Verwende weder unnoetig viele noch unnoetig wenige Zutaten. "
     "Wenn Zielwerte angegeben sind, muss die berechnete Summe aus amount_g innerhalb der erlaubten Bereiche liegen. "
-    "Kalorien duerfen niemals ueber dem Zielwert liegen. "
+    "Kalorien duerfen das Ziel um hoechstens 5% ueberschreiten. "
     "Protein darf ueber dem Zielwert liegen, aber nicht deutlich darunter. "
     "Fett und Kohlenhydrate muessen innerhalb der angegebenen Toleranzen bleiben. "
 
@@ -183,7 +183,7 @@ def build_prompt(fridge_items, daily_goal=None, recipe_category=None, retry_reas
     "Rechne vor der Ausgabe mit den angegebenen /100g-Werten nach. "
     "Wenn kcal oder Protein zu niedrig sind, erhoehe zuerst eine passende Proteinquelle und eine passende Staerke. "
     "Wenn Fett zu niedrig ist, erhoehe Oel, Oliven, Kaese, Hackfleisch oder andere passende Fettquellen. "
-    "Prioritaet: kcal nie ueber Ziel, protein mindestens nahe Ziel, fat und carbs innerhalb Toleranz. "
+    "Prioritaet: kcal hoechstens 5% ueber Ziel, protein mindestens nahe Ziel, fat und carbs innerhalb Toleranz. "
     "estimated_macros nur plausibel fuellen und niemals schoenrechnen. "
 
     "AUSGABE: "
@@ -204,15 +204,19 @@ def _run(fridge_items, daily_goal, recipe_category, model, base_url, timeout, co
     profile = _profile(model)
     prompt_items = limit_items(fridge_items, profile["max_items"])
     temperature = 0.7 if count > 1 else 0.15
+    # Ein Versuch reicht selten fuer mehrere strikt makro-konforme Rezepte, also
+    # bei Bedarf mehrfach nachfordern. Fuer ein Einzelrezept bleibt es bei einem
+    # Versuch plus einer Wiederholung wie bisher.
+    max_attempts = 2 if count <= 1 else count + 1
 
-    def ask(retry_reason=None):
+    def ask(retry_reason=None, extra_exclude=None):
         prompt = build_prompt(
             prompt_items,
             daily_goal,
             recipe_category,
             retry_reason=retry_reason,
             count=count,
-            exclude=exclude,
+            exclude=(list(exclude or []) + list(extra_exclude or [])) or None,
         )
         response = generate_from_ollama(
             prompt=prompt,
@@ -239,29 +243,39 @@ def _run(fridge_items, daily_goal, recipe_category, model, base_url, timeout, co
         recipe_category=recipe_category,
         daily_goal=daily_goal,
     )
-    if not recipes:
-        feedback = validation_feedback(response, prompt_items, daily_goal)
+
+    # Reicht das nicht fuer ``count`` Rezepte, mehrfach nachfordern und dabei die
+    # bereits gefundenen Titel ausschliessen, damit jeder Versuch andere Gerichte
+    # liefert statt dieselben zu wiederholen.
+    attempt = 1
+    while len(recipes) < count and attempt < max_attempts:
+        attempt += 1
+        found_titles = [recipe["title"] for recipe in recipes]
+        retry_reason = (
+            "Titel/Zutaten widersprechen sich, falsche IDs, unpassende Rezeptart, "
+            "unrealistische Mengen, Zielwerte stark verfehlt oder fehlende Schritte"
+            if not recipes
+            else "Es fehlen noch valide, deutlich unterschiedliche Rezepte"
+        )
+        feedback = validation_feedback(raw_responses[-1], prompt_items, daily_goal)
+        if feedback:
+            retry_reason += f"; {feedback}"
         try:
-            _, retry_response = ask(
-                retry_reason=(
-                    "Titel/Zutaten widersprechen sich, falsche IDs, unpassende Rezeptart, "
-                    "unrealistische Mengen, Zielwerte stark verfehlt oder fehlende Schritte"
-                    + (f"; {feedback}" if feedback else "")
-                )
-            )
+            _, retry_response = ask(retry_reason=retry_reason, extra_exclude=found_titles)
         except Exception:
-            retry_response = ""
-        if retry_response:
-            raw_responses.append(retry_response)
-            recipes = valid_recipes(
-                retry_response,
-                prompt_items,
-                count,
-                exclude=exclude,
-                recipe_category=recipe_category,
-                daily_goal=daily_goal,
-            )
-            feedback = validation_feedback(retry_response, prompt_items, daily_goal) or feedback
+            break
+        if not retry_response:
+            break
+        raw_responses.append(retry_response)
+        more = valid_recipes(
+            retry_response,
+            prompt_items,
+            count,
+            exclude=list(exclude or []) + found_titles,
+            recipe_category=recipe_category,
+            daily_goal=daily_goal,
+        )
+        recipes = (recipes + more)[:count]
 
     return {
         "recipes": recipes,
@@ -269,7 +283,7 @@ def _run(fridge_items, daily_goal, recipe_category, model, base_url, timeout, co
         "prompt": prompt,
         "raw": "\n\n--- retry ---\n\n".join(raw_responses),
         "items": prompt_items,
-        "feedback": feedback if not recipes else "",
+        "feedback": validation_feedback(raw_responses[-1], prompt_items, daily_goal) if not recipes else "",
     }
 
 

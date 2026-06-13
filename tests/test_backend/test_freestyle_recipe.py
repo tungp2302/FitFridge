@@ -72,7 +72,7 @@ def test_valid_recipe_is_returned_with_json_mode(monkeypatch):
     assert result["recipe"]["title"] == "Protein-Pfannkuchen"
     assert result["recipe"]["used_fridge_items"] == ["Dinkel Mehl", "Frische Eier"]
     assert captured["format_json"] is True
-    assert captured["num_predict"] == 900
+    assert captured["num_predict"] == 1200
 
 
 def test_structured_amounts_compute_macros_instead_of_trusting_llm(monkeypatch):
@@ -475,23 +475,56 @@ def test_protein_may_exceed_target(monkeypatch):
     assert result["recipe"]["estimated_macros"]["kcal"] <= 400
 
 
-def test_kcal_must_not_exceed_target(monkeypatch):
-    over_target = """
+def test_kcal_up_to_5_percent_over_target_is_accepted(monkeypatch):
+    # Berechnet rund 4% ueber dem kcal-Ziel -> innerhalb der 5%-Toleranz, gueltig.
+    slightly_over = """
     {
       "title": "Huhn-Reis-Teller",
       "why_this_works": "Huhn und Reis ergeben eine einfache Hauptspeise.",
-      "ingredients": ["200g Huhn", "20g Reis"],
+      "ingredients": ["240g Huhn", "5g Reis"],
       "fridge_ingredients": [
-        {"id": 1, "amount_g": 200, "label": "200g Huhn"},
-        {"id": 2, "amount_g": 20, "label": "20g Reis"}
+        {"id": 1, "amount_g": 240, "label": "240g Huhn"},
+        {"id": 2, "amount_g": 5, "label": "5g Reis"}
       ],
       "instructions": ["Reis garen.", "Huhn braten.", "Zusammen servieren."],
-      "estimated_macros": {"kcal": 400, "protein": 30, "fat": 8, "carbs": 15},
+      "estimated_macros": {"kcal": 414, "protein": 75, "fat": 9, "carbs": 4},
       "used_fridge_item_ids": [1, 2],
       "pantry_assumptions": []
     }
     """
-    responses = iter([over_target, over_target])
+    _patch_llm(monkeypatch, lambda **kwargs: slightly_over)
+    result = generate_freestyle_recipe(
+        [
+            {"name": "Huhn", "amount": 300, "kcal_per_100g": 165, "protein_per_100g": 31, "fat_per_100g": 3.6, "carbs_per_100g": 0},
+            {"name": "Reis", "amount": 500, "kcal_per_100g": 351, "protein_per_100g": 7.3, "fat_per_100g": 1.3, "carbs_per_100g": 77},
+        ],
+        daily_goal={"protein": 30, "kcal": 400},
+        recipe_category="hauptspeise",
+    )
+
+    assert result["recipe"]["title"] == "Huhn-Reis-Teller"
+    assert 400 < result["recipe"]["estimated_macros"]["kcal"] <= 420
+
+
+def test_kcal_far_over_target_is_rejected(monkeypatch):
+    # Mehr als doppelt so viele kcal wie das Ziel -> auch Herunterskalieren kann
+    # das nicht in den Zielbereich bringen, also verwerfen.
+    far_over = """
+    {
+      "title": "Huhn-Reis-Teller",
+      "why_this_works": "Huhn und Reis ergeben eine einfache Hauptspeise.",
+      "ingredients": ["250g Huhn", "200g Reis"],
+      "fridge_ingredients": [
+        {"id": 1, "amount_g": 250, "label": "250g Huhn"},
+        {"id": 2, "amount_g": 200, "label": "200g Reis"}
+      ],
+      "instructions": ["Reis garen.", "Huhn braten.", "Zusammen servieren."],
+      "estimated_macros": {"kcal": 1100, "protein": 90, "fat": 12, "carbs": 154},
+      "used_fridge_item_ids": [1, 2],
+      "pantry_assumptions": []
+    }
+    """
+    responses = iter([far_over, far_over])
     _patch_llm(monkeypatch, lambda **kwargs: next(responses))
     result = generate_freestyle_recipe(
         [
@@ -533,10 +566,12 @@ def test_targeted_recipe_requires_computed_macros(monkeypatch):
     assert result["recipe"]["title"] != "Huhn-Reis-Teller"
 
 
-def test_first_suggestion_rejects_recipe_too_low_for_kcal_and_protein(monkeypatch):
+def test_too_low_recipe_is_scaled_up_to_targets(monkeypatch):
+    # Richtige Komposition, aber zu kleine Portion: die Mengen werden proportional
+    # hochskaliert, bis kcal und Protein im Zielbereich liegen.
     too_low = """
     {
-      "title": "Kleine Huhn-Reis-Bowl",
+      "title": "Huhn-Reis-Bowl",
       "why_this_works": "Huhn und Reis ergeben eine einfache Hauptspeise.",
       "ingredients": ["110g Huhn", "100g Reis", "80g Brokkoli"],
       "fridge_ingredients": [
@@ -545,13 +580,12 @@ def test_first_suggestion_rejects_recipe_too_low_for_kcal_and_protein(monkeypatc
         {"id": 3, "amount_g": 80, "label": "80g Brokkoli"}
       ],
       "instructions": ["Reis garen.", "Huhn braten.", "Mit Brokkoli servieren."],
-      "estimated_macros": {"kcal": 800, "protein": 60, "fat": 20, "carbs": 90},
+      "estimated_macros": {"kcal": 560, "protein": 44, "fat": 6, "carbs": 84},
       "used_fridge_item_ids": [1, 2, 3],
       "pantry_assumptions": []
     }
     """
-    responses = iter([too_low, too_low])
-    _patch_llm(monkeypatch, lambda **kwargs: next(responses))
+    _patch_llm(monkeypatch, lambda **kwargs: too_low)
     result = generate_freestyle_recipes(
         [
             {"name": "Huhn", "amount": 300, "kcal_per_100g": 165, "protein_per_100g": 31, "fat_per_100g": 3.6, "carbs_per_100g": 0},
@@ -564,8 +598,13 @@ def test_first_suggestion_rejects_recipe_too_low_for_kcal_and_protein(monkeypatc
     )
 
     assert len(result["recipes"]) == 1
-    _assert_invalid_warning(result["recipes"][0])
-    assert result["recipes"][0]["title"] != "Kleine Huhn-Reis-Bowl"
+    recipe = result["recipes"][0]
+    assert "warning" not in recipe
+    assert recipe["title"] == "Huhn-Reis-Bowl"
+    assert recipe["macro_source"] == "computed_from_fridge_amounts"
+    macros = recipe["estimated_macros"]
+    assert 680 <= macros["kcal"] <= 840
+    assert macros["protein"] >= 51
 
 
 def test_retries_still_reject_recipes_far_from_primary_targets(monkeypatch):
@@ -818,9 +857,39 @@ def test_generate_three_recipes_from_array(monkeypatch):
     result = generate_freestyle_recipes(BASIC_FRIDGE, count=3)
 
     assert [r["title"] for r in result["recipes"]] == ["Rezept A", "Rezept B", "Rezept C"]
-    assert captured["num_predict"] == 900 * 3
+    assert captured["num_predict"] == 1200 * 3
     assert captured["temperature"] == 0.7
     assert captured["format_json"] is True
+
+
+def test_partial_response_tops_up_with_retry(monkeypatch):
+    # Erster Versuch liefert nur 1 valides Rezept, obwohl 2 angefragt sind.
+    # Der Nachforder-Versuch muss das fehlende, andere Rezept ergaenzen und
+    # dabei den bereits gefundenen Titel ausschliessen.
+    first = """
+    [{"title": "Rezept A", "why_this_works": "x", "ingredients": ["Dinkel Mehl", "Wasser"],
+      "instructions": ["a", "b", "c"], "estimated_macros": {"kcal": 400, "protein": 20, "fat": 8, "carbs": 60},
+      "used_fridge_item_ids": [1], "pantry_assumptions": ["Wasser"]}]
+    """
+    second = """
+    [{"title": "Rezept B", "why_this_works": "x", "ingredients": ["Frische Eier"],
+      "instructions": ["a", "b", "c"], "estimated_macros": {"kcal": 200, "protein": 18, "fat": 12, "carbs": 2},
+      "used_fridge_item_ids": [2], "pantry_assumptions": []}]
+    """
+    responses = iter([first, second])
+    prompts = []
+
+    def fake(**kwargs):
+        prompts.append(kwargs["prompt"])
+        return next(responses)
+
+    _patch_llm(monkeypatch, fake)
+    result = generate_freestyle_recipes(BASIC_FRIDGE, count=2)
+
+    assert [r["title"] for r in result["recipes"]] == ["Rezept A", "Rezept B"]
+    assert len(prompts) == 2
+    assert "Rezept A" in prompts[1]  # Nachforderung schliesst das erste Gericht aus
+    assert "--- retry ---" in result["raw_response"]
 
 
 def test_multi_prompt_requests_array_of_three(monkeypatch):

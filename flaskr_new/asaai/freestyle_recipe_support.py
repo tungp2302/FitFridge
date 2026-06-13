@@ -247,7 +247,7 @@ def macro_target_ranges(daily_goal):
         if not target:
             continue
         low = max(0.0, target - tolerance(target))
-        high = None if key == "protein" else target if key == "kcal" else target + tolerance(target)
+        high = None if key == "protein" else target * 1.05 if key == "kcal" else target + tolerance(target)
         ranges[key] = (round(low, 1), None if high is None else round(high, 1))
     return ranges
 def macros_within_targets(macros, daily_goal):
@@ -261,7 +261,7 @@ def macros_within_targets(macros, daily_goal):
             continue
         value = float(macros.get(key, 0.0) or 0.0)
         if key == "kcal":
-            if value > target or target - value > tolerance(target):
+            if value > target * 1.05 or target - value > tolerance(target):
                 return False
         elif key == "protein":
             if target - value > tolerance(target):
@@ -305,6 +305,45 @@ def _repair_minor_oil_overage(recipe, fridge_items, daily_goal):
             candidate["pantry_ingredients"].pop(index)
         if macros_within_targets(computed_macros(candidate, fridge_items), daily_goal):
             return candidate
+    return recipe
+def _scale_fridge_amounts(recipe, factor):
+    # Skaliert alle Kuehlschrank-Mengen mit einem Faktor (groessere/kleinere
+    # Portion). Labels werden geleert, damit sie aus der neuen Menge neu
+    # aufgebaut werden.
+    scaled = copy.deepcopy(recipe)
+    for raw in _raw_fridge(scaled):
+        if not isinstance(raw, dict):
+            continue
+        amount = safe_float(raw.get("amount_g", raw.get("grams", raw.get("g"))))
+        if amount is None:
+            continue
+        raw["amount_g"] = round(amount * factor, 1)
+        raw.pop("grams", None)
+        raw.pop("g", None)
+        raw["label"] = ""
+    return scaled
+def _repair_macros(recipe, fridge_items, daily_goal):
+    # Liegt ein Rezept ausserhalb der Zielwerte, die Portion proportional auf das
+    # kcal-Ziel skalieren (fehlende kcal hinzufuegen bzw. ueberschuessige
+    # entfernen). Nur uebernehmen, wenn danach alle Zielwerte stimmen; sonst
+    # bleibt das Rezept unveraendert und wird wie bisher verworfen.
+    if not has_macro_targets(daily_goal):
+        return recipe
+    macros = computed_macros(recipe, fridge_items)
+    if not macros or macros_within_targets(macros, daily_goal):
+        return recipe
+    target_kcal = safe_float((daily_goal or {}).get("kcal"))
+    current_kcal = macros.get("kcal") or 0.0
+    if not target_kcal or current_kcal <= 0:
+        return recipe
+    factor = max(0.5, min(2.0, target_kcal / current_kcal))
+    if abs(factor - 1.0) < 0.01:
+        return recipe
+    scaled = _scale_fridge_amounts(recipe, factor)
+    if not _amounts_ok(scaled, fridge_items):
+        return recipe
+    if macros_within_targets(computed_macros(scaled, fridge_items), daily_goal):
+        return scaled
     return recipe
 def extract_recipes(response):
     if not isinstance(response, str) or not response.strip():
@@ -362,6 +401,7 @@ def valid_recipes(response, fridge_items, count, exclude=None, recipe_category=N
     excluded, out, seen = {normalize(title) for title in (exclude or [])}, [], set()
     for raw in extract_recipes(response):
         raw = _repair_minor_oil_overage(raw, fridge_items, daily_goal)
+        raw = _repair_macros(raw, fridge_items, daily_goal)
         if not _is_valid(raw, fridge_items, recipe_category, daily_goal):
             continue
         recipe, key = clean_recipe(raw, fridge_items), normalize(str(raw.get("title") or ""))
