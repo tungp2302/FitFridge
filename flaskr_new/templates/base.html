@@ -1,54 +1,34 @@
 <!doctype html>
-<html lang="de">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}FitFridge{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('frontend.static', filename='style.css') }}">
-  <script>
-    // HTML-Escaping fuer alles, was per innerHTML gerendert wird,
-    // damit Namen mit Sonderzeichen (&, <, ") sauber dargestellt werden.
-    window.escHtml = function (value) {
-      return String(value ?? '').replace(/[&<>"']/g, function (c) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-      });
-    };
-  </script>
-</head>
-<body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <a class="brand-button" href="{{ url_for('frontend.dashboard') }}">FitFridge</a>
-      <p class="brand-copy">Deine Lebensmittel. Der Überblick.</p>
-      <nav class="sidebar-nav" aria-label="Primary">
+<title>{% block title %}FitFridge{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<nav>
+  <div id="logo">
+  <h1>FitFridge</h1>
+  </div>
+  <div id="menubar">
+      <div id="menuleft">
         <a href="{{ url_for('frontend.dashboard') }}">Kühlschrank</a>
         <a href="{{ url_for('frontend.meal_tracker') }}">Mahlzeiten-Tracker</a>
         <a href="{{ url_for('asaai.planner_ui') }}">Rezeptplaner</a>
         <a href="{{ url_for('frontend.settings') }}">Einstellungen</a>
-      </nav>
-
-      <div class="sidebar-footer">
-        {% if g.user %}
-          <div class="user-chip">{{ g.user['username'] }}</div>
-          <a class="link-button subtle" href="{{ url_for('frontend.logout') }}">Abmelden</a>
-        {% else %}
-          <a class="link-button" href="{{ url_for('frontend.register') }}">Registrieren</a>
-          <a class="link-button subtle" href="{{ url_for('frontend.login') }}">Anmelden</a>
-        {% endif %}
       </div>
-    </aside>
-
-    <main class="main-pane">
-      <section class="content">
-        <header class="page-header">
-          {% block header %}{% endblock %}
-        </header>
-        {% for message in get_flashed_messages() %}
-          <div class="flash">{{ message }}</div>
-        {% endfor %}
-        {% block content %}{% endblock %}
-      </section>
-    </main>
+  <div id="usermenu">
+    {% if g.user %}
+    <a href="{{ url_for('frontend.logout') }}">Log Out</a>
+    <a href="{{ url_for('frontend.dashboard')}}">{{ g.user['username'] }}</a>
+      {% else %}
+      <a href="{{ url_for('frontend.register') }}">Register</a>
+      <a href="{{ url_for('frontend.login') }}">Log In</a>
+      {% endif %} 
   </div>
-</body>
-</html>
+</div>
+</nav>
+<section class="content">
+  <header>
+    {% block header %}{% endblock %}
+  </header>
+  {% for message in get_flashed_messages() %}
+  <div class="flash">{{ message }}</div>
+  {% endfor %}
+  {% block content %}{% endblock %}
+</section>
