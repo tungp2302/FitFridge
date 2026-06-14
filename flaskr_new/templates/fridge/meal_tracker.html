@@ -169,7 +169,7 @@
             <div class="pending-items__empty muted">Noch nichts zur Liste hinzugefuegt.</div>
           </div>
 
-          <p class="muted">Use OFF results or AI estimate. Nothing is added to the fridge.</p>
+          <p class="muted">Treffer kommen von Open Food Facts. Nothing is added to the fridge.</p>
           <div class="add-modal__actions">
             <button type="button" class="clear-x-button" id="clear-selection" aria-label="Clear selected product">×</button>
             <input type="submit" value="Log meal">
@@ -441,7 +441,7 @@
           <div class="pending-item" data-index="${index}">
             <div class="pending-item__main">
               <strong>${escHtml(item.name || '(no name)')}</strong>
-              <div class="pending-item__meta">${item.brand ? escHtml(item.brand) + ' · ' : ''}${escHtml(item.kcal_per_100g || '')} kcal / 100g${item.ai ? ' · AI' : ''}</div>
+              <div class="pending-item__meta">${item.brand ? escHtml(item.brand) + ' · ' : ''}${escHtml(item.kcal_per_100g || '')} kcal / 100g</div>
             </div>
             <div class="pending-item__controls">
               <div class="pending-item__field">
@@ -498,10 +498,10 @@
           <div class="search-item" data-idx="${index}">
             <div class="search-item__top">
               <strong>${escHtml(item.name || '(no name)')}</strong>
-              <span class="search-item__badge ${item.ai ? 'is-ai' : 'is-off'}">${item.ai ? 'AI' : 'OFF'}</span>
+              <span class="search-item__badge is-off">OFF</span>
             </div>
             <div class="search-item__brand muted">${escHtml(item.brand || '')}</div>
-            <small>${item.ai ? 'AI estimate' : 'Open Food Facts'} · ${escHtml(item.kcal_per_100g || '')} kcal/100g</small>
+            <small>Open Food Facts · ${escHtml(item.kcal_per_100g || '')} kcal/100g</small>
           </div>
         `).join('');
 
@@ -517,14 +517,13 @@
               fat_per_100g: Number(item.fat_per_100g || 0),
               carbs_per_100g: Number(item.carbs_per_100g || 0),
               unit: item.unit || 'g',
-              ai: Boolean(item.ai),
             };
             selectedDiv.innerHTML = `
               <div class="selected-product-panel__title">
                 <strong>${escHtml(currentSelection.name)}</strong>
-                <span class="selected-product-panel__badge ${currentSelection.ai ? 'is-ai' : 'is-off'}">${currentSelection.ai ? 'AI' : 'OFF'}</span>
+                <span class="selected-product-panel__badge is-off">OFF</span>
               </div>
-              <div class="selected-product-panel__meta">${currentSelection.brand ? escHtml(currentSelection.brand) + ' · ' : ''}${currentSelection.ai ? 'AI estimate' : 'Open Food Facts'} · ${escHtml(currentSelection.kcal_per_100g || '')} kcal / 100g</div>
+              <div class="selected-product-panel__meta">${currentSelection.brand ? escHtml(currentSelection.brand) + ' · ' : ''}Open Food Facts · ${escHtml(currentSelection.kcal_per_100g || '')} kcal / 100g</div>
               <div class="selected-product-panel__actions">
                 <button type="button" class="search-action-button" id="log-selected-button">Add</button>
                 <button type="button" class="clear-x-button" id="reset-selected-button" aria-label="Clear selected product">×</button>

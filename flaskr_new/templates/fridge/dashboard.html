@@ -19,7 +19,7 @@
     <div class="today-dashboard__body">
       <div class="macro-donut-grid">
         <div class="macro-donut-block">
-          <div class="macro-donut" style="--progress: {{ overview.protein_ratio }};">
+          <div class="macro-donut" style="--progress: 1;">
             <div class="macro-donut__inner">
               <div class="macro-donut__target">{{ overview.totals.protein|round(0) }} g</div>
             </div>
@@ -27,7 +27,7 @@
           <div class="macro-donut__caption">protein total</div>
         </div>
         <div class="macro-donut-block">
-          <div class="macro-donut" style="--progress: {{ overview.carbs_ratio }};">
+          <div class="macro-donut" style="--progress: 1;">
             <div class="macro-donut__inner">
               <div class="macro-donut__target">{{ overview.totals.carbs|round(0) }} g</div>
             </div>
@@ -35,7 +35,7 @@
           <div class="macro-donut__caption">carbs total</div>
         </div>
         <div class="macro-donut-block">
-          <div class="macro-donut" style="--progress: {{ overview.fat_ratio }};">
+          <div class="macro-donut" style="--progress: 1;">
             <div class="macro-donut__inner">
               <div class="macro-donut__target">{{ overview.totals.fat|round(0) }} g</div>
             </div>
@@ -46,7 +46,7 @@
 
       <div class="today-progress-card">
         <div class="today-progress__bar" aria-hidden="true">
-          <div class="today-progress__fill" style="width: {{ (overview.kcal_ratio * 100)|round(1) }}%;"></div>
+          <div class="today-progress__fill" style="width: 100%;"></div>
         </div>
         <div class="today-progress__footer">
           <span>{{ overview.totals.kcal|round(0) }} kcal total</span>

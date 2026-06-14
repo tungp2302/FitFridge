@@ -30,8 +30,6 @@ from .meal_tracker_service import (
     track_meal_from_form,
     track_meals_from_payload,
 )
-from .app_settings_repo import get_settings as get_app_settings, save_settings as save_app_settings
-from .asaai.ollama_client import OLLAMA_MODEL_CHOICES, resolve_ollama_model, test_ollama_model
 from .fridge_service import (
     calculate_total_nutrition,
     consume_amount,
@@ -43,7 +41,7 @@ from .fridge_service import (
     refill_amount,
     update_dashboard_item,
 )
-from .openfoodfacts_client import ai_estimate, search_product, search_products
+from .openfoodfacts_client import search_product, search_products
 from .product_repo import search_by_name
 
 bp = Blueprint("frontend", __name__, template_folder="templates", static_folder="static")
@@ -94,55 +92,11 @@ def dashboard():
         "item_count": len(posts_with_nutrition),
     }
 
-    max_metric = max(totals["kcal"], totals["protein"], totals["carbs"], totals["fat"], 1.0)
-    overview = {
-        "totals": totals,
-        "protein_ratio": totals["protein"] / max_metric,
-        "carbs_ratio": totals["carbs"] / max_metric,
-        "fat_ratio": totals["fat"] / max_metric,
-        "kcal_ratio": totals["kcal"] / max_metric,
-    }
+    # Keine Zielvorgaben im Kuehlschrank -> die Ringe werden im Template voll
+    # gezeichnet, hier brauchen wir nur die Gesamtsummen.
+    overview = {"totals": totals}
 
     return render_template("fridge/dashboard.html", posts=posts_with_nutrition, overview=overview)
-
-
-@bp.route("/settings", methods=("GET", "POST"))
-@login_required
-def settings():
-    allowed_models = {choice["name"] for choice in OLLAMA_MODEL_CHOICES}
-    llm_test = None
-
-    if request.method == "POST":
-        action = request.form.get("action")
-        selected_model = resolve_ollama_model(request.form.get("llm_model"))
-        if selected_model not in allowed_models:
-            flash("Unbekanntes LLM-Modell.")
-        else:
-            save_app_settings(g.user["id"], llm_model=selected_model)
-            if action == "test_llm":
-                try:
-                    llm_test = test_ollama_model(selected_model)
-                    if llm_test["ok"]:
-                        flash(f"LLM-Test erfolgreich: {selected_model} antwortet.")
-                    else:
-                        flash(f"LLM-Test fehlgeschlagen: {selected_model} antwortet nicht.")
-                except Exception as exc:
-                    llm_test = {
-                        "ok": False,
-                        "model": selected_model,
-                        "error": str(exc),
-                    }
-                    flash(f"LLM-Test fehlgeschlagen: {exc}")
-            else:
-                flash("Einstellungen gespeichert.")
-
-    settings_data = get_app_settings(g.user["id"])
-    return render_template(
-        "settings.html",
-        settings=settings_data,
-        model_choices=OLLAMA_MODEL_CHOICES,
-        llm_test=llm_test,
-    )
 
 
 @bp.route("/meal-tracker", methods=("GET", "POST"))
@@ -179,14 +133,6 @@ def meal_tracker():
 
     if flash_message:
         flash(flash_message)
-
-    if request.args.get("format") == "json":
-        return {
-            "settings": settings,
-            "consumed": consumed,
-            "summary": summary,
-            "meal_count": len(recent_meals),
-        }
 
     return render_template(
         "fridge/meal_tracker.html",
@@ -277,7 +223,7 @@ def api_products_search():
     if not q:
         return jsonify([])
 
-    # Barcode (nur Ziffern): immer die OFF-Barcode-API nutzen, keine KI-Schaetzung.
+    # Barcode (nur Ziffern): direkt die OFF-Barcode-API nutzen.
     if q.isdigit():
         try:
             product = search_product(q)
@@ -286,113 +232,48 @@ def api_products_search():
             product = None
         if not product or not product.get("name"):
             return jsonify([])
-        return jsonify([{
-            "name": product.get("name"),
-            "brand": product.get("brand"),
-            "barcode": product.get("barcode"),
-            "kcal_per_100g": product.get("kcal_per_100g"),
-            "protein_per_100g": product.get("protein_per_100g"),
-            "fat_per_100g": product.get("fat_per_100g"),
-            "carbs_per_100g": product.get("carbs_per_100g"),
-            "total_amount": product.get("total_amount"),
-            "unit": product.get("unit"),
-            "ai": False,
-        }])
+        return jsonify([_to_result(product)])
 
-    # Text-Suche: lokale Treffer + OFF-Textsuche, KI-Schaetzung daneben.
-    local = []
-    try:
-        rows = search_by_name(q, limit=10)
-        for r in rows:
-            local.append(
-                {
-                    "name": r[1],
-                    "brand": r[2],
-                    "barcode": r[3],
-                    "kcal_per_100g": r[4],
-                }
-            )
-    except Exception:
-        current_app.logger.exception("Lokale Produktsuche fehlgeschlagen")
-        local = []
-
-    # OpenFoodFacts-Textsuche
-    try:
-        results = search_products(q)
-    except Exception:
-        current_app.logger.exception("OFF-Textsuche fehlgeschlagen")
-        results = []
-
-    # KI-Schaetzung als zusaetzliche Option daneben
-    try:
-        ai_result = ai_estimate(q)
-    except Exception:
-        current_app.logger.exception("KI-Schaetzung fehlgeschlagen")
-        ai_result = None
-
-    ai_items = []
-    off_items = []
+    # Text-Suche: erst lokale Treffer aus der DB, dann die OFF-Textsuche.
+    results = []
     seen_barcodes = set()
 
-    def append_item(target, item, source):
+    def add(item):
         barcode = item.get("barcode") or ""
         if barcode and barcode in seen_barcodes:
             return
         if barcode:
             seen_barcodes.add(barcode)
-        target.append({
-            "name": item.get("name"),
-            "brand": item.get("brand"),
-            "barcode": barcode,
-            "kcal_per_100g": item.get("kcal_per_100g"),
-            "protein_per_100g": item.get("protein_per_100g"),
-            "fat_per_100g": item.get("fat_per_100g"),
-            "carbs_per_100g": item.get("carbs_per_100g"),
-            "total_amount": item.get("total_amount"),
-            "unit": item.get("unit"),
-            "ai": source == "ai",
-        })
-
-    for row in local:
-        append_item(off_items, row, "off")
-
-    for row in (results or []):
-        append_item(off_items, row, "off")
-
-    if ai_result:
-        append_item(ai_items, ai_result, "ai")
-
-    combined = [*ai_items, *off_items]
-    return jsonify(combined)
-
-
-@bp.route("/api/products/ai")
-@login_required
-def api_products_ai():
-    q = request.args.get("q", "").strip()
-    if not q:
-        return jsonify({})
+        results.append(_to_result(item))
 
     try:
-        prod = ai_estimate(q)
+        for r in search_by_name(q, limit=10):
+            add({"name": r[1], "brand": r[2], "barcode": r[3], "kcal_per_100g": r[4]})
     except Exception:
-        current_app.logger.exception("KI-Schaetzung fehlgeschlagen")
-        prod = None
+        current_app.logger.exception("Lokale Produktsuche fehlgeschlagen")
 
-    if not prod:
-        return jsonify({})
+    try:
+        for item in search_products(q) or []:
+            add(item)
+    except Exception:
+        current_app.logger.exception("OFF-Textsuche fehlgeschlagen")
 
-    reduced = {
-        "name": prod.get("name"),
-        "brand": prod.get("brand"),
-        "barcode": prod.get("barcode"),
-        "kcal_per_100g": prod.get("kcal_per_100g"),
-        "protein_per_100g": prod.get("protein_per_100g"),
-        "fat_per_100g": prod.get("fat_per_100g"),
-        "carbs_per_100g": prod.get("carbs_per_100g"),
-        "ai": True,
+    return jsonify(results)
+
+
+def _to_result(item):
+    """Vereinheitlicht ein Produkt-Dict zu den Feldern, die das Frontend nutzt."""
+    return {
+        "name": item.get("name"),
+        "brand": item.get("brand"),
+        "barcode": item.get("barcode") or "",
+        "kcal_per_100g": item.get("kcal_per_100g"),
+        "protein_per_100g": item.get("protein_per_100g"),
+        "fat_per_100g": item.get("fat_per_100g"),
+        "carbs_per_100g": item.get("carbs_per_100g"),
+        "total_amount": item.get("total_amount"),
+        "unit": item.get("unit"),
     }
-    return jsonify(reduced)
 
 
 @bp.route("/fridge/<int:item_id>/delete", methods=("POST",))

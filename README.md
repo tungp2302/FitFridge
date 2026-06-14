@@ -47,44 +47,19 @@ Quick fix:
     Reload Pylance:
         Command Palette -> Developer: Reload Window
 
-Ollama local setup for kept AI features:
-1. Install Ollama from https://ollama.com and start the local service.
-2. Pull a model, for example:
-    ollama pull qwen3.5:latest
-    ollama pull qwen3:4b
-    ollama pull gemma3:1b
-3. Set environment variables before starting Flask:
-    export OLLAMA_MODEL=qwen3.5:latest
-    export OLLAMA_BASE_URL=http://127.0.0.1:11434
-4. Start the app:
-    flask --app flaskr_new run --debug
-5. Open:
-    Add Food with AI estimate:
-        http://127.0.0.1:5000/fridge/add
-    Freestyle recipe planner:
-        http://127.0.0.1:5000/asaai/ui/planner
+Scope (SE-Version):
+    Diese Version enthaelt nur die Core-Funktionalitaet:
+    - Kuehlschrank (Produkte ueber Open Food Facts suchen, anlegen, bearbeiten,
+      verbrauchen/auffuellen)
+    - Mahlzeiten-Tracker (Tagesziel, Makroverteilung, Mahlzeiten loggen)
 
-Model choice:
-    Desktop default: qwen3.5:latest
-    Laptop slower: qwen3:4b
-    Laptop fast: gemma3:1b
+    Die AI-Funktionen (AI-Schaetzung, Rezeptplaner, LLM-Einstellungen) gehoeren
+    zur ASaai-Version und sind hier nicht enthalten.
 
-    Browser choice:
-        http://127.0.0.1:5000/settings
-
-    Terminal / env fallback before starting Flask:
-        export OLLAMA_MODEL=qwen3:4b
-        export OLLAMA_MODEL=gemma3:1b
-
-Ollama smoke test:
-     curl http://127.0.0.1:11434/api/tags
-
-FitFridge keeps only these local Ollama features for the current project scope:
-    - Add Food with AI estimate
-    - Freestyle recipe in the recipe planner
-
-The active recipe LLM code is in:
-    flaskr_new/asaai/freestyle_recipe.py
+Seiten:
+    Kuehlschrank:        http://127.0.0.1:5000/
+    Produkt hinzufuegen: http://127.0.0.1:5000/fridge/add
+    Mahlzeiten-Tracker:  http://127.0.0.1:5000/meal-tracker
 
 Demo data:
     python scripts/seed_demo.py

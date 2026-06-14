@@ -67,23 +67,17 @@ def create_dashboard_item_from_data(product_data, author_id=None):
     return _add_item_from_product_data(product_data, fallback_barcode=fallback_barcode, author_id=author_id)
 
 
-def _get_item_for_user(item_id, user_id=None):
-    """Scoped lookup: mit ``user_id`` nur eigene oder besitzerlose Items.
-
-    Bewusst KEIN Fallback auf eine ungescopte Suche - sonst koennte ein
-    Nutzer ueber geratene IDs die Items anderer Nutzer lesen/aendern.
-    """
-    if user_id is None:
-        return fridge_repo.get_item(item_id)
-    return fridge_repo.get_item(item_id, user_id=user_id)
-
 def update_dashboard_item(item_id, current_amount=None, unit=None, name=None, brand=None, user_id=None):
-    """Update fridge item amount and optionally product metadata."""
+    """Menge und optional Name/Marke eines Fridge-Items aktualisieren.
+
+    Die Suche ist auf den Nutzer gescoped (``user_id``), damit niemand
+    ueber geratene IDs fremde Items aendert.
+    """
     updated = 0
 
     current_item = None
     if current_amount is not None or unit is not None or name is not None or brand is not None:
-        current_item = _get_item_for_user(item_id, user_id=user_id)
+        current_item = fridge_repo.get_item(item_id, user_id=user_id)
         if current_item is None:
             raise ValueError("No fridge item found for id")
         current_item = dict(current_item)
@@ -144,7 +138,7 @@ def _change_amount(item_id, amount, user_id, *, consume):
             "message": "Menge muss größer als 0 sein.",
         }
 
-    item = _get_item_for_user(item_id, user_id=user_id)
+    item = fridge_repo.get_item(item_id, user_id=user_id)
     if item is None:
         return {
             "success": False,
