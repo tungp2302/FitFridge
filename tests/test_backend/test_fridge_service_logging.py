@@ -12,7 +12,7 @@ def test_update_dashboard_item_logs_consume_delta(monkeypatch):
 
     fridge_service.update_dashboard_item(3, current_amount=90, unit="g")
 
-    assert calls == [("consume", 7, 30.0, "g", "update_dashboard_item consume delta")]
+    assert calls == [("consume", 7, 30.0, "g", "Korrektur Bestand")]
 
 
 def test_update_dashboard_item_logs_refill_delta(monkeypatch):
@@ -26,4 +26,4 @@ def test_update_dashboard_item_logs_refill_delta(monkeypatch):
 
     fridge_service.update_dashboard_item(3, current_amount=150, unit="g")
 
-    assert calls == [("refill", 7, 30.0, "g", "update_dashboard_item refill delta")]
+    assert calls == [("refill", 7, 30.0, "g", "Korrektur Bestand")]

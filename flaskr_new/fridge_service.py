@@ -91,19 +91,9 @@ def update_dashboard_item(item_id, current_amount=None, unit=None, name=None, br
         item_unit = unit or (current_item["unit"] if current_item else None) or "g"
 
         if delta < 0:
-            log_consume(
-                current_item["product_id"],
-                abs(delta),
-                item_unit,
-                note="update_dashboard_item consume delta",
-            )
+            log_consume(current_item["product_id"], abs(delta), item_unit, note="Korrektur Bestand")
         elif delta > 0:
-            log_refill(
-                current_item["product_id"],
-                delta,
-                item_unit,
-                note="update_dashboard_item refill delta",
-            )
+            log_refill(current_item["product_id"], delta, item_unit, note="Korrektur Bestand")
 
     # update product metadata if provided
     if name is not None or brand is not None:
@@ -121,15 +111,9 @@ def delete_dashboard_item(item_id):
     return fridge_repo.delete_item(item_id)
 
 def _change_amount(item_id, amount, user_id, *, consume):
-    """Gemeinsame Logik fuer Verbrauchen und Auffuellen.
+    """Verbrauchen/Auffuellen. Beim Verbrauchen faellt der Bestand nicht unter 0.
 
-    Edge Cases:
-    - amount <= 0 oder None: success=False
-    - Item existiert nicht (oder gehoert einem anderen Nutzer): success=False
-    - Beim Verbrauchen wird der Bestand auf 0.0 begrenzt
-
-    Returns:
-        dict: {"success": bool, "new_amount": float, "message": str}
+    Gibt {"success", "new_amount", "message"} zurueck.
     """
     if amount is None or amount <= 0:
         return {
@@ -156,7 +140,7 @@ def _change_amount(item_id, amount, user_id, *, consume):
     # Verbrauchs-/Auffuell-Log schreiben; die Hauptaktion soll auch bei
     # fehlgeschlagenem Logging erfolgreich bleiben.
     log_fn = log_consume if consume else log_refill
-    note = "consume_amount direkt" if consume else "refill_amount direkt"
+    note = "Verbraucht" if consume else "Aufgefüllt"
     try:
         log_fn(item_dict["product_id"], delta, item_dict["unit"], note=note)
     except Exception:

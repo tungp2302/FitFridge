@@ -31,7 +31,6 @@ CREATE TABLE product (
     protein_per_100g REAL NOT NULL,
     fat_per_100g REAL NOT NULL,
     carbs_per_100g REAL NOT NULL,
-    expiry_date DATE,
     created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -70,7 +69,6 @@ CREATE TABLE meal_tracker_entry (
     carbs_g REAL NOT NULL DEFAULT 0,
     fat_g REAL NOT NULL DEFAULT 0,
     note TEXT,
-    section TEXT,
     eaten_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user (id)
 );

@@ -1,13 +1,10 @@
 """Open-Food-Facts-Client: Barcode-Lookup und Textsuche mit Mengen-Parsing."""
 
-from __future__ import annotations
-
 import json
 import logging
 import re
 import ssl
 import unicodedata
-from typing import Optional, Tuple, Dict
 from urllib.parse import quote
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -24,14 +21,14 @@ OFF_API_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
 OFF_SEARCH_API_URL = "https://search.openfoodfacts.org/search"
 
 
-def _first_string(*values: Optional[str]) -> str:
+def _first_string(*values):
     for v in values:
         if v:
             return str(v)
     return ""
 
 
-def _float_value(value, default: float = 0.0) -> float:
+def _float_value(value, default=0.0):
     try:
         if value is None or value == "":
             return default
@@ -40,7 +37,7 @@ def _float_value(value, default: float = 0.0) -> float:
         return default
 
 
-def _normalize_text(value: str) -> str:
+def _normalize_text(value):
     text = unicodedata.normalize("NFKD", str(value or ""))
     text = text.encode("ascii", "ignore").decode("ascii")
     text = text.lower().strip()
@@ -48,8 +45,8 @@ def _normalize_text(value: str) -> str:
     return " ".join(text.split())
 
 
-def _score_off_product(query: str, product: dict) -> float:
-    """Rank OpenFoodFacts products by textual closeness to the query."""
+def _score_off_product(query, product):
+    """Ranking OpenFoodFacts products by text closeness."""
     normalized_query = _normalize_text(query)
     name = _normalize_text(product.get("name", ""))
 
@@ -65,7 +62,7 @@ def _score_off_product(query: str, product: dict) -> float:
     return score
 
 
-def _rank_off_products(query: str, products: list) -> list:
+def _rank_off_products(query, products):
     return sorted(
         products,
         key=lambda product: (
@@ -77,7 +74,7 @@ def _rank_off_products(query: str, products: list) -> list:
     )
 
 
-def _parse_total_quantity(product_data: dict) -> Tuple[Optional[float], Optional[str]]:
+def _parse_total_quantity(product_data):
     """
     Versucht eine Gesamtmenge zu extrahieren. Behandelt z.B.:
       - "400 g", "500ml", "1.5 l"
@@ -120,7 +117,7 @@ def _parse_total_quantity(product_data: dict) -> Tuple[Optional[float], Optional
     return mult * amount, unit_norm
 
 
-def _kJ_to_kcal(kj: float) -> float:
+def _kJ_to_kcal(kj):
     return kj / 4.184 if kj else 0.0
 
 
@@ -131,7 +128,7 @@ def _make_ssl_context():
     return ssl.create_default_context()
 
 
-def _kcal_from_nutriments(nutriments: dict) -> float:
+def _kcal_from_nutriments(nutriments):
     """Normalize energy value from the nutriments dict to kcal per 100g."""
     if nutriments.get("energy-kcal_100g") is not None:
         return _float_value(nutriments.get("energy-kcal_100g"))
@@ -142,7 +139,7 @@ def _kcal_from_nutriments(nutriments: dict) -> float:
     return 0.0
 
 
-def search_product(barcode: str) -> Optional[Dict]:
+def search_product(barcode):
     """Holt ein Produkt per Barcode von Open Food Facts.
 
     Gibt ein Dict mit Name, Marke, Naehrwerten (pro 100g) und - falls
@@ -186,7 +183,7 @@ def search_product(barcode: str) -> Optional[Dict]:
     }
 
 
-def lookup_product(query: str) -> Optional[Dict]:
+def lookup_product(query):
     """Loest einen Barcode (nur Ziffern) oder einen Produktnamen auf.
 
     Gibt den besten Treffer zurueck oder None, wenn nichts gefunden wurde.
@@ -201,7 +198,7 @@ def lookup_product(query: str) -> Optional[Dict]:
     return ranked[0] if ranked else None
 
 
-def search_products(query: str, limit: int = 10) -> list:
+def search_products(query, limit=10):
     """Textsuche bei Open Food Facts.
 
     Die Such-API liefert nur Barcodes; fuer jeden Treffer laden wir die

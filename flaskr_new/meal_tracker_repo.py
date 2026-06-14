@@ -1,8 +1,6 @@
-"""Repository fuer den Meal Tracker."""
-from __future__ import annotations
+"""Repository fuer den Meal Tracker (Tagesziele + Mahlzeiten-Eintraege)."""
 
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional
+from datetime import datetime, timezone
 
 from .db import get_db
 
@@ -23,16 +21,16 @@ def _now():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def _iso(dt: datetime) -> str:
+def _iso(dt):
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _start_of_today() -> datetime:
+def _start_of_today():
     now = _now()
     return datetime(now.year, now.month, now.day)
 
 
-def ensure_schema() -> None:
+def ensure_schema():
     db = get_db()
     db.execute(
         """
@@ -63,33 +61,15 @@ def ensure_schema() -> None:
             carbs_g REAL NOT NULL DEFAULT 0,
             fat_g REAL NOT NULL DEFAULT 0,
             note TEXT,
-            section TEXT,
             eaten_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES user (id)
         )
         """
     )
-
-    existing_columns = {
-        row[1]
-        for row in db.execute("PRAGMA table_info(meal_tracker_entry)").fetchall()
-    }
-    for column_sql, column_name in (
-        ("ALTER TABLE meal_tracker_entry ADD COLUMN product_id INTEGER", "product_id"),
-        ("ALTER TABLE meal_tracker_entry ADD COLUMN barcode TEXT", "barcode"),
-        ("ALTER TABLE meal_tracker_entry ADD COLUMN amount REAL", "amount"),
-        ("ALTER TABLE meal_tracker_entry ADD COLUMN unit TEXT", "unit"),
-        ("ALTER TABLE meal_tracker_entry ADD COLUMN section TEXT", "section"),
-    ):
-        if column_name not in existing_columns:
-            try:
-                db.execute(column_sql)
-            except Exception:
-                pass
     db.commit()
 
 
-def get_settings(user_id: int) -> Dict:
+def get_settings(user_id):
     db = get_db()
     row = db.execute(
         "SELECT * FROM meal_tracker_settings WHERE user_id = ?",
@@ -100,7 +80,7 @@ def get_settings(user_id: int) -> Dict:
     return dict(row)
 
 
-def save_settings(user_id: int, daily_kcal: float, protein_pct: float, carbs_pct: float, fat_pct: float) -> None:
+def save_settings(user_id, daily_kcal, protein_pct, carbs_pct, fat_pct):
     db = get_db()
     existing = db.execute(
         "SELECT id FROM meal_tracker_settings WHERE user_id = ?",
@@ -119,7 +99,7 @@ def save_settings(user_id: int, daily_kcal: float, protein_pct: float, carbs_pct
     db.commit()
 
 
-def delete_meal_entry(entry_id: int, user_id: int) -> bool:
+def delete_meal_entry(entry_id, user_id):
     db = get_db()
     result = db.execute(
         "DELETE FROM meal_tracker_entry WHERE id = ? AND user_id = ?",
@@ -129,7 +109,7 @@ def delete_meal_entry(entry_id: int, user_id: int) -> bool:
     return result.rowcount > 0
 
 
-def update_meal_entry_amount(entry_id: int, user_id: int, new_amount: float) -> bool:
+def update_meal_entry_amount(entry_id, user_id, new_amount):
     db = get_db()
     row = db.execute(
         "SELECT amount, kcal, protein_g, carbs_g, fat_g FROM meal_tracker_entry WHERE id = ? AND user_id = ?",
@@ -161,22 +141,21 @@ def update_meal_entry_amount(entry_id: int, user_id: int, new_amount: float) -> 
 
 
 def add_meal_entry(
-    user_id: int,
-    meal_name: str,
-    kcal: float,
-    protein_g: float = 0.0,
-    carbs_g: float = 0.0,
-    fat_g: float = 0.0,
-    note: Optional[str] = None,
-    product_id: Optional[int] = None,
-    barcode: Optional[str] = None,
-    amount: Optional[float] = None,
-    unit: Optional[str] = None,
-    section: Optional[str] = None,
-) -> int:
+    user_id,
+    meal_name,
+    kcal,
+    protein_g=0.0,
+    carbs_g=0.0,
+    fat_g=0.0,
+    note=None,
+    product_id=None,
+    barcode=None,
+    amount=None,
+    unit=None,
+):
     db = get_db()
     cur = db.execute(
-        "INSERT INTO meal_tracker_entry (user_id, meal_name, product_id, barcode, amount, unit, kcal, protein_g, carbs_g, fat_g, note, section, eaten_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO meal_tracker_entry (user_id, meal_name, product_id, barcode, amount, unit, kcal, protein_g, carbs_g, fat_g, note, eaten_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             user_id,
             meal_name,
@@ -189,7 +168,6 @@ def add_meal_entry(
             float(carbs_g),
             float(fat_g),
             note,
-            section,
             _iso(_now()),
         ),
     )
@@ -197,18 +175,17 @@ def add_meal_entry(
     return cur.lastrowid
 
 
-def get_recent_meals(user_id: int, days: int = 1) -> List[Dict]:
+def get_today_meals(user_id):
     db = get_db()
-    since = _start_of_today() if days == 1 else _now() - timedelta(days=days)
     rows = db.execute(
         "SELECT * FROM meal_tracker_entry WHERE user_id = ? AND eaten_at >= ? ORDER BY eaten_at DESC",
-        (user_id, _iso(since)),
+        (user_id, _iso(_start_of_today())),
     ).fetchall()
     return [_row_to_dict(row) for row in rows]
 
 
-def get_today_totals(user_id: int) -> Dict[str, float]:
-    meals = get_recent_meals(user_id, days=1)
+def get_today_totals(user_id):
+    meals = get_today_meals(user_id)
     totals = {"kcal": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0}
     for meal in meals:
         totals["kcal"] += float(meal.get("kcal", 0.0))
@@ -216,16 +193,3 @@ def get_today_totals(user_id: int) -> Dict[str, float]:
         totals["carbs_g"] += float(meal.get("carbs_g", 0.0))
         totals["fat_g"] += float(meal.get("fat_g", 0.0))
     return {key: round(value, 1) for key, value in totals.items()}
-
-
-__all__ = [
-    "DEFAULT_SETTINGS",
-    "ensure_schema",
-    "get_settings",
-    "save_settings",
-    "delete_meal_entry",
-    "update_meal_entry_amount",
-    "add_meal_entry",
-    "get_recent_meals",
-    "get_today_totals",
-]

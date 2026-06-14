@@ -23,7 +23,7 @@ from .meal_tracker_service import (
     build_daily_summary,
     delete_meal_action,
     edit_meal_amount_action,
-    get_recent_meals,
+    get_today_meals,
     get_settings,
     get_today_totals,
     save_settings_action,
@@ -126,7 +126,7 @@ def meal_tracker():
                 flash_message = track_meal_from_form(user_id, request.form)
 
     settings = get_settings(g.user["id"])
-    recent_meals = get_recent_meals(g.user["id"], days=1)
+    recent_meals = get_today_meals(g.user["id"])
     consumed = get_today_totals(g.user["id"])
     summary = build_daily_summary(settings, consumed)
     fridge_items = [dict(item) for item in list_dashboard_items(g.user["id"])]
@@ -160,7 +160,6 @@ def product_detail(item_id):
     if request.method == "POST":
         name = request.form.get("name")
         brand = request.form.get("brand")
-        barcode = request.form.get("barcode")
         current_amount = request.form.get("current_amount")
         unit = request.form.get("unit")
         error = None
@@ -235,6 +234,7 @@ def api_products_search():
         return jsonify([_to_result(product)])
 
     # Text-Suche: erst lokale Treffer aus der DB, dann die OFF-Textsuche.
+    # search_products faengt Netzfehler selbst ab und liefert dann [].
     results = []
     seen_barcodes = set()
 
@@ -246,17 +246,11 @@ def api_products_search():
             seen_barcodes.add(barcode)
         results.append(_to_result(item))
 
-    try:
-        for r in search_by_name(q, limit=10):
-            add({"name": r[1], "brand": r[2], "barcode": r[3], "kcal_per_100g": r[4]})
-    except Exception:
-        current_app.logger.exception("Lokale Produktsuche fehlgeschlagen")
+    for r in search_by_name(q, limit=10):
+        add({"name": r[1], "brand": r[2], "barcode": r[3], "kcal_per_100g": r[4]})
 
-    try:
-        for item in search_products(q) or []:
-            add(item)
-    except Exception:
-        current_app.logger.exception("OFF-Textsuche fehlgeschlagen")
+    for item in search_products(q):
+        add(item)
 
     return jsonify(results)
 
@@ -350,17 +344,9 @@ def logout():
     return redirect(url_for("frontend.dashboard"))
 
 def _parse_amount_input(amount_raw):
-    """Validiert eine Mengen-Eingabe aus dem Formular.
+    """Prueft eine Mengen-Eingabe (Zahl > 0, max 10000, Komma erlaubt).
 
-    Regeln:
-    - amount muss vorhanden sein
-    - amount muss eine Zahl sein (Komma als Dezimaltrenner erlaubt)
-    - amount muss > 0 sein
-    - amount muss <= 10000 sein (Tippfehler-Schutz)
-
-    Returns:
-        (amount, None, None) bei Erfolg,
-        (None, fehlermeldung, flash_kategorie) bei ungueltiger Eingabe.
+    Liefert (amount, None, None) oder (None, fehlermeldung, flash_kategorie).
     """
     amount_raw = (amount_raw or "").strip()
 

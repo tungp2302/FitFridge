@@ -21,22 +21,6 @@ def list_items(user_id=None):
     ).fetchall()
 
 
-def ensure_schema():
-    db = get_db()
-    table_exists = db.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='fridge_item'"
-    ).fetchone()
-    if table_exists is None:
-        return
-    existing_columns = {
-        row[1]
-        for row in db.execute("PRAGMA table_info(fridge_item)").fetchall()
-    }
-    if "user_id" not in existing_columns:
-        db.execute("ALTER TABLE fridge_item ADD COLUMN user_id INTEGER")
-        db.commit()
-
-
 def get_item(item_id, user_id=None):
     """Ein spezifisches FridgeItem mit Produktdetails abrufen.
 
