@@ -1,67 +1,78 @@
-Projekt FitFrdge für Strukturierte programmierung SoSe26 
-https://flask.palletsprojects.com/en/stable/installation/
-Run
+# FitFridge
 
-flask --app flaskr run --debug
-for testing
+Projekt für Software Engineering (SoSe 2026).
 
-$ flask --app flaskr init-db
-Initialize the database
+FitFridge ist ein digitaler Kühlschrank mit Mahlzeiten-Tracker. 
+Man legt
+Lebensmittel per **Barcode oder Name** an – die Nährwerte kommen automatisch von
+**Open Food Facts**. Der Bestand lässt sich verbrauchen/auffüllen, und Mahlzeiten
+werden gegen ein selbst gesetztes **Tagesziel** (Kalorien + Makros) geloggt.
 
-//
-Tutorial zum testen:
-1. Im Projektordner das Terminal öffnen. (ist schon)
-Umgebung erstellen:  python3 -m venv .venv
-Umgebung aktivieren: source .venv/bin/activate   (Windows: .\.venv\Scripts\Activate.ps1)
-Dependencies installieren: pip install -r requirements.txt
-2. Befehle ausführen
-Datenbank initialisieren (optional, fuer kompletten Reset): flask --app flaskr_new init-db
-   Hinweis: Die App legt fehlende Tabellen beim Start automatisch an.
-dev Server starten: flask --app flaskr_new run --debug
+Technik: Python + Flask, SQLite, Jinja2-Templates (HTML/CSS/JS, kein Frontend-
+Framework). Open Food Facts wird über die Standardbibliothek (`urllib`) angesprochen
+– kein API-Key nötig.
 
-3. Im browser öffnen
-http://127.0.0.1:5000
+> SE-Version: nur die Core-Funktionalität. Die KI-Teile (AI-Schätzung, Rezeptplaner,
+> LLM-Einstellungen) gehören zur ASaai-Version und sind hier **nicht** enthalten.
 
-//
+## Ablauf (so benutzt man die App)
 
+1. **Registrieren / Einloggen** – jeder Nutzer hat seinen eigenen Kühlschrank.
+2. **Produkt hinzufügen** (`/fridge/add`): Barcode oder Name eingeben → Treffer aus
+   Open Food Facts auswählen → landet mit Nährwerten im Kühlschrank.
+3. **Kühlschrank** (`/`): Bestände + hochgerechnete Nährwerte ansehen, bearbeiten,
+   **verbrauchen / auffüllen**.
+4. **Mahlzeiten-Tracker** (`/meal-tracker`): Tagesziel setzen und Mahlzeiten loggen
+   (aus einem Kühlschrank-Item oder per Barcode) – die Tagesübersicht zeigt
+   verbraucht vs. übrig.
 
-For tests nachdem in der Umgebung:
-1: dependencies: pip install -r requirements-dev.txt
-   (enthaelt requirements.txt + pytest)
-2: Tests:
-# single test file
-python -m pytest tests/test_api_db/test_api_db.py -q
+## Starten und im Browser testen
 
-# all tests
-python -m pytest -q
+Im Projektordner ein Terminal öffnen.
 
+```powershell
+# 1. Virtuelle Umgebung anlegen und aktivieren
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1        # Linux/macOS: source .venv/bin/activate
 
-Flask import problem in VS Code:
-Flask not available in the active interpreter.
-Quick fix:
-    create a virtual environment: python -m venv .venv
-    .\.venv\Scripts\Activate.ps1
-    pip install flask click werkzeug pytest requests
-    In VS Code select the .venv interpreter:
-        Command Palette -> Python: Select Interpreter -> .venv
-    Reload Pylance:
-        Command Palette -> Developer: Reload Window
+# 2. Abhängigkeiten installieren
+pip install -r requirements.txt
 
-Scope (SE-Version):
-    Diese Version enthaelt nur die Core-Funktionalitaet:
-    - Kuehlschrank (Produkte ueber Open Food Facts suchen, anlegen, bearbeiten,
-      verbrauchen/auffuellen)
-    - Mahlzeiten-Tracker (Tagesziel, Makroverteilung, Mahlzeiten loggen)
+# 3. Dev-Server starten
+flask --app flaskr_new run --debug
+```
 
-    Die AI-Funktionen (AI-Schaetzung, Rezeptplaner, LLM-Einstellungen) gehoeren
-    zur ASaai-Version und sind hier nicht enthalten.
+Dann im Browser öffnen: **http://127.0.0.1:5000**
 
-Seiten:
-    Kuehlschrank:        http://127.0.0.1:5000/
-    Produkt hinzufuegen: http://127.0.0.1:5000/fridge/add
-    Mahlzeiten-Tracker:  http://127.0.0.1:5000/meal-tracker
+> Die Datenbank wird beim ersten Start automatisch angelegt (fehlende Tabellen).
+> Ein kompletter Reset geht mit `flask --app flaskr_new init-db`.
 
-Demo data:
-    python scripts/seed_demo.py
-    Login: demo / demo
-    Opens a repeatable fridge with sample products, meal entries, and forecast data.
+### Wichtige Seiten
+
+| Seite | URL |
+|---|---|
+| Kühlschrank (Dashboard) | http://127.0.0.1:5000/ |
+| Produkt hinzufügen | http://127.0.0.1:5000/fridge/add |
+| Mahlzeiten-Tracker | http://127.0.0.1:5000/meal-tracker |
+
+### Demo-Daten (optional)
+
+Legt einen gefüllten Kühlschrank mit Beispiel-Produkten und Mahlzeiten an:
+
+```powershell
+python scripts/seed_demo.py
+# Login: demo / demo
+```
+
+## Tests
+
+```powershell
+pip install -r requirements-dev.txt   # enthält requirements.txt + pytest
+python -m pytest -q                    # alle Tests
+```
+
+## Flask-Import-Problem in VS Code
+
+Wenn „Flask not available in the active interpreter" erscheint: die `.venv` als
+Interpreter wählen – Command Palette → *Python: Select Interpreter* → `.venv`,
+danach *Developer: Reload Window*.
