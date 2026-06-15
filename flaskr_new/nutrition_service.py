@@ -1,4 +1,4 @@
-"""Rechnet die "pro 100g"-Naehrwerte eines Produkts auf eine Menge um."""
+"""Rechnet die "pro 100g" eines Produkts auf eine Menge um."""
 
 from .calculations import convert_units
 

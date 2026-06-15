@@ -1,4 +1,4 @@
-"""Open-Food-Facts-Client: Barcode-Lookup und Textsuche mit Mengen-Parsing."""
+"""Open-Food-Facts-Client"""
 
 import json
 import logging
@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 
 try:
     import certifi
-except ModuleNotFoundError:  # certifi ist optional, sonst System-Zertifikate
+except ModuleNotFoundError:  
     certifi = None
 
 OFF_API_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
-# Text-Suche laeuft ueber die Search-a-licious-API (liefert nur Barcodes).
+
 OFF_SEARCH_API_URL = "https://search.openfoodfacts.org/search"
 
 

@@ -1,5 +1,5 @@
-"""Schreibt Verbrauchs-/Auffuell-Eintraege in die Tabelle consumption_log,
-damit nachvollziehbar bleibt, wie viel von einem Produkt bewegt wurde."""
+"""Verbrauchs-/Auffuell in die Tabelle consumption_log,
+(viel von einem Produkt bewegt wurde)."""
 
 from datetime import datetime, timezone
 

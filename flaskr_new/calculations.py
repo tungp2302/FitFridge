@@ -1,4 +1,4 @@
-"""Hilfsfunktion für Einheiten-Umrechnung (z.B. kg zu g, l zu ml)."""
+"""Einheiten-Umrechnung (z.B. kg zu g, l zu ml)."""
 
 def convert_units(amount, from_unit, to_unit):
     """Rechnet eine Menge innerhalb einer Kategorie um.

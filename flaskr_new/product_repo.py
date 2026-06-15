@@ -1,4 +1,4 @@
-"""Repository-Funktionen fuer Produkte."""
+"""Repo-Funktionen."""
 
 from .db import get_db
 

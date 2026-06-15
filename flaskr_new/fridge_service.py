@@ -1,4 +1,4 @@
-"""Fachlogik fuer den Fridge-Bereich von FitFridge."""
+"""Fachlogik fuer den Fridge-Bereich."""
 
 import logging
 

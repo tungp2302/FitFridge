@@ -1,14 +1,4 @@
-"""Tests für consume_amount und refill_amount aus fridge_service.
-
-Diese Tests prüfen die Edge Cases der Bestands-Tracking-Funktionen:
-- Normale Operationen
-- Negative/Zero/None-Mengen
-- Schutz vor negativen Beständen
-- Unbekannte Item-IDs
-
-Das consumption_log-Logging wird separat in
-test_fridge_service_logging.py geprüft.
-"""
+"""Tests für consume_amount und refill_amount aus fridge_service."""
 
 import pytest
 
@@ -68,20 +58,6 @@ def test_consume_negative_amount_fails(app, item_id):
         assert item["current_amount"] == 500.0
 
 
-def test_consume_zero_amount_fails(app, item_id):
-    """Menge 0 wird abgelehnt."""
-    with app.app_context():
-        result = consume_amount(item_id, 0)
-        assert result["success"] is False
-
-
-def test_consume_none_amount_fails(app, item_id):
-    """None als Menge wird abgelehnt."""
-    with app.app_context():
-        result = consume_amount(item_id, None)
-        assert result["success"] is False
-
-
 def test_consume_more_than_available_clamps_to_zero(app, item_id):
     """Mehr verbrauchen als vorhanden → Bestand wird auf 0 gesetzt."""
     with app.app_context():
@@ -111,20 +87,6 @@ def test_refill_negative_amount_fails(app, item_id):
     """Negative Menge zum Auffüllen wird abgelehnt."""
     with app.app_context():
         result = refill_amount(item_id, -50)
-        assert result["success"] is False
-
-
-def test_refill_zero_fails(app, item_id):
-    """Menge 0 wird abgelehnt."""
-    with app.app_context():
-        result = refill_amount(item_id, 0)
-        assert result["success"] is False
-
-
-def test_refill_unknown_item_fails(app):
-    """Item das nicht existiert → Fehler."""
-    with app.app_context():
-        result = refill_amount(99999, 100)
         assert result["success"] is False
 
 

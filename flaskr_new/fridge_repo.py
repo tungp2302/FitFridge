@@ -1,4 +1,4 @@
-"""Repository-Funktionen fuer die Fridge-/Dashboard-Daten."""
+"""Repo-Funktionen Fridge-/Dashboard-Daten."""
 
 from .db import get_db
 

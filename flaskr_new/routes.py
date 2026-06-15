@@ -1,4 +1,4 @@
-"""Frontend-Routen fuer FitFridge."""
+"""Frontend-Routen"""
 
 import functools
 import json

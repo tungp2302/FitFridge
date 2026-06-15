@@ -1,4 +1,4 @@
-"""Repository fuer den Meal Tracker (Tagesziele + Mahlzeiten-Eintraege)."""
+"""Repository Meal Tracker (Tagesziele + Mahlzeiten)."""
 
 from datetime import datetime, timezone
 
