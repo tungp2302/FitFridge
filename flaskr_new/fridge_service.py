@@ -67,23 +67,17 @@ def create_dashboard_item_from_data(product_data, author_id=None):
     return _add_item_from_product_data(product_data, fallback_barcode=fallback_barcode, author_id=author_id)
 
 
-def _get_item_for_user(item_id, user_id=None):
-    """Scoped lookup: mit ``user_id`` nur eigene oder besitzerlose Items.
-
-    Bewusst KEIN Fallback auf eine ungescopte Suche - sonst koennte ein
-    Nutzer ueber geratene IDs die Items anderer Nutzer lesen/aendern.
-    """
-    if user_id is None:
-        return fridge_repo.get_item(item_id)
-    return fridge_repo.get_item(item_id, user_id=user_id)
-
 def update_dashboard_item(item_id, current_amount=None, unit=None, name=None, brand=None, user_id=None):
-    """Update fridge item amount and optionally product metadata."""
+    """Menge und optional Name/Marke eines Fridge-Items aktualisieren.
+
+    Die Suche ist auf den Nutzer gescoped (``user_id``), damit niemand
+    ueber geratene IDs fremde Items aendert.
+    """
     updated = 0
 
     current_item = None
     if current_amount is not None or unit is not None or name is not None or brand is not None:
-        current_item = _get_item_for_user(item_id, user_id=user_id)
+        current_item = fridge_repo.get_item(item_id, user_id=user_id)
         if current_item is None:
             raise ValueError("No fridge item found for id")
         current_item = dict(current_item)
@@ -97,19 +91,9 @@ def update_dashboard_item(item_id, current_amount=None, unit=None, name=None, br
         item_unit = unit or (current_item["unit"] if current_item else None) or "g"
 
         if delta < 0:
-            log_consume(
-                current_item["product_id"],
-                abs(delta),
-                item_unit,
-                note="update_dashboard_item consume delta",
-            )
+            log_consume(current_item["product_id"], abs(delta), item_unit, note="Korrektur Bestand")
         elif delta > 0:
-            log_refill(
-                current_item["product_id"],
-                delta,
-                item_unit,
-                note="update_dashboard_item refill delta",
-            )
+            log_refill(current_item["product_id"], delta, item_unit, note="Korrektur Bestand")
 
     # update product metadata if provided
     if name is not None or brand is not None:
@@ -127,15 +111,9 @@ def delete_dashboard_item(item_id):
     return fridge_repo.delete_item(item_id)
 
 def _change_amount(item_id, amount, user_id, *, consume):
-    """Gemeinsame Logik fuer Verbrauchen und Auffuellen.
+    """Verbrauchen/Auffuellen. Beim Verbrauchen faellt der Bestand nicht unter 0.
 
-    Edge Cases:
-    - amount <= 0 oder None: success=False
-    - Item existiert nicht (oder gehoert einem anderen Nutzer): success=False
-    - Beim Verbrauchen wird der Bestand auf 0.0 begrenzt
-
-    Returns:
-        dict: {"success": bool, "new_amount": float, "message": str}
+    Gibt {"success", "new_amount", "message"} zurueck.
     """
     if amount is None or amount <= 0:
         return {
@@ -144,7 +122,7 @@ def _change_amount(item_id, amount, user_id, *, consume):
             "message": "Menge muss größer als 0 sein.",
         }
 
-    item = _get_item_for_user(item_id, user_id=user_id)
+    item = fridge_repo.get_item(item_id, user_id=user_id)
     if item is None:
         return {
             "success": False,
@@ -162,7 +140,7 @@ def _change_amount(item_id, amount, user_id, *, consume):
     # Verbrauchs-/Auffuell-Log schreiben; die Hauptaktion soll auch bei
     # fehlgeschlagenem Logging erfolgreich bleiben.
     log_fn = log_consume if consume else log_refill
-    note = "consume_amount direkt" if consume else "refill_amount direkt"
+    note = "Verbraucht" if consume else "Aufgefüllt"
     try:
         log_fn(item_dict["product_id"], delta, item_dict["unit"], note=note)
     except Exception:

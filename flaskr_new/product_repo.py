@@ -37,16 +37,7 @@ def create_product(name, brand, barcode, kcal_per_100g,
     return cursor.lastrowid
 
 
-def list_all():
-    """Alle Produkte abrufen."""
-    return get_db().execute(
-        "SELECT id, name, brand, barcode,"
-        " kcal_per_100g, protein_per_100g, fat_per_100g, carbs_per_100g"
-        " FROM product ORDER BY name"
-    ).fetchall()
-
-
-def search_by_name(query: str, limit: int = 10):
+def search_by_name(query, limit=10):
     """Search local products by name (case-insensitive, simple LIKE)."""
     q = f"%{query}%"
     return get_db().execute(

@@ -1,92 +1,122 @@
-Projekt FitFrdge für Strukturierte programmierung SoSe26 
-https://flask.palletsprojects.com/en/stable/installation/
-Run
+# FitFridge
 
-flask --app flaskr run --debug
-for testing
+Projekt für Software Engineering (SoSe 2026).
 
-$ flask --app flaskr init-db
-Initialize the database
+FitFridge ist ein digitaler Kühlschrank mit Mahlzeiten-Tracker. 
+Man legt Lebensmittel per Barcode oder Name an, Nährwerte kommen automatisch von
+Open Food Facts. Der Bestand lässt sich verbrauchen/auffüllen, und Mahlzeiten
+werden gegen ein selbst gesetztes Tagesziel (Kalorien + Makros) geloggt.
 
-//
-Tutorial zum testen:
-1. Im Projektordner das Terminal öffnen. (ist schon)
-Umgebung erstellen:  python3 -m venv .venv
-Umgebung aktivieren: source .venv/bin/activate   (Windows: .\.venv\Scripts\Activate.ps1)
-Dependencies installieren: pip install -r requirements.txt
-2. Befehle ausführen
-Datenbank initialisieren (optional, fuer kompletten Reset): flask --app flaskr_new init-db
-   Hinweis: Die App legt fehlende Tabellen beim Start automatisch an.
-dev Server starten: flask --app flaskr_new run --debug
+Technik: Python + Flask, SQLite, Jinja2-Templates (HTML/CSS/JS, kein Frontend-
+Framework). Open Food Facts wird über die Standardbibliothek (`urllib`) angesprochen
+– kein API-Key nötig.
 
-3. Im browser öffnen
-http://127.0.0.1:5000
+> SE-Version: nur die Core-Funktionalität. Die KI-Teile (AI-Schätzung, Rezeptplaner,
+> LLM-Einstellungen) gehören zur ASaai-Version und sind hier nicht enthalten.
 
-//
+## Ablauf (so benutzt man die App)
 
+1. Registrieren / Einloggen: Jeder Nutzer hat seinen eigenen Kühlschrank.
+2. Produkt hinzufügen: (`/fridge/add`): Barcode oder Name eingeben → Treffer aus
+   Open Food Facts auswählen → landet mit Nährwerten im Kühlschrank.
+3. Kühlschrank: (`/`): Bestände + hochgerechnete Nährwerte ansehen, bearbeiten,
+   verbrauchen / auffüllen.
+4.*Mahlzeiten-Tracker: (`/meal-tracker`): Tagesziel setzen und Mahlzeiten loggen
+   (aus einem Kühlschrank-Item oder per Barcode) – die Tagesübersicht zeigt
+   verbraucht vs. übrig.
 
-For tests nachdem in der Umgebung:
-1: dependencies: pip install -r requirements-dev.txt
-   (enthaelt requirements.txt + pytest)
-2: Tests:
-# single test file
-python -m pytest tests/test_api_db/test_api_db.py -q
+## Starten und im Browser testen
 
-# all tests
+### macOS
+**Setup (einmalig):**
+
+```bash
+# 1. Ins Projektverzeichnis wechseln
+cd /pfad/zum/FitFridge
+
+# 2. Virtuelle Umgebung anlegen und aktivieren
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 3. Abhängigkeiten installieren
+pip install -r requirements.txt
+```
+
+**Server starten:**
+
+```bash
+# Virtuelle Umgebung aktivieren (falls noch nicht aktiv)
+source .venv/bin/activate
+
+flask --app flaskr_new run --debug
+```
+
+Dann im Browser öffnen: **http://127.0.0.1:5000**
+
+> Die Datenbank wird beim ersten Start automatisch angelegt.
+> Ein kompletter Reset geht mit `flask --app flaskr_new init-db`.
+
+**Demo-Daten laden (optional):**
+
+```bash
+python3 scripts/seed_demo.py
+# Login: demo / demo
+```
+
+**Tests ausführen:**
+
+```bash
+pip install -r requirements-dev.txt
+python3 -m pytest -q
+```
+
+---
+
+### Windows (PowerShell)
+
+Im Projektordner ein Terminal öffnen.
+
+```powershell
+# 1. Virtuelle Umgebung anlegen und aktivieren
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# 2. Abhängigkeiten installieren
+pip install -r requirements.txt
+
+# 3. Dev-Server starten
+flask --app flaskr_new run --debug
+```
+
+Dann im Browser öffnen: **http://127.0.0.1:5000**
+
+> Die Datenbank wird beim ersten Start automatisch angelegt (fehlende Tabellen).
+> Ein kompletter Reset geht mit `flask --app flaskr_new init-db`.
+
+### Wichtige Seiten
+
+| Seite | URL |
+|---|---|
+| Kühlschrank (Dashboard) | http://127.0.0.1:5000/ |
+| Produkt hinzufügen | http://127.0.0.1:5000/fridge/add |
+| Mahlzeiten-Tracker | http://127.0.0.1:5000/meal-tracker |
+
+### Demo-Daten (optional, Windows)
+
+```powershell
+python scripts/seed_demo.py
+# Login: demo / demo
+```
+
+## Tests (Windows)
+
+```powershell
+pip install -r requirements-dev.txt
 python -m pytest -q
+```
 
+## Flask-Import-Problem in VS Code
 
-Flask import problem in VS Code:
-Flask not available in the active interpreter.
-Quick fix:
-    create a virtual environment: python -m venv .venv
-    .\.venv\Scripts\Activate.ps1
-    pip install flask click werkzeug pytest requests
-    In VS Code select the .venv interpreter:
-        Command Palette -> Python: Select Interpreter -> .venv
-    Reload Pylance:
-        Command Palette -> Developer: Reload Window
-
-Ollama local setup for kept AI features:
-1. Install Ollama from https://ollama.com and start the local service.
-2. Pull a model, for example:
-    ollama pull qwen3.5:latest
-    ollama pull qwen3:4b
-    ollama pull gemma3:1b
-3. Set environment variables before starting Flask:
-    export OLLAMA_MODEL=qwen3.5:latest
-    export OLLAMA_BASE_URL=http://127.0.0.1:11434
-4. Start the app:
-    flask --app flaskr_new run --debug
-5. Open:
-    Add Food with AI estimate:
-        http://127.0.0.1:5000/fridge/add
-    Freestyle recipe planner:
-        http://127.0.0.1:5000/asaai/ui/planner
-
-Model choice:
-    Desktop default: qwen3.5:latest
-    Laptop slower: qwen3:4b
-    Laptop fast: gemma3:1b
-
-    Browser choice:
-        http://127.0.0.1:5000/settings
-
-    Terminal / env fallback before starting Flask:
-        export OLLAMA_MODEL=qwen3:4b
-        export OLLAMA_MODEL=gemma3:1b
-
-Ollama smoke test:
-     curl http://127.0.0.1:11434/api/tags
-
-FitFridge keeps only these local Ollama features for the current project scope:
-    - Add Food with AI estimate
-    - Freestyle recipe in the recipe planner
-
-The active recipe LLM code is in:
-    flaskr_new/asaai/freestyle_recipe.py
-
-Demo data:
-    python scripts/seed_demo.py
-    Login: demo / demo
-    Opens a repeatable fridge with sample products, meal entries, and forecast data.
+Wenn „Flask not available in the active interpreter" erscheint: die `.venv` als
+Interpreter wählen – Command Palette → *Python: Select Interpreter* → `.venv`,
+danach *Developer: Reload Window*.

@@ -1,7 +1,6 @@
 DROP TABLE IF EXISTS fridge_item;
 DROP TABLE IF EXISTS meal_tracker_entry;
 DROP TABLE IF EXISTS meal_tracker_settings;
-DROP TABLE IF EXISTS app_settings;
 DROP TABLE IF EXISTS consumption_log;
 DROP TABLE IF EXISTS product;
 DROP TABLE IF EXISTS user;
@@ -23,14 +22,6 @@ CREATE TABLE meal_tracker_settings (
     FOREIGN KEY (user_id) REFERENCES user (id)
 );
 
-CREATE TABLE app_settings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER UNIQUE NOT NULL,
-    llm_model TEXT NOT NULL DEFAULT 'qwen3.5:latest',
-    updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES user (id)
-);
-
 CREATE TABLE product (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -40,7 +31,6 @@ CREATE TABLE product (
     protein_per_100g REAL NOT NULL,
     fat_per_100g REAL NOT NULL,
     carbs_per_100g REAL NOT NULL,
-    expiry_date DATE,
     created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -79,7 +69,6 @@ CREATE TABLE meal_tracker_entry (
     carbs_g REAL NOT NULL DEFAULT 0,
     fat_g REAL NOT NULL DEFAULT 0,
     note TEXT,
-    section TEXT,
     eaten_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user (id)
 );

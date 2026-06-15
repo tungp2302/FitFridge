@@ -1,8 +1,6 @@
-"""Business logic fuer den Meal Tracker."""
-from __future__ import annotations
+"""Fachlogik fuer den Meal Tracker (Tagesziel, Makros, Mahlzeiten loggen)."""
 
 import json
-from typing import Dict
 
 from . import fridge_repo, product_repo
 from .fridge_service import create_dashboard_item_from_data, list_dashboard_items, update_dashboard_item
@@ -10,7 +8,7 @@ from .meal_tracker_repo import (
     DEFAULT_SETTINGS,
     add_meal_entry,
     delete_meal_entry,
-    get_recent_meals,
+    get_today_meals,
     get_settings,
     get_today_totals,
     save_settings,
@@ -20,7 +18,7 @@ from .nutrition_service import calculate_for_amount
 from .openfoodfacts_client import lookup_product
 
 
-def normalize_macro_percentages(protein_pct: float, carbs_pct: float, fat_pct: float) -> Dict[str, float]:
+def normalize_macro_percentages(protein_pct, carbs_pct, fat_pct):
     values = {
         "protein_pct": max(0.0, float(protein_pct)),
         "carbs_pct": max(0.0, float(carbs_pct)),
@@ -36,7 +34,7 @@ def normalize_macro_percentages(protein_pct: float, carbs_pct: float, fat_pct: f
     return normalized
 
 
-def calculate_macro_targets(daily_kcal: float, protein_pct: float, carbs_pct: float, fat_pct: float) -> Dict[str, float]:
+def calculate_macro_targets(daily_kcal, protein_pct, carbs_pct, fat_pct):
     protein_kcal = float(daily_kcal) * float(protein_pct) / 100.0
     carbs_kcal = float(daily_kcal) * float(carbs_pct) / 100.0
     fat_kcal = float(daily_kcal) * float(fat_pct) / 100.0
@@ -49,7 +47,7 @@ def calculate_macro_targets(daily_kcal: float, protein_pct: float, carbs_pct: fl
     }
 
 
-def build_daily_summary(settings: Dict, consumed: Dict) -> Dict:
+def build_daily_summary(settings, consumed):
     targets = calculate_macro_targets(
         settings["daily_kcal"],
         settings["protein_pct"],
@@ -82,8 +80,8 @@ def build_daily_summary(settings: Dict, consumed: Dict) -> Dict:
     }
 
 
-def resolve_product_from_barcode(barcode: str, user_id: int | None = None):
-    """Resolve a product by barcode and return product row + fridge item if available."""
+def resolve_product_from_barcode(barcode, user_id=None):
+    """Sucht ein Produkt per Barcode und gibt (Produkt, Fridge-Item) zurueck."""
     barcode = (barcode or "").strip()
     if not barcode:
         return None, None
@@ -115,8 +113,8 @@ def resolve_product_from_barcode(barcode: str, user_id: int | None = None):
     return dict(product), fridge_item
 
 
-def log_meal_from_product(user_id: int, product: Dict, amount: float, unit: str, fridge_item_id: int | None = None, section: str | None = None):
-    """Log a meal entry and optionally deduct the same amount from the fridge."""
+def log_meal_from_product(user_id, product, amount, unit, fridge_item_id=None):
+    """Loggt eine Mahlzeit und zieht die Menge optional vom Fridge-Item ab."""
     nutrition = calculate_for_amount(product, amount, unit)
     meal_name = product.get("name") or "Meal"
     entry_id = add_meal_entry(
@@ -131,7 +129,6 @@ def log_meal_from_product(user_id: int, product: Dict, amount: float, unit: str,
         carbs_g=nutrition["carbs"],
         fat_g=nutrition["fat"],
         note="meal tracker meal",
-        section=section,
     )
 
     deducted = False
@@ -163,14 +160,14 @@ def log_meal_from_product(user_id: int, product: Dict, amount: float, unit: str,
 # ---------------------------------------------------------------------------
 
 
-def _safe_float(value, default: float) -> float:
+def _safe_float(value, default):
     try:
         return float(value)
     except (TypeError, ValueError):
         return float(default)
 
 
-def _product_from_payload_item(item: Dict) -> Dict:
+def _product_from_payload_item(item):
     return {
         "name": item.get("name") or "Product",
         "barcode": item.get("barcode") or item.get("name") or "selected-product",
@@ -181,7 +178,7 @@ def _product_from_payload_item(item: Dict) -> Dict:
     }
 
 
-def save_settings_action(user_id: int, form) -> str:
+def save_settings_action(user_id, form):
     """Speichert Tagesziel + Makroverteilung aus dem Formular."""
     current = get_settings(user_id)
     daily_kcal = _safe_float(form.get("daily_kcal"), current["daily_kcal"])
@@ -199,7 +196,7 @@ def save_settings_action(user_id: int, form) -> str:
     return "Tagesziel und Macroverteilung gespeichert."
 
 
-def delete_meal_action(user_id: int, entry_id_raw) -> str:
+def delete_meal_action(user_id, entry_id_raw):
     """Loescht einen Meal-Eintrag des Nutzers."""
     if not entry_id_raw:
         return "Mahlzeit konnte nicht geloescht werden."
@@ -210,7 +207,7 @@ def delete_meal_action(user_id: int, entry_id_raw) -> str:
     return "Mahlzeit geloescht." if deleted else "Mahlzeit konnte nicht geloescht werden."
 
 
-def edit_meal_amount_action(user_id: int, entry_id_raw, new_amount_raw) -> str:
+def edit_meal_amount_action(user_id, entry_id_raw, new_amount_raw):
     """Skaliert einen Meal-Eintrag auf eine neue Menge."""
     if not entry_id_raw or not new_amount_raw:
         return "Neue Menge konnte nicht gespeichert werden."
@@ -221,7 +218,7 @@ def edit_meal_amount_action(user_id: int, entry_id_raw, new_amount_raw) -> str:
     return "Menge aktualisiert." if updated else "Neue Menge konnte nicht gespeichert werden."
 
 
-def track_meals_from_payload(user_id: int, selected_payload_raw: str) -> str:
+def track_meals_from_payload(user_id, selected_payload_raw):
     """Loggt mehrere ausgewaehlte Produkte; Restmengen wandern in den Fridge."""
     try:
         selected_payload = json.loads(selected_payload_raw)
@@ -247,7 +244,6 @@ def track_meals_from_payload(user_id: int, selected_payload_raw: str) -> str:
             amount,
             unit,
             fridge_item_id=None,
-            section=None,
         )
         remaining_amount = _safe_float(item.get("remaining_amount"), 0.0)
         if remaining_amount > 0:
@@ -270,7 +266,7 @@ def track_meals_from_payload(user_id: int, selected_payload_raw: str) -> str:
     return message
 
 
-def track_meal_from_form(user_id: int, form) -> str:
+def track_meal_from_form(user_id, form):
     """Loggt eine einzelne Mahlzeit aus Fridge-Item oder Barcode."""
     amount = _safe_float(form.get("amount"), 0.0)
     if amount <= 0:
@@ -310,36 +306,14 @@ def track_meal_from_form(user_id: int, form) -> str:
     else:
         return "Bitte ein Barcode oder ein Fridge-Item auswaehlen."
 
-    section = form.get("meal_section") or form.get("section")
     result = log_meal_from_product(
         user_id,
         selected_product,
         amount,
         unit,
         fridge_item_id=selected_fridge_item_id,
-        section=section,
     )
     message = f"{selected_product['name']} mit {amount} {unit} gespeichert."
     if result["deducted"]:
         message += " Bestand im Kuehlschrank wurde reduziert."
     return message
-
-
-__all__ = [
-    "add_meal_entry",
-    "delete_meal_entry",
-    "build_daily_summary",
-    "log_meal_from_product",
-    "normalize_macro_percentages",
-    "calculate_macro_targets",
-    "resolve_product_from_barcode",
-    "get_recent_meals",
-    "get_settings",
-    "get_today_totals",
-    "save_settings",
-    "save_settings_action",
-    "delete_meal_action",
-    "edit_meal_amount_action",
-    "track_meals_from_payload",
-    "track_meal_from_form",
-]
