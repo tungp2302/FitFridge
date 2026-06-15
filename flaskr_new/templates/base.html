@@ -1,10 +1,11 @@
 <!doctype html>
 <title>{% block title %}FitFridge{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-<nav>
+
   <div id="logo">
   <h1>FitFridge</h1>
   </div>
+  <nav>
   <div id="menubar">
       <div id="menuleft">
         <a href="{{ url_for('frontend.dashboard') }}">Kühlschrank</a>
