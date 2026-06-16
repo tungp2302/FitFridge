@@ -29,8 +29,8 @@
   <section class="page-card today-dashboard" style="margin-bottom:1rem;">
     <div class="today-dashboard__header">
       <div>
-        <h2 style="margin:0 0 .25rem 0;">Today</h2>
-        <p class="muted" style="margin:0;">Simple macros at a glance.</p>
+        <h2>Today</h2>
+        <p class="muted">Simple macros at a glance.</p>
       </div>
       <div class="today-dashboard__actions">
         <button type="button" class="today-text-button" id="open-settings">edit</button>
@@ -90,7 +90,7 @@
       <div class="settings-modal__header">
         <div>
           <h2 id="settings-modal-title">Settings</h2>
-          <p class="muted" style="margin:0;">Daily goal</p>
+          <p class="muted">Daily goal</p>
         </div>
         <button type="button" class="settings-modal__close" id="close-settings" aria-label="Close settings">×</button>
       </div>
@@ -138,7 +138,7 @@
       <div class="settings-modal__header">
         <div>
           <h2 id="add-modal-title">Add</h2>
-          <p class="muted" style="margin:0;">Choose how to log food</p>
+          <p class="muted">Choose how to log food</p>
         </div>
         <button type="button" class="settings-modal__close" id="close-add" aria-label="Close add dialog">×</button>
       </div>
@@ -244,7 +244,7 @@
       <div class="settings-modal__header">
         <div>
           <h2 id="edit-amount-title">Menge aendern</h2>
-          <p class="muted" id="edit-amount-subtitle" style="margin:0;">Produkt</p>
+          <p class="muted" id="edit-amount-subtitle">Produkt</p>
         </div>
         <button type="button" class="settings-modal__close" id="close-edit-amount" aria-label="Close edit amount dialog">×</button>
       </div>
@@ -498,7 +498,7 @@
           <div class="search-item" data-idx="${index}">
             <div class="search-item__top">
               <strong>${escHtml(item.name || '(no name)')}</strong>
-              <span class="search-item__badge is-off">OFF</span>
+              <span class="badge is-off">OFF</span>
             </div>
             <div class="search-item__brand muted">${escHtml(item.brand || '')}</div>
             <small>Open Food Facts · ${escHtml(item.kcal_per_100g || '')} kcal/100g</small>
@@ -521,7 +521,7 @@
             selectedDiv.innerHTML = `
               <div class="selected-product-panel__title">
                 <strong>${escHtml(currentSelection.name)}</strong>
-                <span class="selected-product-panel__badge is-off">OFF</span>
+                <span class="badge is-off">OFF</span>
               </div>
               <div class="selected-product-panel__meta">${currentSelection.brand ? escHtml(currentSelection.brand) + ' · ' : ''}Open Food Facts · ${escHtml(currentSelection.kcal_per_100g || '')} kcal / 100g</div>
               <div class="selected-product-panel__actions">

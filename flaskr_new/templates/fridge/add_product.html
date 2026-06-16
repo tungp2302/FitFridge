@@ -16,7 +16,7 @@
         required
       >
       <input type="hidden" name="selected_payload" id="selected-payload" value="">
-      <div id="search-results" class="search-results" style="display:none; max-height:220px; overflow:auto; border:1px solid #e5e7eb; margin-top:.5rem; border-radius:12px; background:#fff;"></div>
+      <div id="search-results" class="search-results-panel" style="display:none; margin-top:.5rem;"></div>
       <p class="muted">Die Treffer kommen von Open Food Facts. Findet die Suche nichts, kannst du das Produkt mit "Create anyway" trotzdem anlegen.</p>
       <div style="display:flex; gap:.75rem; align-items:center; margin-top:.5rem; flex-wrap:wrap;">
         <input type="submit" id="save-btn" value="Search">
@@ -49,7 +49,7 @@
         createAnyway.style.display='inline-block';
         results.style.display='block';
         results.innerHTML = items.map((i, idx) => `
-          <div class="search-item" data-idx="${idx}" style="padding:.5rem; border-bottom:1px solid #f0f0f0; cursor:pointer;">
+          <div class="search-item" data-idx="${idx}">
             <strong>${escHtml(i.name || '(no name)')}</strong> — <span class="muted">${escHtml(i.brand || '')}</span><br>
             <small>Barcode: ${escHtml(i.barcode || '')} · ${escHtml(i.kcal_per_100g || '')} kcal/100g</small>
           </div>

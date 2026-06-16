@@ -81,7 +81,8 @@ form,
   box-shadow:var(--shadow);
 }
 
-.page-card{padding:18px}
+.page-card,
+.insight-card{padding:18px}
 
 button.btn{border-radius:10px;font-weight:600}
 
@@ -126,7 +127,6 @@ fieldset{border:1px solid #dbe3ee;border-radius:12px;padding:14px;margin:0 0 14p
 
 hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 
-/* small utilities */
 .muted{color:var(--muted)}
 
 .post{padding:16px;margin-bottom:14px;position:relative;overflow:hidden}
@@ -159,10 +159,17 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 .muted-box{background:#f8fafc;border:1px solid #e5e7eb;border-radius:14px;padding:12px}
 
 .today-dashboard{
-  max-width: 560px;
-  margin-left: auto;
-  margin-right: auto;
+  max-width:560px;
+  margin:0 auto;
 }
+
+.today-dashboard__header h2,
+.settings-modal__header h2{margin:0 0 .25rem}
+
+.today-dashboard__header .muted,
+.settings-modal__header .muted{margin:0}
+
+.card-header{margin-bottom:.75rem}
 
 .today-dashboard__header{
   display:flex;
@@ -321,11 +328,6 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 
 .settings-modal.is-open{display:block;}
 
-.settings-modal__backdrop,
-.settings-modal__panel{
-  display:none;
-}
-
 .settings-modal__backdrop{
   position:absolute;
   inset:0;
@@ -344,8 +346,6 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   padding:18px;
 }
 
-.settings-modal.is-open .settings-modal__backdrop,
-.settings-modal.is-open .settings-modal__panel{display:block}
 
 .settings-modal__header{
   display:flex;
@@ -405,7 +405,8 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   gap:10px;
 }
 
-.settings-modal__secondary{
+.settings-modal__secondary,
+button.secondary{
   background:#eef2f7;
   color:#111827;
 }
@@ -543,8 +544,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   gap:10px;
 }
 
-.search-item__badge,
-.selected-product-panel__badge{
+.badge{
   display:inline-flex;
   align-items:center;
   justify-content:center;
@@ -555,17 +555,8 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   letter-spacing:.02em;
 }
 
-.search-item__badge.is-ai,
-.selected-product-panel__badge.is-ai{
-  background:#dcfce7;
-  color:#15803d;
-}
-
-.search-item__badge.is-off,
-.selected-product-panel__badge.is-off{
-  background:#e2e8f0;
-  color:#334155;
-}
+.badge.is-ai{background:#dcfce7;color:#15803d}
+.badge.is-off{background:#e2e8f0;color:#334155}
 
 .search-item__brand{margin-top:4px}
 
