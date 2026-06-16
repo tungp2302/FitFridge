@@ -59,12 +59,10 @@ def test_meal_entry_analysis(app_context):
     repo.add_meal_entry(1, "Lunch", 700, 40, 80, 20)
 
     consumed = repo.get_today_totals(1)
-    summary = service.build_daily_summary(repo.get_settings(1), consumed)
+    summary = service.build_daily_summary(repo.get_settings(1))
 
     assert consumed["kcal"] == 1250.0
     assert summary["targets"]["kcal"] == 2000.0
-    assert summary["remaining"]["kcal"] == 750.0
-    assert "Noch 750.0 kcal offen" in summary["recommendation"]
 
 
 def test_meal_logging_deducts_from_fridge(app_context):

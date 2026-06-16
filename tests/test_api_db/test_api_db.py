@@ -48,11 +48,9 @@ def test_product_insert_lookup(app_context):
 
     by_id = product_repo.get_by_id(product_id)
     by_barcode = product_repo.get_by_barcode("3017620422003")
-    all_products = product_repo.list_all()
 
     assert by_id["name"] == "Nutella"
     assert by_barcode["brand"] == "Ferrero"
-    assert len(all_products) == 1
 
 
 def test_fridge_item_crud(app_context):

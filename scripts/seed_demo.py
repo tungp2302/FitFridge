@@ -12,10 +12,9 @@ from werkzeug.security import generate_password_hash
 
 from flaskr_new import create_app
 from flaskr_new.db import get_db, init_db
-from flaskr_new.meal_tracker_repo import add_meal_entry, ensure_schema, save_settings
+from flaskr_new.meal_tracker_repo import add_meal_entry, save_settings
 from flaskr_new.fridge_repo import add_item
 from flaskr_new.product_repo import create_product
-from flaskr_new.consumption_log_repo import log_consume, log_refill
 
 
 def seed_demo_data() -> None:
@@ -23,7 +22,6 @@ def seed_demo_data() -> None:
 
     with app.app_context():
         init_db()
-        ensure_schema()
 
         db = get_db()
 
@@ -139,9 +137,6 @@ def seed_demo_data() -> None:
             )
             add_item(product_id, product["current_amount"], product["unit"], user_id=user_id)
             product_ids[product["name"]] = product_id
-
-        log_consume(product_ids["Nutella"], 20, "g", note="demo consumption")
-        log_refill(product_ids["Parmesan"], 150, "g", note="demo refill")
 
         save_settings(user_id, daily_kcal=2200, protein_pct=30, carbs_pct=40, fat_pct=30)
 

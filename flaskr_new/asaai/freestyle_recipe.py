@@ -305,12 +305,3 @@ def generate_freestyle_recipes(fridge_items, daily_goal=None, recipe_category=No
             f"{detail}",
         )]
     return {"recipes": recipes, "prompt_used": result["prompt"], "raw_response": result["raw"]}
-
-
-def generate_freestyle_recipe(fridge_items, daily_goal=None, recipe_category=None, model=None, base_url=None, timeout=120):
-    """Generate exactly one recipe as ``{"recipe": ...}``."""
-    result = generate_freestyle_recipes(fridge_items, daily_goal, recipe_category, model, base_url, timeout, count=1)
-    out = {"recipe": result["recipes"][0], "prompt_used": result["prompt_used"], "raw_response": result["raw_response"]}
-    if "error" in result:
-        out["error"] = result["error"]
-    return out

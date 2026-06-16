@@ -7,22 +7,6 @@ from .db import get_db
 DEFAULT_LLM_MODEL = "qwen3.5:latest"
 
 
-def ensure_schema():
-    db = get_db()
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS app_settings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER UNIQUE NOT NULL,
-            llm_model TEXT NOT NULL DEFAULT 'qwen3.5:latest',
-            updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES user (id)
-        )
-        """
-    )
-    db.commit()
-
-
 def get_settings(user_id: int) -> dict:
     row = get_db().execute(
         "SELECT llm_model FROM app_settings WHERE user_id = ?",

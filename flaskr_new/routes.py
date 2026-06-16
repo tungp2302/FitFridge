@@ -34,13 +34,11 @@ from .app_settings_repo import get_settings as get_app_settings, save_settings a
 from .asaai.ollama_client import OLLAMA_MODEL_CHOICES, resolve_ollama_model, test_ollama_model
 from .fridge_service import (
     calculate_total_nutrition,
-    consume_amount,
     create_dashboard_item,
     create_dashboard_item_from_data,
     delete_dashboard_item,
     get_dashboard_item,
     list_dashboard_items,
-    refill_amount,
     update_dashboard_item,
 )
 from .openfoodfacts_client import ai_estimate, search_product, search_products
@@ -174,7 +172,7 @@ def meal_tracker():
     settings = get_settings(g.user["id"])
     recent_meals = get_recent_meals(g.user["id"], days=1)
     consumed = get_today_totals(g.user["id"])
-    summary = build_daily_summary(settings, consumed)
+    summary = build_daily_summary(settings)
     fridge_items = [dict(item) for item in list_dashboard_items(g.user["id"])]
 
     if flash_message:
@@ -214,9 +212,7 @@ def product_detail(item_id):
     if request.method == "POST":
         name = request.form.get("name")
         brand = request.form.get("brand")
-        barcode = request.form.get("barcode")
         current_amount = request.form.get("current_amount")
-        unit = request.form.get("unit")
         error = None
 
         if not name:
@@ -225,11 +221,9 @@ def product_detail(item_id):
         if error is not None:
             flash(error)
         else:
-            # update amount and optional product metadata
             update_dashboard_item(
                 item_id,
                 current_amount=current_amount,
-                unit=unit,
                 name=name,
                 brand=brand,
                 user_id=g.user["id"],
@@ -366,35 +360,6 @@ def api_products_search():
     return jsonify(combined)
 
 
-@bp.route("/api/products/ai")
-@login_required
-def api_products_ai():
-    q = request.args.get("q", "").strip()
-    if not q:
-        return jsonify({})
-
-    try:
-        prod = ai_estimate(q)
-    except Exception:
-        current_app.logger.exception("KI-Schaetzung fehlgeschlagen")
-        prod = None
-
-    if not prod:
-        return jsonify({})
-
-    reduced = {
-        "name": prod.get("name"),
-        "brand": prod.get("brand"),
-        "barcode": prod.get("barcode"),
-        "kcal_per_100g": prod.get("kcal_per_100g"),
-        "protein_per_100g": prod.get("protein_per_100g"),
-        "fat_per_100g": prod.get("fat_per_100g"),
-        "carbs_per_100g": prod.get("carbs_per_100g"),
-        "ai": True,
-    }
-    return jsonify(reduced)
-
-
 @bp.route("/fridge/<int:item_id>/delete", methods=("POST",))
 @login_required
 def delete_product(item_id):
@@ -467,67 +432,3 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("frontend.dashboard"))
-
-def _parse_amount_input(amount_raw):
-    """Validiert eine Mengen-Eingabe aus dem Formular.
-
-    Regeln:
-    - amount muss vorhanden sein
-    - amount muss eine Zahl sein (Komma als Dezimaltrenner erlaubt)
-    - amount muss > 0 sein
-    - amount muss <= 10000 sein (Tippfehler-Schutz)
-
-    Returns:
-        (amount, None, None) bei Erfolg,
-        (None, fehlermeldung, flash_kategorie) bei ungueltiger Eingabe.
-    """
-    amount_raw = (amount_raw or "").strip()
-
-    if not amount_raw:
-        return None, "Bitte gib eine Menge an.", "error"
-
-    # Komma durch Punkt ersetzen (deutsche Eingabe)
-    amount_raw = amount_raw.replace(",", ".")
-
-    try:
-        amount = float(amount_raw)
-    except ValueError:
-        return None, f"'{amount_raw}' ist keine gültige Zahl.", "error"
-
-    if amount <= 0:
-        return None, "Die Menge muss größer als 0 sein.", "error"
-
-    if amount > 10000:
-        return (
-            None,
-            f"Die Menge {amount} scheint sehr hoch. Bitte prüfe deine Eingabe (max. 10000).",
-            "warning",
-        )
-
-    return amount, None, None
-
-
-def _handle_amount_change(item_id, service_fn):
-    """Gemeinsamer Ablauf fuer consume/refill: validieren, Service, Flash."""
-    amount, error, category = _parse_amount_input(request.form.get("amount", ""))
-    if error is not None:
-        flash(error, category)
-        return redirect(url_for("frontend.product_detail", item_id=item_id))
-
-    result = service_fn(item_id, amount, user_id=g.user["id"])
-    flash(result["message"], "success" if result["success"] else "error")
-    return redirect(url_for("frontend.product_detail", item_id=item_id))
-
-
-@bp.route("/fridge/<int:item_id>/consume", methods=("POST",))
-@login_required
-def consume_product(item_id):
-    """Verbraucht eine Menge eines Fridge-Items."""
-    return _handle_amount_change(item_id, consume_amount)
-
-
-@bp.route("/fridge/<int:item_id>/refill", methods=("POST",))
-@login_required
-def refill_product(item_id):
-    """Füllt eine Menge zu einem Fridge-Item hinzu."""
-    return _handle_amount_change(item_id, refill_amount)

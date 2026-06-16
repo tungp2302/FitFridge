@@ -159,7 +159,6 @@ def test_ollama_model(model: Optional[str] = None, base_url: Optional[str] = Non
 
 def generate_from_ollama(
     prompt: str,
-    api_key: Optional[str] = None,
     model: Optional[str] = None,
     base_url: Optional[str] = None,
     timeout: int = 30,
@@ -169,26 +168,11 @@ def generate_from_ollama(
     temperature: float = 0.2,
     **_: Any,
 ) -> str:
-    """Generate a response via a locally running Ollama instance.
+    """Schickt einen Prompt an die lokale Ollama-Instanz und gibt den Text zurueck.
 
-    Parameters
-    ----------
-    prompt:
-        User prompt to send to Ollama.
-    api_key:
-        Unused placeholder for parity with remote backends.
-    model:
-        Ollama model name, defaults to `OLLAMA_MODEL` or `llama3.1`.
-    base_url:
-        Base URL of the local Ollama server, defaults to `OLLAMA_BASE_URL`
-        or `http://127.0.0.1:11434`.
-    timeout:
-        HTTP timeout in seconds.
-    system:
-        Optional system prompt to prepend.
+    ``base_url`` faellt auf OLLAMA_BASE_URL bzw. http://127.0.0.1:11434 zurueck,
+    das Modell auf das konfigurierte oder erste lokal installierte Modell.
     """
-    del api_key
-
     endpoint = (base_url or os.getenv("OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL).rstrip("/")
     selected_model = resolve_ollama_model(model)
     if not selected_model:

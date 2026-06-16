@@ -1,4 +1,4 @@
-"""OpenFoodFacts-Client fuer Barcode-Lookups mit Mengen-Parsing und Fallbacks."""
+nb  """OpenFoodFacts-Client fuer Barcode-Lookups mit Mengen-Parsing und Fallbacks."""
 
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ except ModuleNotFoundError:  # pragma: no cover - depends on local environment
     certifi = None
 
 OFF_API_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
-OFF_STAGING_API_URL = "https://world.openfoodfacts.net/api/v2/product/{barcode}.json"
 # Text-Suche laeuft ueber die Search-a-licious-API (liefert nur Barcodes).
 OFF_SEARCH_API_URL = "https://search.openfoodfacts.org/search"
 
@@ -234,21 +233,16 @@ def _kcal_from_nutriments(nutriments: dict) -> float:
     return 0.0
 
 
-def search_product(barcode: str, user_agent: str = DEFAULT_USER_AGENT, use_staging: bool = False) -> Optional[Dict]:
-    """
-    Holt ein Produkt von Open Food Facts via Barcode.
+def search_product(barcode: str, user_agent: str = DEFAULT_USER_AGENT) -> Optional[Dict]:
+    """Holt ein Produkt von Open Food Facts via Barcode.
 
-    Returns:
-      dict mit Schluesseln:
-        name, brand, barcode,
-        kcal_per_100g, protein_per_100g, fat_per_100g, carbs_per_100g,
-        total_amount (optional), unit (optional), raw_quantity (raw field)
-      oder None, wenn nicht gefunden.
+    Liefert ein dict mit name, brand, barcode, den /100g-Naehrwerten und
+    optional total_amount/unit - oder None, wenn nichts gefunden wurde.
     """
     if not barcode:
         raise ValueError("barcode is required")
 
-    url = OFF_STAGING_API_URL.format(barcode=barcode) if use_staging else OFF_API_URL.format(barcode=barcode)
+    url = OFF_API_URL.format(barcode=barcode)
     req = Request(
         url,
         headers={
@@ -290,14 +284,12 @@ def search_product(barcode: str, user_agent: str = DEFAULT_USER_AGENT, use_stagi
         "sugar_per_100g": _float_value(nutriments.get("sugars_100g")),
         "total_amount": total_amount,
         "unit": unit,
-        "raw_quantity": product.get("quantity"),
-        "raw_product": product,  # optional: kompletten Roh-Datensatz für Debug/erweiterte Verwendung
     }
 
     return result
 
 
-def lookup_product(query: str, user_agent: str = DEFAULT_USER_AGENT, use_staging: bool = False) -> Optional[Dict]:
+def lookup_product(query: str, user_agent: str = DEFAULT_USER_AGENT) -> Optional[Dict]:
     """
     Nimmt entweder einen Barcode oder einen Produktnamen.
 
@@ -314,9 +306,9 @@ def lookup_product(query: str, user_agent: str = DEFAULT_USER_AGENT, use_staging
     query = stripped_query
 
     if query.isdigit():
-        return search_product(query, user_agent=user_agent, use_staging=use_staging)
+        return search_product(query, user_agent=user_agent)
 
-    products = search_products(query, user_agent=user_agent, use_staging=use_staging, limit=10)
+    products = search_products(query, user_agent=user_agent, limit=10)
     if not products:
         return ai_estimate(query)
 
@@ -327,7 +319,7 @@ def lookup_product(query: str, user_agent: str = DEFAULT_USER_AGENT, use_staging
     return ranked[0]
 
 
-def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_staging: bool = False, limit: int = 10) -> Optional[list]:
+def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, limit: int = 10) -> Optional[list]:
     """
     Sucht per Text bei Open Food Facts nach passenden Produkten.
 
@@ -367,7 +359,7 @@ def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, use_stagin
             continue
         seen.add(code)
         try:
-            full = search_product(code, user_agent=user_agent, use_staging=use_staging)
+            full = search_product(code, user_agent=user_agent)
         except Exception:
             logger.warning("OFF-Barcode-Detail fehlgeschlagen fuer %s", code, exc_info=True)
             full = None

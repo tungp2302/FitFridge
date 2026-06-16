@@ -15,10 +15,6 @@ DEFAULT_SETTINGS = {
 }
 
 
-def _row_to_dict(row):
-    return dict(row) if row is not None else None
-
-
 def _now():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -30,63 +26,6 @@ def _iso(dt: datetime) -> str:
 def _start_of_today() -> datetime:
     now = _now()
     return datetime(now.year, now.month, now.day)
-
-
-def ensure_schema() -> None:
-    db = get_db()
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS meal_tracker_settings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER UNIQUE NOT NULL,
-            daily_kcal REAL NOT NULL DEFAULT 2000,
-            protein_pct REAL NOT NULL DEFAULT 30,
-            carbs_pct REAL NOT NULL DEFAULT 40,
-            fat_pct REAL NOT NULL DEFAULT 30,
-            updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES user (id)
-        )
-        """
-    )
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS meal_tracker_entry (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            meal_name TEXT NOT NULL,
-            product_id INTEGER,
-            barcode TEXT,
-            amount REAL,
-            unit TEXT,
-            kcal REAL NOT NULL,
-            protein_g REAL NOT NULL DEFAULT 0,
-            carbs_g REAL NOT NULL DEFAULT 0,
-            fat_g REAL NOT NULL DEFAULT 0,
-            note TEXT,
-            section TEXT,
-            eaten_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES user (id)
-        )
-        """
-    )
-
-    existing_columns = {
-        row[1]
-        for row in db.execute("PRAGMA table_info(meal_tracker_entry)").fetchall()
-    }
-    for column_sql, column_name in (
-        ("ALTER TABLE meal_tracker_entry ADD COLUMN product_id INTEGER", "product_id"),
-        ("ALTER TABLE meal_tracker_entry ADD COLUMN barcode TEXT", "barcode"),
-        ("ALTER TABLE meal_tracker_entry ADD COLUMN amount REAL", "amount"),
-        ("ALTER TABLE meal_tracker_entry ADD COLUMN unit TEXT", "unit"),
-        ("ALTER TABLE meal_tracker_entry ADD COLUMN section TEXT", "section"),
-    ):
-        if column_name not in existing_columns:
-            try:
-                db.execute(column_sql)
-            except Exception:
-                pass
-    db.commit()
 
 
 def get_settings(user_id: int) -> Dict:
@@ -204,7 +143,7 @@ def get_recent_meals(user_id: int, days: int = 1) -> List[Dict]:
         "SELECT * FROM meal_tracker_entry WHERE user_id = ? AND eaten_at >= ? ORDER BY eaten_at DESC",
         (user_id, _iso(since)),
     ).fetchall()
-    return [_row_to_dict(row) for row in rows]
+    return [dict(row) for row in rows]
 
 
 def get_today_totals(user_id: int) -> Dict[str, float]:
@@ -220,7 +159,6 @@ def get_today_totals(user_id: int) -> Dict[str, float]:
 
 __all__ = [
     "DEFAULT_SETTINGS",
-    "ensure_schema",
     "get_settings",
     "save_settings",
     "delete_meal_entry",
