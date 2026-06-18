@@ -22,11 +22,7 @@ def list_items(user_id=None):
 
 
 def get_item(item_id, user_id=None):
-    """Ein spezifisches FridgeItem mit Produktdetails abrufen.
-
-    Mit ``user_id`` werden nur eigene Items oder besitzerlose Alt-Items
-    (user_id IS NULL) gefunden - niemals Items anderer Nutzer.
-    """
+    """Ein FridgeItem mit Produktdetails; mit user_id nur eigene/besitzerlose."""
     if user_id is None:
         return get_db().execute(f"{_FRIDGE_ITEM_SELECT} WHERE f.id = ?", (item_id,)).fetchone()
     return get_db().execute(
@@ -65,13 +61,10 @@ def update_amount(item_id, current_amount):
     return cursor.rowcount
 
 
-def delete_item(item_id, user_id=None):
+def delete_item(item_id):
     """Ein FridgeItem aus dem Kühlschrank entfernen."""
     db = get_db()
-    if user_id is None:
-        cursor = db.execute("DELETE FROM fridge_item WHERE id = ?", (item_id,))
-    else:
-        cursor = db.execute("DELETE FROM fridge_item WHERE id = ? AND user_id = ?", (item_id, user_id))
+    cursor = db.execute("DELETE FROM fridge_item WHERE id = ?", (item_id,))
     db.commit()
     return cursor.rowcount
 

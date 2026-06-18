@@ -19,9 +19,6 @@
       <label for="current_amount">Amount</label>
       <input name="current_amount" id="current_amount" value="{{ request.form.get('current_amount', post['current_amount']) }}">
 
-      <label for="unit">Unit</label>
-      <input name="unit" id="unit" value="{{ request.form.get('unit', post['unit']) }}">
-
       <fieldset>
         <legend>Total Nutrition (for {{ post['current_amount'] }} {{ post['unit'] }})</legend>
         <p>

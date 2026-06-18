@@ -13,7 +13,14 @@
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
       });
     };
-  </script>
+    // Einheitliches Oeffnen/Schliessen der Modale (is-open + aria-hidden).
+    window.setModalOpen = function (modal, open) {
+      if (!modal) return;
+      modal.classList.toggle('is-open', open);
+      modal.setAttribute('aria-hidden', open ? 'false' : 'true');
+    };
+</script>
+  <script defer src="{{ url_for('frontend.static', filename='barcode_scan.js') }}"></script>
 </head>
 <body>
   <div class="app-shell">

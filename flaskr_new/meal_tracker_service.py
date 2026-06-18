@@ -1,18 +1,14 @@
 """Business logic fuer den Meal Tracker."""
-from __future__ import annotations
-
 import json
 from typing import Dict
 
 from . import fridge_repo
-from .fridge_service import create_dashboard_item_from_data, list_dashboard_items, update_dashboard_item
+from .fridge_service import create_dashboard_item_from_data, update_dashboard_item
 from .meal_tracker_repo import (
     DEFAULT_SETTINGS,
     add_meal_entry,
     delete_meal_entry,
-    get_recent_meals,
     get_settings,
-    get_today_totals,
     save_settings,
     update_meal_entry_amount,
 )
@@ -59,7 +55,7 @@ def build_daily_summary(settings: Dict) -> Dict:
     return {"targets": targets}
 
 
-def log_meal_from_product(user_id: int, product: Dict, amount: float, unit: str, fridge_item_id: int | None = None, section: str | None = None):
+def log_meal_from_product(user_id: int, product: Dict, amount: float, unit: str, fridge_item_id: int | None = None):
     """Log a meal entry and optionally deduct the same amount from the fridge."""
     nutrition = calculate_for_amount(product, amount, unit)
     meal_name = product.get("name") or "Meal"
@@ -74,8 +70,6 @@ def log_meal_from_product(user_id: int, product: Dict, amount: float, unit: str,
         protein_g=nutrition["protein"],
         carbs_g=nutrition["carbs"],
         fat_g=nutrition["fat"],
-        note="meal tracker meal",
-        section=section,
     )
 
     deducted = False
@@ -98,12 +92,6 @@ def log_meal_from_product(user_id: int, product: Dict, amount: float, unit: str,
         "nutrition": nutrition,
         "deducted": deducted,
     }
-
-
-# ---------------------------------------------------------------------------
-# Action-Handler fuer die /meal-tracker Route.
-# Jeder Handler kapselt eine POST-Action und gibt die Flash-Nachricht zurueck.
-# ---------------------------------------------------------------------------
 
 
 def _safe_float(value, default: float) -> float:
@@ -190,7 +178,6 @@ def track_meals_from_payload(user_id: int, selected_payload_raw: str) -> str:
             amount,
             unit,
             fridge_item_id=None,
-            section=None,
         )
         remaining_amount = _safe_float(item.get("remaining_amount"), 0.0)
         if remaining_amount > 0:
@@ -224,7 +211,7 @@ def track_meal_from_form(user_id: int, form) -> str:
         return "Bitte ein Fridge-Item auswaehlen."
 
     fridge_item = next(
-        (item for item in list_dashboard_items(user_id) if str(item["id"]) == str(fridge_item_id)),
+        (item for item in fridge_repo.list_items(user_id) if str(item["id"]) == str(fridge_item_id)),
         None,
     )
     if fridge_item is None:
@@ -247,28 +234,8 @@ def track_meal_from_form(user_id: int, form) -> str:
         amount,
         unit,
         fridge_item_id=fridge_item["id"],
-        section=None,
     )
     message = f"{selected_product['name']} mit {amount} {unit} gespeichert."
     if result["deducted"]:
         message += " Bestand im Kuehlschrank wurde reduziert."
     return message
-
-
-__all__ = [
-    "add_meal_entry",
-    "delete_meal_entry",
-    "build_daily_summary",
-    "log_meal_from_product",
-    "normalize_macro_percentages",
-    "calculate_macro_targets",
-    "get_recent_meals",
-    "get_settings",
-    "get_today_totals",
-    "save_settings",
-    "save_settings_action",
-    "delete_meal_action",
-    "edit_meal_amount_action",
-    "track_meals_from_payload",
-    "track_meal_from_form",
-]

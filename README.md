@@ -1,92 +1,141 @@
-Projekt FitFrdge für Strukturierte programmierung SoSe26 
-https://flask.palletsprojects.com/en/stable/installation/
-Run
+# FitFridge
 
-flask --app flaskr run --debug
-for testing
+Projekt für Software Engineering / ASAAI SoSe26.
 
-$ flask --app flaskr init-db
-Initialize the database
+Eine Flask-App zum Tracken von Kühlschrank-Inhalten und Mahlzeiten, mit
+optionalen lokalen LLM-Funktionen (KI-Nährwertschätzung + Freestyle-
+Rezeptplaner) über Ollama.
 
-//
-Tutorial zum testen:
-1. Im Projektordner das Terminal öffnen. (ist schon)
-Umgebung erstellen:  python3 -m venv .venv
-Umgebung aktivieren: source .venv/bin/activate   (Windows: .\.venv\Scripts\Activate.ps1)
-Dependencies installieren: pip install -r requirements.txt
-2. Befehle ausführen
-Datenbank initialisieren (optional, fuer kompletten Reset): flask --app flaskr_new init-db
-   Hinweis: Die App legt fehlende Tabellen beim Start automatisch an.
-dev Server starten: flask --app flaskr_new run --debug
+---
 
-3. Im browser öffnen
-http://127.0.0.1:5000
+## 1. App starten
 
-//
+### Windows (PowerShell)
 
+```powershell
+# im Projektordner
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 
-For tests nachdem in der Umgebung:
-1: dependencies: pip install -r requirements-dev.txt
-   (enthaelt requirements.txt + pytest)
-2: Tests:
-# single test file
-python -m pytest tests/test_api_db/test_api_db.py -q
+flask --app flaskr_new run --debug
+```
 
-# all tests
-python -m pytest -q
+### macOS / Linux (bash/zsh)
 
+```bash
+# im Projektordner
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 
-Flask import problem in VS Code:
-Flask not available in the active interpreter.
-Quick fix:
-    create a virtual environment: python -m venv .venv
-    .\.venv\Scripts\Activate.ps1
-    pip install flask click werkzeug pytest requests
-    In VS Code select the .venv interpreter:
-        Command Palette -> Python: Select Interpreter -> .venv
-    Reload Pylance:
-        Command Palette -> Developer: Reload Window
+flask --app flaskr_new run --debug
+```
 
-Ollama local setup for kept AI features:
-1. Install Ollama from https://ollama.com and start the local service.
-2. Pull a model, for example:
-    ollama pull qwen3.5:latest
-    ollama pull qwen3:4b
-    ollama pull gemma3:1b
-3. Set environment variables before starting Flask:
-    export OLLAMA_MODEL=qwen3.5:latest
-    export OLLAMA_BASE_URL=http://127.0.0.1:11434
-4. Start the app:
-    flask --app flaskr_new run --debug
-5. Open:
-    Add Food with AI estimate:
-        http://127.0.0.1:5000/fridge/add
-    Freestyle recipe planner:
-        http://127.0.0.1:5000/asaai/ui/planner
+Dann im Browser öffnen: http://127.0.0.1:5000
 
-Model choice:
-    Desktop default: qwen3.5:latest
-    Laptop slower: qwen3:4b
-    Laptop fast: gemma3:1b
+Die App legt fehlende Datenbank-Tabellen beim Start automatisch an, ein
+Init-Schritt ist für den normalen Betrieb nicht nötig.
 
-    Browser choice:
-        http://127.0.0.1:5000/settings
+---
 
-    Terminal / env fallback before starting Flask:
-        export OLLAMA_MODEL=qwen3:4b
-        export OLLAMA_MODEL=gemma3:1b
+## 2. Demo-Konto
 
-Ollama smoke test:
-     curl http://127.0.0.1:11434/api/tags
+Legt einen wiederholbaren Kühlschrank mit Beispielprodukten und
+Mahlzeiten-Einträgen an:
 
-FitFridge keeps only these local Ollama features for the current project scope:
-    - Add Food with AI estimate
-    - Freestyle recipe in the recipe planner
+```bash
+python scripts/seed_demo.py
+```
 
-The active recipe LLM code is in:
-    flaskr_new/asaai/freestyle_recipe.py
+Login: **demo / demo**
 
-Demo data:
-    python scripts/seed_demo.py
-    Login: demo / demo
-    Opens a repeatable fridge with sample products, meal entries, and forecast data.
+---
+
+## 3. Datenbank zurücksetzen (optional)
+
+Löscht alle Daten und legt alle Tabellen neu an:
+
+```bash
+flask --app flaskr_new init-db
+```
+
+---
+
+## 4. Ollama (lokale LLM-Funktionen)
+
+Diese beiden Funktionen brauchen eine laufende Ollama-Instanz:
+
+- **Lebensmittel hinzufügen → KI-Schätzung** — http://127.0.0.1:5000/fridge/add
+- **Freestyle-Rezeptplaner** — http://127.0.0.1:5000/asaai/ui/planner
+
+### Installieren & Modell laden
+
+1. Ollama von https://ollama.com installieren (startet einen lokalen Dienst
+   auf `127.0.0.1:11434`).
+2. Mindestens ein Modell laden:
+
+   ```bash
+   ollama pull qwen3.5:latest   # Desktop-Standard
+   ollama pull qwen3:4b         # Laptop, langsamer
+   ollama pull gemma3:1b        # Laptop, schnell
+   ```
+
+3. Smoke-Test, ob der Dienst antwortet:
+
+   ```bash
+   curl http://127.0.0.1:11434/api/tags
+   ```
+
+### Flask auf Ollama zeigen lassen (optional — Standardwerte passen direkt)
+
+Die App nutzt standardmäßig `http://127.0.0.1:11434` und `qwen3.5:latest`
+und fällt sonst auf das erste lokal installierte Modell zurück. Mit
+Umgebungsvariablen vor dem Start von Flask überschreiben:
+
+**Windows (PowerShell)**
+
+```powershell
+$env:OLLAMA_BASE_URL = "http://127.0.0.1:11434"
+$env:OLLAMA_MODEL    = "qwen3:4b"
+flask --app flaskr_new run --debug
+```
+
+**macOS / Linux**
+
+```bash
+export OLLAMA_BASE_URL=http://127.0.0.1:11434
+export OLLAMA_MODEL=qwen3:4b
+flask --app flaskr_new run --debug
+```
+
+### Modell im Browser wählen
+
+http://127.0.0.1:5000/settings — Modell auswählen und mit **Test LLM**
+prüfen, ob es antwortet. Auswahl: `qwen3.5:latest` (Desktop), `qwen3:4b`
+(Laptop), `gemma3:1b` (schnell).
+
+Der aktive Rezept-LLM-Code liegt in `flaskr_new/asaai/freestyle_recipe.py`.
+
+---
+
+## 5. Tests
+
+```bash
+pip install -r requirements-dev.txt   # requirements.txt + pytest
+
+python -m pytest -q                                   # alle Tests
+python -m pytest tests/test_api_db/test_api_db.py -q  # einzelne Datei
+```
+
+---
+
+## Fehlerbehebung
+
+**VS Code: "Flask not available in the active interpreter"** — den
+`.venv`-Interpreter auswählen: Command Palette → *Python: Select
+Interpreter* → `.venv` wählen, danach *Developer: Reload Window*.
+
+**KI-Funktionen hängen oder geben Fehler** — prüfen, ob Ollama läuft
+(`curl http://127.0.0.1:11434/api/tags`) und ob das gewählte Modell geladen
+ist (`ollama list`).

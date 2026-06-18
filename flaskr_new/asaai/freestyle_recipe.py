@@ -1,11 +1,4 @@
-"""Freestyle recipe generation from fridge items.
-
-This module stays intentionally small: it builds the LLM prompt, calls Ollama,
-and delegates parsing, validation, macro calculation, and warning responses to
-``freestyle_recipe_support``.
-"""
-from __future__ import annotations
-
+"""Rezeptvorschlaege aus Kuehlschrank-Zutaten via Ollama."""
 from .freestyle_recipe_support import (
     empty_fridge_recipe,
     has_term,
@@ -27,8 +20,8 @@ from .ollama_client import generate_from_ollama, resolve_ollama_model
 
 DEFAULT_PROFILE = {"num_predict": 1200, "max_items": None}
 MODEL_PROFILES = {
-    "qwen3:4b": {"num_predict": 520, "max_items": 7},
-    "gemma3:1b": {"num_predict": 560, "max_items": 5},
+    "qwen3:4b": {"num_predict": 720, "max_items": 7},
+    "gemma3:1b": {"num_predict": 760, "max_items": 5},
 }
 
 _SCHEMA = (
@@ -139,6 +132,10 @@ def build_prompt(fridge_items, daily_goal=None, recipe_category=None, retry_reas
     "GERICHTSART: "
     "Fuer Hauptspeise oder Abendessen bevorzuge herzhafte Gerichte. "
     "Diese sollten typischerweise Protein, Staerke und/oder Gemuese enthalten, sofern passende Zutaten vorhanden sind. "
+    "Waehle genau EINE Hauptproteinquelle und genau EINE Haupt-Staerkebeilage pro Gericht. "
+    "Kombiniere niemals mehrere Fleisch- oder Fischsorten (z.B. nicht Rind und Haehnchen zusammen) "
+    "und niemals mehrere Staerkebeilagen (z.B. nicht Spaghetti und Kartoffeln, nicht Reis und Nudeln zusammen). "
+    "Nutze nicht alle vorhandenen Zutaten, nur weil sie da sind; lass ueberzaehlige Protein- oder Staerkequellen weg. "
     "Brot, Broetchen, Buns, Wraps, Reis, Kartoffeln, Nudeln und aehnliche Beilagen zaehlen als passende Staerke. "
     "Wenn solche Staerken fuer ein herzhaftes Gericht vorhanden sind, nutze sie lieber als suesse Zutaten. "
     "Keine Fruehstuecks-, Dessert-, Shake-, Porridge- oder suesse Bowl-Ideen, ausser die Rezeptart verlangt dies ausdruecklich. "
@@ -189,7 +186,11 @@ def build_prompt(fridge_items, daily_goal=None, recipe_category=None, retry_reas
     "AUSGABE: "
     "why_this_works soll auf Deutsch in genau einem kurzen Satz erklaeren, warum Geschmack, Textur und Zubereitung zusammenpassen. "
     "Kein Marketingtext und keine reine Makro-Begruendung. "
-    "Schreibe genau 3 kurze instructions, keine vierte oder weitere Schritte. "
+    "Schreibe so viele kurze instructions, wie das Gericht wirklich braucht: einfache Gerichte 3-4 Schritte, "
+    "ein durchschnittliches Hauptgericht 5-8 klare Schritte. "
+    "Jeder Schritt ist genau eine konkrete Koch-Handlung in der richtigen Reihenfolge "
+    "(z.B. vorbereiten/schneiden, anbraten, koechen lassen, wuerzen, anrichten); "
+    "fasse nicht mehrere Arbeitsschritte in einem Satz zusammen und erfinde keine Fuellschritte. "
     "Instructions duerfen keine Makroberechnung, Kalorienzeile, Anpassungsnotiz oder Erklaerung enthalten. "
     "Jedes Objekt muss vollstaendig valides JSON sein. "
     "Keine Kommentare. "
@@ -204,9 +205,6 @@ def _run(fridge_items, daily_goal, recipe_category, model, base_url, timeout, co
     profile = _profile(model)
     prompt_items = limit_items(fridge_items, profile["max_items"])
     temperature = 0.7 if count > 1 else 0.15
-    # Ein Versuch reicht selten fuer mehrere strikt makro-konforme Rezepte, also
-    # bei Bedarf mehrfach nachfordern. Fuer ein Einzelrezept bleibt es bei einem
-    # Versuch plus einer Wiederholung wie bisher.
     max_attempts = 2 if count <= 1 else count + 1
 
     def ask(retry_reason=None, extra_exclude=None):
@@ -244,9 +242,7 @@ def _run(fridge_items, daily_goal, recipe_category, model, base_url, timeout, co
         daily_goal=daily_goal,
     )
 
-    # Reicht das nicht fuer ``count`` Rezepte, mehrfach nachfordern und dabei die
-    # bereits gefundenen Titel ausschliessen, damit jeder Versuch andere Gerichte
-    # liefert statt dieselben zu wiederholen.
+    # fehlt was, nachfordern und gefundene Titel ausschliessen
     attempt = 1
     while len(recipes) < count and attempt < max_attempts:
         attempt += 1

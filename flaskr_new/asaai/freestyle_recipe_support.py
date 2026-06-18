@@ -1,5 +1,4 @@
-"""Small deterministic helper layer for freestyle recipes."""
-from __future__ import annotations
+"""Parsing, Validierung und Makro-Berechnung fuer Freestyle-Rezepte."""
 import copy
 import json
 import re
@@ -19,6 +18,23 @@ PROTEIN = ("ei", "egg", "eier", "tofu", "tempeh", "huhn", "chicken", "rind", "be
 DAIRY = ("milch", "milk", "joghurt", "yogurt", "quark", "skyr")
 FOOD = set(SWEET + VEG + STARCH + PROTEIN + DAIRY)
 SAVORY = VEG + STARCH + PROTEIN
+# erste passende Gruppe gewinnt; Eier/Kaese/Joghurt sind kein Hauptprotein
+MAIN_PROTEIN_GROUPS = (
+    ("fisch", ("fisch", "fish", "lachs", "salmon", "thunfisch", "tuna", "forelle", "garnele", "shrimp")),
+    ("gefluegel", ("huhn", "chicken", "haehnchen", "hähnchen", "pute", "turkey", "gefluegel", "geflügel")),
+    ("rind", ("rind", "beef", "steak")),
+    ("schwein", ("schwein", "pork", "schinken", "speck", "bacon", "kassler")),
+    ("lamm", ("lamm", "lamb")),
+    ("hack", ("hack", "hackfleisch", "mince")),
+    ("tofu", ("tofu", "tempeh", "seitan")),
+)
+MAIN_STARCH_GROUPS = (
+    ("pasta", ("nudel", "noodle", "pasta", "spaghetti", "makkaroni", "penne", "fusilli", "tagliatelle")),
+    ("reis", ("reis", "rice")),
+    ("kartoffel", ("kartoffel", "potato")),
+    ("brot", ("brot", "bread", "broetchen", "brötchen", "bun", "buns", "semmel", "wrap", "tortilla", "toast")),
+    ("getreide", ("bulgur", "couscous", "quinoa")),
+)
 SAVORY_CATS = ("hauptspeise", "abendessen", "mittag", "lunch", "dinner", "main")
 SWEET_DISH = ("porridge", "haferbrei", "muesli", "smoothie", "shake", "joghurtbowl", "yogurt bowl", "dessert", "nachspeise", "pfannkuchen", "pancake")
 SUPP_BLOCK = VEG + ("reis", "rice", "kartoffel", "potato", "nudel", "noodle", "pasta", "brot", "bread", "huhn", "chicken", "haehnchen", "hähnchen", "rind", "beef", "steak", "fisch", "fish", "lachs", "salmon", "tofu", "tempeh", "pfanne", "brat", "auflauf", "curry", "suppe", "salat", "gemuese", "gemüse")
@@ -66,6 +82,8 @@ def _num(value):
 def _grams(amount, name):
     amount = _num(amount)
     return f"{amount}g {name}" if amount else name
+def _amount_g(raw):
+    return safe_float(raw.get("amount_g", raw.get("grams", raw.get("g"))))
 def limit_items(fridge_items, max_items):
     items = [item for item in fridge_items if (item.get("name") or "").strip()]
     return items[:max_items] if max_items else items
@@ -107,7 +125,7 @@ def structured_fridge_ingredients(recipe, fridge_items):
     for raw in _raw_fridge(recipe):
         if not isinstance(raw, dict):
             continue
-        amount = safe_float(raw.get("amount_g", raw.get("grams", raw.get("g"))))
+        amount = _amount_g(raw)
         try:
             item = by_id[int(raw.get("id", raw.get("fridge_item_id")))]
         except (KeyError, TypeError, ValueError):
@@ -125,7 +143,7 @@ def _structured_pantry(recipe):
         name = str(raw.get("name") or raw.get("label") or "").strip()
         if not name:
             continue
-        amount = safe_float(raw.get("amount_g", raw.get("grams", raw.get("g"))))
+        amount = _amount_g(raw)
         label = str(raw.get("label") or "").strip() or (_grams(amount, name) if amount else name)
         if normalize(name) not in normalize(label):
             label = f"{name} {label}" if normalize(label).startswith(("zum ", "nach ")) else f"{label} {name}"
@@ -217,10 +235,22 @@ def _legacy_names_ok(recipe, fridge_items):
         return True
     text = _ingredient_text(recipe)
     return all(_mentions_item(text, name) for name in used_fridge_names(recipe, fridge_items))
+def _distinct_main_groups(used_names, groups):
+    found = set()
+    for name in used_names:
+        for label, terms in groups:
+            if has_term(name, terms):
+                found.add(label)
+                break
+    return found
 def _recipe_conflicts(recipe, category, used_names):
     text = _ingredient_text(recipe)
     title = normalize(recipe.get("title") or "")
     full_text = " ".join([title, text, " ".join(normalize(name) for name in used_names)])
+    if len(_distinct_main_groups(used_names, MAIN_PROTEIN_GROUPS)) > 1:
+        return True
+    if len(_distinct_main_groups(used_names, MAIN_STARCH_GROUPS)) > 1:
+        return True
     if any(has_term(name, VEG) for name in used_names) and any(_sweetish(name) for name in used_names):
         return True
     if any(is_supplement(name) for name in used_names) and (has_term(full_text, SUPP_BLOCK) or not has_term(full_text, SUPP_OK)):
@@ -274,47 +304,13 @@ def _macros_fit(recipe, fridge_items, daily_goal):
     if not has_macro_targets(daily_goal):
         return True
     return macros_within_targets(macros, daily_goal)
-def _repair_minor_oil_overage(recipe, fridge_items, daily_goal):
-    if not has_macro_targets(daily_goal):
-        return recipe
-    target_kcal = safe_float(daily_goal.get("kcal"))
-    if not target_kcal:
-        return recipe
-    macros = computed_macros(recipe, fridge_items)
-    if not macros:
-        return recipe
-    overage = macros["kcal"] - target_kcal
-    if overage <= 0 or overage > 45:
-        return recipe
-    for index, item in enumerate(recipe.get("pantry_ingredients") or []):
-        if not isinstance(item, dict):
-            continue
-        name = str(item.get("name") or "")
-        if "oil" not in normalize(name) and "oel" not in normalize(name):
-            continue
-        amount = safe_float(item.get("amount_g", item.get("grams", item.get("g"))))
-        if not amount:
-            continue
-        candidate = copy.deepcopy(recipe)
-        reduction = min(amount, overage / 9.0 + 0.5)
-        new_amount = max(0.0, round(amount - reduction, 1))
-        candidate["pantry_ingredients"][index]["amount_g"] = new_amount
-        if new_amount:
-            candidate["pantry_ingredients"][index]["label"] = _grams(new_amount, name)
-        else:
-            candidate["pantry_ingredients"].pop(index)
-        if macros_within_targets(computed_macros(candidate, fridge_items), daily_goal):
-            return candidate
-    return recipe
 def _scale_fridge_amounts(recipe, factor):
-    # Skaliert alle Kuehlschrank-Mengen mit einem Faktor (groessere/kleinere
-    # Portion). Labels werden geleert, damit sie aus der neuen Menge neu
-    # aufgebaut werden.
+    # Mengen mit Faktor skalieren; Labels leeren -> aus neuer Menge neu aufbauen
     scaled = copy.deepcopy(recipe)
     for raw in _raw_fridge(scaled):
         if not isinstance(raw, dict):
             continue
-        amount = safe_float(raw.get("amount_g", raw.get("grams", raw.get("g"))))
+        amount = _amount_g(raw)
         if amount is None:
             continue
         raw["amount_g"] = round(amount * factor, 1)
@@ -323,10 +319,7 @@ def _scale_fridge_amounts(recipe, factor):
         raw["label"] = ""
     return scaled
 def _repair_macros(recipe, fridge_items, daily_goal):
-    # Liegt ein Rezept ausserhalb der Zielwerte, die Portion proportional auf das
-    # kcal-Ziel skalieren (fehlende kcal hinzufuegen bzw. ueberschuessige
-    # entfernen). Nur uebernehmen, wenn danach alle Zielwerte stimmen; sonst
-    # bleibt das Rezept unveraendert und wird wie bisher verworfen.
+    # ausserhalb der Ziele: Portion aufs kcal-Ziel skalieren, nur wenn danach alles passt
     if not has_macro_targets(daily_goal):
         return recipe
     macros = computed_macros(recipe, fridge_items)
@@ -391,7 +384,7 @@ def clean_recipe(recipe, fridge_items):
         "title": str(recipe.get("title")).strip(),
         "why_this_works": str(recipe.get("why_this_works") or recipe.get("why") or "").strip(),
         "ingredients": ingredients,
-        "instructions": string_list(recipe.get("instructions"))[:3],
+        "instructions": string_list(recipe.get("instructions"))[:8],
         "estimated_macros": computed or {key: macros.get(key, 0) for key in ("kcal", "protein", "fat", "carbs")},
         "macro_source": "computed_from_fridge_amounts" if computed else "llm_estimate",
         "used_fridge_items": used_fridge_names(recipe, fridge_items),
@@ -400,7 +393,6 @@ def clean_recipe(recipe, fridge_items):
 def valid_recipes(response, fridge_items, count, exclude=None, recipe_category=None, daily_goal=None):
     excluded, out, seen = {normalize(title) for title in (exclude or [])}, [], set()
     for raw in extract_recipes(response):
-        raw = _repair_minor_oil_overage(raw, fridge_items, daily_goal)
         raw = _repair_macros(raw, fridge_items, daily_goal)
         if not _is_valid(raw, fridge_items, recipe_category, daily_goal):
             continue
@@ -424,9 +416,14 @@ def validation_feedback(response, fridge_items, daily_goal=None):
             macro_text = ", ".join(f"{key}={macros.get(key, 0)}" for key in ("kcal", "protein", "fat", "carbs"))
             return f"Berechnete Naehrwerte aus amount_g waren {macro_text}; erlaubt ist {range_text}."
     return ""
+def _stub_recipe(title, message, instructions, warning=False):
+    stub = {"title": title, "why_this_works": message, "ingredients": [], "instructions": instructions, "estimated_macros": {"kcal": 0, "protein": 0, "fat": 0, "carbs": 0}, "macro_source": "none", "used_fridge_items": [], "pantry_assumptions": []}
+    if warning:
+        stub["warning"] = True
+    return stub
 def warning_recipe(title, message):
-    return {"title": title, "why_this_works": message, "ingredients": [], "instructions": ["Pruefe, ob Ollama laeuft und das gewaehlte Modell installiert ist.", "Waehle in den Einstellungen bei Bedarf ein anderes Modell.", "Starte die Rezeptgenerierung danach erneut."], "estimated_macros": {"kcal": 0, "protein": 0, "fat": 0, "carbs": 0}, "macro_source": "none", "used_fridge_items": [], "pantry_assumptions": [], "warning": True}
+    return _stub_recipe(title, message, ["Pruefe, ob Ollama laeuft und das gewaehlte Modell installiert ist.", "Waehle in den Einstellungen bei Bedarf ein anderes Modell.", "Starte die Rezeptgenerierung danach erneut."], warning=True)
 def invalid_recipe_warning(title, message):
-    return {"title": title, "why_this_works": message, "ingredients": [], "instructions": [], "estimated_macros": {"kcal": 0, "protein": 0, "fat": 0, "carbs": 0}, "macro_source": "none", "used_fridge_items": [], "pantry_assumptions": [], "warning": True}
+    return _stub_recipe(title, message, [], warning=True)
 def empty_fridge_recipe():
-    return {"title": "Keine Zutaten verfügbar", "why_this_works": "Dein Kühlschrank ist leer.", "ingredients": [], "instructions": ["Füge zuerst Lebensmittel zu deinem Kühlschrank hinzu."], "estimated_macros": {"kcal": 0, "protein": 0, "fat": 0, "carbs": 0}, "macro_source": "none", "used_fridge_items": [], "pantry_assumptions": []}
+    return _stub_recipe("Keine Zutaten verfügbar", "Dein Kühlschrank ist leer.", ["Füge zuerst Lebensmittel zu deinem Kühlschrank hinzu."])

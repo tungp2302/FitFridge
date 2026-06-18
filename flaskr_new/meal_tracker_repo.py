@@ -1,6 +1,4 @@
 """Repository fuer den Meal Tracker."""
-from __future__ import annotations
-
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
@@ -106,16 +104,14 @@ def add_meal_entry(
     protein_g: float = 0.0,
     carbs_g: float = 0.0,
     fat_g: float = 0.0,
-    note: Optional[str] = None,
     product_id: Optional[int] = None,
     barcode: Optional[str] = None,
     amount: Optional[float] = None,
     unit: Optional[str] = None,
-    section: Optional[str] = None,
 ) -> int:
     db = get_db()
     cur = db.execute(
-        "INSERT INTO meal_tracker_entry (user_id, meal_name, product_id, barcode, amount, unit, kcal, protein_g, carbs_g, fat_g, note, section, eaten_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO meal_tracker_entry (user_id, meal_name, product_id, barcode, amount, unit, kcal, protein_g, carbs_g, fat_g, eaten_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             user_id,
             meal_name,
@@ -127,8 +123,6 @@ def add_meal_entry(
             float(protein_g),
             float(carbs_g),
             float(fat_g),
-            note,
-            section,
             _iso(_now()),
         ),
     )
@@ -146,24 +140,45 @@ def get_recent_meals(user_id: int, days: int = 1) -> List[Dict]:
     return [dict(row) for row in rows]
 
 
-def get_today_totals(user_id: int) -> Dict[str, float]:
-    meals = get_recent_meals(user_id, days=1)
-    totals = {"kcal": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0}
+def get_tracked_days_in_month(user_id: int, year: int, month: int) -> List[int]:
+    """Tage des Monats, an denen mindestens eine Mahlzeit getrackt wurde."""
+    db = get_db()
+    start = f"{year:04d}-{month:02d}-01 00:00:00"
+    if month == 12:
+        end = f"{year + 1:04d}-01-01 00:00:00"
+    else:
+        end = f"{year:04d}-{month + 1:02d}-01 00:00:00"
+    rows = db.execute(
+        "SELECT DISTINCT strftime('%d', eaten_at) AS day FROM meal_tracker_entry "
+        "WHERE user_id = ? AND eaten_at >= ? AND eaten_at < ?",
+        (user_id, start, end),
+    ).fetchall()
+    return [int(row["day"]) for row in rows]
+
+
+def get_meals_for_date(user_id: int, date_str: str) -> List[Dict]:
+    """Alle Mahlzeiten eines bestimmten Tages (date_str im Format YYYY-MM-DD)."""
+    db = get_db()
+    start = f"{date_str} 00:00:00"
+    end = (datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d 00:00:00")
+    rows = db.execute(
+        "SELECT * FROM meal_tracker_entry WHERE user_id = ? AND eaten_at >= ? AND eaten_at < ? ORDER BY eaten_at ASC",
+        (user_id, start, end),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+_MEAL_MACRO_KEYS = ("kcal", "protein_g", "carbs_g", "fat_g")
+
+
+def sum_meal_macros(meals: List[Dict]) -> Dict[str, float]:
+    """Summiert kcal + Makros (in g) ueber Mahlzeiten und rundet auf 1."""
+    totals = {key: 0.0 for key in _MEAL_MACRO_KEYS}
     for meal in meals:
-        totals["kcal"] += float(meal.get("kcal", 0.0))
-        totals["protein_g"] += float(meal.get("protein_g", 0.0))
-        totals["carbs_g"] += float(meal.get("carbs_g", 0.0))
-        totals["fat_g"] += float(meal.get("fat_g", 0.0))
+        for key in _MEAL_MACRO_KEYS:
+            totals[key] += float(meal.get(key, 0.0) or 0.0)
     return {key: round(value, 1) for key, value in totals.items()}
 
 
-__all__ = [
-    "DEFAULT_SETTINGS",
-    "get_settings",
-    "save_settings",
-    "delete_meal_entry",
-    "update_meal_entry_amount",
-    "add_meal_entry",
-    "get_recent_meals",
-    "get_today_totals",
-]
+def get_today_totals(user_id: int) -> Dict[str, float]:
+    return sum_meal_macros(get_recent_meals(user_id, days=1))

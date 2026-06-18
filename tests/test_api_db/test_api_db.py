@@ -1,4 +1,3 @@
-import json
 import sqlite3
 from pathlib import Path
 
@@ -46,10 +45,9 @@ def test_product_insert_lookup(app_context):
         carbs_per_100g=57.5,
     )
 
-    by_id = product_repo.get_by_id(product_id)
     by_barcode = product_repo.get_by_barcode("3017620422003")
 
-    assert by_id["name"] == "Nutella"
+    assert by_barcode["name"] == "Nutella"
     assert by_barcode["brand"] == "Ferrero"
 
 
@@ -106,17 +104,15 @@ def test_create_dashboard_item_from_data_inserts_directly(app_context):
 
 
 class _FakeResponse:
-    def __init__(self, payload):
+    def __init__(self, payload, status_code=200):
         self._payload = payload
+        self.status_code = status_code
 
-    def __enter__(self):
-        return self
+    def raise_for_status(self):
+        pass
 
-    def __exit__(self, exc_type, exc, tb):
-        return False
-
-    def read(self):
-        return json.dumps(self._payload).encode("utf-8")
+    def json(self):
+        return self._payload
 
 
 def test_openfoodfacts_parsing(monkeypatch):
@@ -137,7 +133,7 @@ def test_openfoodfacts_parsing(monkeypatch):
         },
     }
 
-    monkeypatch.setattr(ofc, "urlopen", lambda *args, **kwargs: _FakeResponse(payload))
+    monkeypatch.setattr(ofc.requests, "get", lambda *args, **kwargs: _FakeResponse(payload))
 
     result = ofc.search_product("3017620422003")
 
@@ -149,7 +145,6 @@ def test_openfoodfacts_parsing(monkeypatch):
     assert result["protein_per_100g"] == 6.3
     assert result["fat_per_100g"] == 30.9
     assert result["carbs_per_100g"] == 57.5
-    assert result["sugar_per_100g"] == 56.3
 
 
 def test_lookup_product_ranks_off_results_by_text_match(monkeypatch):

@@ -5,14 +5,6 @@ from .openfoodfacts_client import lookup_product
 from flaskr_new.nutrition_service import calculate_for_amount
 
 
-def list_dashboard_items(user_id=None):
-    return fridge_repo.list_items(user_id=user_id)
-
-
-def get_dashboard_item(item_id, user_id=None):
-    return fridge_repo.get_item(item_id, user_id=user_id)
-
-
 def _resolve_or_create_product(product_data, fallback_barcode):
     """Find an existing product by barcode or create it from the payload."""
     barcode = product_data.get("barcode") or ""
@@ -58,15 +50,9 @@ def create_dashboard_item_from_data(product_data, author_id=None):
     return _add_item_from_product_data(product_data, fallback_barcode=fallback_barcode, author_id=author_id)
 
 
-def _get_item_for_user(item_id, user_id=None):
-    """Mit ``user_id`` nur eigene oder besitzerlose Items finden (IDOR-Schutz)."""
-    if user_id is None:
-        return fridge_repo.get_item(item_id)
-    return fridge_repo.get_item(item_id, user_id=user_id)
-
 def update_dashboard_item(item_id, current_amount=None, name=None, brand=None, user_id=None):
     """Menge und optional Name/Marke eines Fridge-Items aktualisieren."""
-    current_item = _get_item_for_user(item_id, user_id=user_id)
+    current_item = fridge_repo.get_item(item_id, user_id=user_id)
     if current_item is None:
         raise ValueError("No fridge item found for id")
     current_item = dict(current_item)
@@ -85,19 +71,9 @@ def update_dashboard_item(item_id, current_amount=None, name=None, brand=None, u
     return updated
 
 
-def delete_dashboard_item(item_id):
-    return fridge_repo.delete_item(item_id)
-
-
 def calculate_total_nutrition(item):
     """Naehrwerte fuer die aktuelle Menge, als total_*-Keys fuer die Routen."""
-    product_nutrients = {
-        "kcal_per_100g": item.get("kcal_per_100g", 0.0),
-        "protein_per_100g": item.get("protein_per_100g", 0.0),
-        "fat_per_100g": item.get("fat_per_100g", 0.0),
-        "carbs_per_100g": item.get("carbs_per_100g", 0.0),
-    }
-    calc = calculate_for_amount(product_nutrients, item.get("current_amount"), item.get("unit"))
+    calc = calculate_for_amount(item, item.get("current_amount"), item.get("unit"))
     return {
         "total_kcal": calc.get("kcal", 0.0),
         "total_protein": calc.get("protein", 0.0),

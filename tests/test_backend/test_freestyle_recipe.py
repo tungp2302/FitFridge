@@ -137,6 +137,32 @@ def test_incoherent_combination_is_rejected(monkeypatch):
     assert recipe["title"] == "Kein valides Rezept"
 
 
+def test_multiple_protein_and_starch_sources_are_rejected(monkeypatch):
+    # Ein Gericht soll genau eine Hauptproteinquelle und eine Staerkebeilage haben.
+    # Hier stapelt das Modell Rind + Haehnchen und Spaghetti + Kartoffeln -> ablehnen.
+    fridge = [
+        {"name": "Rinderhackfleisch", "amount": 400, "kcal_per_100g": 250, "protein_per_100g": 26, "fat_per_100g": 17, "carbs_per_100g": 0},
+        {"name": "Spaghetti", "amount": 500, "kcal_per_100g": 350, "protein_per_100g": 12, "fat_per_100g": 1.5, "carbs_per_100g": 72},
+        {"name": "Haehnchenbrust", "amount": 300, "kcal_per_100g": 165, "protein_per_100g": 31, "fat_per_100g": 3.6, "carbs_per_100g": 0},
+        {"name": "Kartoffeln", "amount": 500, "kcal_per_100g": 77, "protein_per_100g": 2, "fat_per_100g": 0.1, "carbs_per_100g": 17},
+    ]
+    response = make_recipe(
+        "Rinderhack-Spaghetti mit Tomatensosse",
+        [
+            {"id": 1, "name": "Rinderhackfleisch", "amount": 140},
+            {"id": 2, "name": "Spaghetti", "amount": 70},
+            {"id": 3, "name": "Haehnchenbrust", "amount": 70},
+            {"id": 4, "name": "Kartoffeln", "amount": 70},
+        ],
+    )
+    _patch_llm(monkeypatch, lambda **kwargs: response)
+    result = generate_freestyle_recipes(fridge, recipe_category="hauptspeise", count=1)
+    recipe = _first(result)
+
+    assert recipe.get("warning") is True
+    assert recipe["title"] == "Kein valides Rezept"
+
+
 def test_multiple_recipe_suggestions_from_array(monkeypatch):
     captured = {}
     three = make_array(

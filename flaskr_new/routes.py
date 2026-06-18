@@ -2,6 +2,7 @@
 
 import functools
 import json
+from datetime import datetime
 
 from flask import (
     Blueprint,
@@ -19,26 +20,29 @@ from werkzeug.exceptions import abort
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .db import get_db
+from .meal_tracker_repo import (
+    get_meals_for_date,
+    get_recent_meals,
+    get_settings,
+    get_today_totals,
+    get_tracked_days_in_month,
+    sum_meal_macros,
+)
 from .meal_tracker_service import (
     build_daily_summary,
     delete_meal_action,
     edit_meal_amount_action,
-    get_recent_meals,
-    get_settings,
-    get_today_totals,
     save_settings_action,
     track_meal_from_form,
     track_meals_from_payload,
 )
 from .app_settings_repo import get_settings as get_app_settings, save_settings as save_app_settings
 from .asaai.ollama_client import OLLAMA_MODEL_CHOICES, resolve_ollama_model, test_ollama_model
+from . import fridge_repo
 from .fridge_service import (
     calculate_total_nutrition,
     create_dashboard_item,
     create_dashboard_item_from_data,
-    delete_dashboard_item,
-    get_dashboard_item,
-    list_dashboard_items,
     update_dashboard_item,
 )
 from .openfoodfacts_client import ai_estimate, search_product, search_products
@@ -75,7 +79,7 @@ def dashboard():
     if g.user is None:
         posts = []
     else:
-        posts = list_dashboard_items(g.user["id"])
+        posts = fridge_repo.list_items(g.user["id"])
     # Calculate total nutrition for each item based on current_amount
     posts_with_nutrition = []
     for post in posts:
@@ -173,18 +177,10 @@ def meal_tracker():
     recent_meals = get_recent_meals(g.user["id"], days=1)
     consumed = get_today_totals(g.user["id"])
     summary = build_daily_summary(settings)
-    fridge_items = [dict(item) for item in list_dashboard_items(g.user["id"])]
+    fridge_items = [dict(item) for item in fridge_repo.list_items(g.user["id"])]
 
     if flash_message:
         flash(flash_message)
-
-    if request.args.get("format") == "json":
-        return {
-            "settings": settings,
-            "consumed": consumed,
-            "summary": summary,
-            "meal_count": len(recent_meals),
-        }
 
     return render_template(
         "fridge/meal_tracker.html",
@@ -199,7 +195,7 @@ def meal_tracker():
 @bp.route("/fridge/<int:item_id>", methods=("GET", "POST"))
 @login_required
 def product_detail(item_id):
-    post = get_dashboard_item(item_id, g.user["id"])
+    post = fridge_repo.get_item(item_id, g.user["id"])
 
     if post is None:
         abort(404, f"Item id {item_id} doesn't exist.")
@@ -264,6 +260,22 @@ def add_product():
     return render_template("fridge/add_product.html")
 
 
+def _search_result(item, ai):
+    """Einheitliches Produkt-Payload fuer die Suche-API."""
+    return {
+        "name": item.get("name"),
+        "brand": item.get("brand"),
+        "barcode": item.get("barcode") or "",
+        "kcal_per_100g": item.get("kcal_per_100g"),
+        "protein_per_100g": item.get("protein_per_100g"),
+        "fat_per_100g": item.get("fat_per_100g"),
+        "carbs_per_100g": item.get("carbs_per_100g"),
+        "total_amount": item.get("total_amount"),
+        "unit": item.get("unit"),
+        "ai": ai,
+    }
+
+
 @bp.route("/api/products/search")
 @login_required
 def api_products_search():
@@ -280,18 +292,7 @@ def api_products_search():
             product = None
         if not product or not product.get("name"):
             return jsonify([])
-        return jsonify([{
-            "name": product.get("name"),
-            "brand": product.get("brand"),
-            "barcode": product.get("barcode"),
-            "kcal_per_100g": product.get("kcal_per_100g"),
-            "protein_per_100g": product.get("protein_per_100g"),
-            "fat_per_100g": product.get("fat_per_100g"),
-            "carbs_per_100g": product.get("carbs_per_100g"),
-            "total_amount": product.get("total_amount"),
-            "unit": product.get("unit"),
-            "ai": False,
-        }])
+        return jsonify([_search_result(product, ai=False)])
 
     # Text-Suche: lokale Treffer + OFF-Textsuche, KI-Schaetzung daneben.
     local = []
@@ -334,18 +335,7 @@ def api_products_search():
             return
         if barcode:
             seen_barcodes.add(barcode)
-        target.append({
-            "name": item.get("name"),
-            "brand": item.get("brand"),
-            "barcode": barcode,
-            "kcal_per_100g": item.get("kcal_per_100g"),
-            "protein_per_100g": item.get("protein_per_100g"),
-            "fat_per_100g": item.get("fat_per_100g"),
-            "carbs_per_100g": item.get("carbs_per_100g"),
-            "total_amount": item.get("total_amount"),
-            "unit": item.get("unit"),
-            "ai": source == "ai",
-        })
+        target.append(_search_result(item, ai=source == "ai"))
 
     for row in local:
         append_item(off_items, row, "off")
@@ -360,15 +350,37 @@ def api_products_search():
     return jsonify(combined)
 
 
+@bp.route("/api/meal-tracker/tracked-days")
+@login_required
+def api_tracked_days():
+    year = request.args.get("year", type=int)
+    month = request.args.get("month", type=int)
+    if not year or not month:
+        return jsonify([])
+    days = get_tracked_days_in_month(g.user["id"], year, month)
+    return jsonify(days)
+
+
+@bp.route("/api/meal-tracker/day/<date_str>")
+@login_required
+def api_meals_for_day(date_str):
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"error": "Invalid date"}), 400
+    meals = get_meals_for_date(g.user["id"], date_str)
+    return jsonify({"meals": meals, "totals": sum_meal_macros(meals)})
+
+
 @bp.route("/fridge/<int:item_id>/delete", methods=("POST",))
 @login_required
 def delete_product(item_id):
-    post = get_dashboard_item(item_id, g.user["id"])
+    post = fridge_repo.get_item(item_id, g.user["id"])
 
     if post is None:
         abort(404, f"Item id {item_id} doesn't exist.")
 
-    delete_dashboard_item(item_id)
+    fridge_repo.delete_item(item_id)
     return redirect(url_for("frontend.dashboard"))
 
 

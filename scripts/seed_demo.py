@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pathlib import Path
 import sys
 
@@ -42,7 +40,6 @@ def seed_demo_data() -> None:
                 "protein_per_100g": 6.3,
                 "fat_per_100g": 30.9,
                 "carbs_per_100g": 57.5,
-                "expiry_date": "2026-12-31",
                 "current_amount": 200,
                 "unit": "g",
             },
@@ -54,7 +51,6 @@ def seed_demo_data() -> None:
                 "protein_per_100g": 38.0,
                 "fat_per_100g": 29.0,
                 "carbs_per_100g": 4.1,
-                "expiry_date": "2026-11-15",
                 "current_amount": 150,
                 "unit": "g",
             },
@@ -66,7 +62,6 @@ def seed_demo_data() -> None:
                 "protein_per_100g": 9.5,
                 "fat_per_100g": 2.0,
                 "carbs_per_100g": 3.5,
-                "expiry_date": "2026-06-10",
                 "current_amount": 300,
                 "unit": "g",
             },
@@ -78,7 +73,6 @@ def seed_demo_data() -> None:
                 "protein_per_100g": 12.6,
                 "fat_per_100g": 9.5,
                 "carbs_per_100g": 0.7,
-                "expiry_date": "2026-06-01",
                 "current_amount": 6,
                 "unit": "stk",
             },
@@ -90,7 +84,6 @@ def seed_demo_data() -> None:
                 "protein_per_100g": 26.0,
                 "fat_per_100g": 12.0,
                 "carbs_per_100g": 0.0,
-                "expiry_date": "2026-06-12",
                 "current_amount": 250,
                 "unit": "g",
             },
@@ -102,7 +95,6 @@ def seed_demo_data() -> None:
                 "protein_per_100g": 2.0,
                 "fat_per_100g": 0.1,
                 "carbs_per_100g": 17.0,
-                "expiry_date": "2026-06-20",
                 "current_amount": 500,
                 "unit": "g",
             },
@@ -114,7 +106,6 @@ def seed_demo_data() -> None:
                 "protein_per_100g": 2.8,
                 "fat_per_100g": 0.4,
                 "carbs_per_100g": 7.0,
-                "expiry_date": "2026-06-13",
                 "current_amount": 300,
                 "unit": "g",
             },
@@ -130,10 +121,6 @@ def seed_demo_data() -> None:
                 product["protein_per_100g"],
                 product["fat_per_100g"],
                 product["carbs_per_100g"],
-            )
-            db.execute(
-                "UPDATE product SET expiry_date = ? WHERE id = ?",
-                (product["expiry_date"], product_id),
             )
             add_item(product_id, product["current_amount"], product["unit"], user_id=user_id)
             product_ids[product["name"]] = product_id
@@ -151,7 +138,6 @@ def seed_demo_data() -> None:
             barcode="demo-nutella-001",
             amount=30,
             unit="g",
-            section="Breakfast",
         )
         add_meal_entry(
             user_id,
@@ -164,7 +150,6 @@ def seed_demo_data() -> None:
             barcode="demo-yogurt-001",
             amount=150,
             unit="g",
-            section="Lunch",
         )
         add_meal_entry(
             user_id,
@@ -177,7 +162,6 @@ def seed_demo_data() -> None:
             barcode="demo-parmesan-001",
             amount=80,
             unit="g",
-            section="Dinner",
         )
 
         db.commit()

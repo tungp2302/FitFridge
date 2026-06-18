@@ -1,6 +1,4 @@
-"""Minimal AI routes kept for the current FitFridge scope."""
-from __future__ import annotations
-
+"""HTTP-Routen fuer den Rezeptplaner."""
 from flask import Blueprint, g, jsonify, render_template, request
 
 from .. import fridge_repo

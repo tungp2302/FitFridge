@@ -3,23 +3,17 @@
 from .db import get_db
 
 
+_PRODUCT_COLUMNS = (
+    "id, name, brand, barcode,"
+    " kcal_per_100g, protein_per_100g, fat_per_100g, carbs_per_100g"
+)
+
+
 def get_by_barcode(barcode):
     """Produkt nach Barcode abrufen."""
     return get_db().execute(
-        "SELECT id, name, brand, barcode,"
-        " kcal_per_100g, protein_per_100g, fat_per_100g, carbs_per_100g"
-        " FROM product WHERE barcode = ?",
+        f"SELECT {_PRODUCT_COLUMNS} FROM product WHERE barcode = ?",
         (barcode,),
-    ).fetchone()
-
-
-def get_by_id(product_id):
-    """Produkt nach ID abrufen."""
-    return get_db().execute(
-        "SELECT id, name, brand, barcode,"
-        " kcal_per_100g, protein_per_100g, fat_per_100g, carbs_per_100g"
-        " FROM product WHERE id = ?",
-        (product_id,),
     ).fetchone()
 
 
@@ -41,7 +35,7 @@ def search_by_name(query: str, limit: int = 10):
     """Search local products by name (case-insensitive, simple LIKE)."""
     q = f"%{query}%"
     return get_db().execute(
-        "SELECT id, name, brand, barcode, kcal_per_100g, protein_per_100g, fat_per_100g, carbs_per_100g FROM product WHERE name LIKE ? OR brand LIKE ? ORDER BY name LIMIT ?",
+        f"SELECT {_PRODUCT_COLUMNS} FROM product WHERE name LIKE ? OR brand LIKE ? ORDER BY name LIMIT ?",
         (q, q, limit),
     ).fetchall()
 

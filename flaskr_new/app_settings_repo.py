@@ -1,10 +1,6 @@
-"""Persistence for user-level app settings."""
-from __future__ import annotations
-
+"""Speichert App-Einstellungen pro Nutzer (aktuell das LLM-Modell)."""
 from .db import get_db
-
-
-DEFAULT_LLM_MODEL = "qwen3.5:latest"
+from .asaai.ollama_client import DEFAULT_OLLAMA_MODEL as DEFAULT_LLM_MODEL
 
 
 def get_settings(user_id: int) -> dict:

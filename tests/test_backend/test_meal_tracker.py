@@ -77,7 +77,7 @@ def test_meal_logging_deducts_from_fridge(app_context):
     ).lastrowid
     db.get_db().commit()
 
-    product = product_repo.get_by_id(product_id)
+    product = product_repo.get_by_barcode("3017620422003")
     result = service.log_meal_from_product(1, dict(product), 100.0, "g", fridge_item_id=fridge_item_id)
 
     fridge_item = fridge_repo.get_item(fridge_item_id)

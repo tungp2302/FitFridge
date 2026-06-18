@@ -1,23 +1,15 @@
-nb  """OpenFoodFacts-Client fuer Barcode-Lookups mit Mengen-Parsing und Fallbacks."""
-
-from __future__ import annotations
+"""OpenFoodFacts-Client fuer Barcode-Lookups mit Mengen-Parsing und Fallbacks."""
 
 import json
 import logging
 import re
-import ssl
 import unicodedata
 from typing import Optional, Tuple, Dict
 from urllib.parse import quote
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+
+import requests
 
 logger = logging.getLogger(__name__)
-
-try:
-    import certifi
-except ModuleNotFoundError:  # pragma: no cover - depends on local environment
-    certifi = None
 
 OFF_API_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
 # Text-Suche laeuft ueber die Search-a-licious-API (liefert nur Barcodes).
@@ -27,10 +19,7 @@ DEFAULT_USER_AGENT = "FitFridge/1.0 (university project; contact: you@example.co
 
 
 def _first_string(*values: Optional[str]) -> str:
-    for v in values:
-        if v:
-            return str(v)
-    return ""
+    return next((str(v) for v in values if v), "")
 
 
 def _float_value(value, default: float = 0.0) -> float:
@@ -211,26 +200,14 @@ def _parse_total_quantity(product_data: dict) -> Tuple[Optional[float], Optional
     return total, unit_norm
 
 
-def _kJ_to_kcal(kj: float) -> float:
-    return kj / 4.184 if kj else 0.0
-
-
-def _make_ssl_context():
-    """Return an SSL context using certifi if available, else system defaults."""
-    if certifi is not None:
-        return ssl.create_default_context(cafile=certifi.where())
-    return ssl.create_default_context()
-
-
 def _kcal_from_nutriments(nutriments: dict) -> float:
     """Normalize energy value from the nutriments dict to kcal per 100g."""
     if nutriments.get("energy-kcal_100g") is not None:
         return _float_value(nutriments.get("energy-kcal_100g"))
     if nutriments.get("energy-kcal_value") is not None:
         return _float_value(nutriments.get("energy-kcal_value"))
-    if nutriments.get("energy_100g") is not None:
-        return _kJ_to_kcal(_float_value(nutriments.get("energy_100g")))
-    return 0.0
+    kj = _float_value(nutriments.get("energy_100g"))  # kJ -> kcal
+    return kj / 4.184 if kj else 0.0
 
 
 def search_product(barcode: str, user_agent: str = DEFAULT_USER_AGENT) -> Optional[Dict]:
@@ -242,24 +219,14 @@ def search_product(barcode: str, user_agent: str = DEFAULT_USER_AGENT) -> Option
     if not barcode:
         raise ValueError("barcode is required")
 
-    url = OFF_API_URL.format(barcode=barcode)
-    req = Request(
-        url,
-        headers={
-            "User-Agent": user_agent,
-            "Accept": "application/json",
-        },
-    )
-    https_context = _make_ssl_context()
-
+    headers = {"User-Agent": user_agent, "Accept": "application/json"}
     try:
-        with urlopen(req, timeout=10, context=https_context) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-    except HTTPError as e:
-        if e.code == 404:
+        resp = requests.get(OFF_API_URL.format(barcode=barcode), headers=headers, timeout=10)
+        if resp.status_code == 404:
             return None
-        raise RuntimeError(f"Open Food Facts request failed: {e}") from e
-    except URLError as e:
+        resp.raise_for_status()
+        payload = resp.json()
+    except requests.RequestException as e:
         raise RuntimeError(f"Open Food Facts request failed: {e}") from e
 
     if payload.get("status") != 1:
@@ -281,7 +248,6 @@ def search_product(barcode: str, user_agent: str = DEFAULT_USER_AGENT) -> Option
         "protein_per_100g": _float_value(nutriments.get("proteins_100g")),
         "fat_per_100g": _float_value(nutriments.get("fat_100g")),
         "carbs_per_100g": _float_value(nutriments.get("carbohydrates_100g")),
-        "sugar_per_100g": _float_value(nutriments.get("sugars_100g")),
         "total_amount": total_amount,
         "unit": unit,
     }
@@ -320,16 +286,7 @@ def lookup_product(query: str, user_agent: str = DEFAULT_USER_AGENT) -> Optional
 
 
 def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, limit: int = 10) -> Optional[list]:
-    """
-    Sucht per Text bei Open Food Facts nach passenden Produkten.
-
-    Nutzt die Search-a-licious-API (search.openfoodfacts.org), die nur
-    Barcodes (`code`) liefert. Fuer jeden Treffer holen wir die vollen
-    Naehrwerte ueber die Barcode-API (`search_product`).
-
-    Returns: Liste von Produkt-Dicts (gleiche Form wie `search_product`)
-    oder eine leere Liste, wenn nichts gefunden wurde.
-    """
+    """Textsuche bei OFF; je Treffer die Naehrwerte per Barcode-API nachladen."""
     if not query:
         raise ValueError("query is required")
 
@@ -338,14 +295,14 @@ def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, limit: int
         f"&page_size={max(1, min(limit, 20))}"
         "&fields=code,product_name,brands"
     )
-    request = Request(
-        search_url,
-        headers={"User-Agent": user_agent, "Accept": "application/json"},
-    )
-
     try:
-        with urlopen(request, timeout=10, context=_make_ssl_context()) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+        response = requests.get(
+            search_url,
+            headers={"User-Agent": user_agent, "Accept": "application/json"},
+            timeout=10,
+        )
+        response.raise_for_status()
+        payload = response.json()
     except Exception:
         logger.warning("OFF-Textsuche fehlgeschlagen fuer %r", query, exc_info=True)
         return []
@@ -372,13 +329,7 @@ def search_products(query: str, user_agent: str = DEFAULT_USER_AGENT, limit: int
 
 
 def ai_estimate(query: str, model: Optional[str] = None) -> Optional[dict]:
-    """Return an AI-generated estimate for any food query.
-
-    This path is independent from OpenFoodFacts search results and is
-    intended to stay visible as a separate selectable option in the UI.
-    ``model`` kann ein vorab aufgeloestes Ollama-Modell sein (siehe
-    ``_llm_ai_macro_estimate``).
-    """
+    """KI-Naehrwertschaetzung fuer einen beliebigen Suchbegriff."""
     if not query:
         return None
 
@@ -413,7 +364,6 @@ def ai_estimate(query: str, model: Optional[str] = None) -> Optional[dict]:
         "protein_per_100g": _macro_value("protein"),
         "fat_per_100g": _macro_value("fat"),
         "carbs_per_100g": _macro_value("carbs"),
-        "sugar_per_100g": 0.0,
         "total_amount": 100.0,
         "unit": "g",
         "raw_quantity": "100 g",

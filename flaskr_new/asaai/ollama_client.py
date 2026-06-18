@@ -1,14 +1,7 @@
-"""Ollama-backed local LLM client for ASaAI.
-
-This module talks to a locally running Ollama server over HTTP.
-It uses the standard `/api/generate` endpoint so the backend can be
-used without extra Python dependencies beyond `requests`.
-"""
-from __future__ import annotations
-
+"""Client fuer eine lokale Ollama-Instanz (HTTP /api/generate)."""
 import os
 import json
-from typing import Any, Optional
+from typing import Optional
 
 import requests
 from flask import g, has_app_context
@@ -39,12 +32,6 @@ _OLLAMA_MODEL_ALIASES = {
     choice["id"]: choice["name"]
     for choice in OLLAMA_MODEL_CHOICES
 }
-
-
-def _build_prompt(prompt: str, system: Optional[str] = None) -> str:
-    if system:
-        return f"{system.strip()}\n\n{prompt.strip()}"
-    return prompt
 
 
 def resolve_ollama_model(model: Optional[str] = None) -> Optional[str]:
@@ -92,18 +79,20 @@ def _local_model_names(endpoint: str) -> list[str]:
     return names
 
 
-def _detect_local_model(endpoint: str) -> str:
-    """Pick the first locally installed Ollama model when no model is configured."""
-    names = _local_model_names(endpoint)
-    if names:
-        return names[0]
+def _resolve_endpoint(base_url: Optional[str] = None) -> str:
+    return (base_url or os.getenv("OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL).rstrip("/")
 
-    return DEFAULT_OLLAMA_MODEL
+
+def _post_generate(endpoint: str, payload: dict, timeout: int) -> dict:
+    """POST an /api/generate, Status pruefen, JSON zurueckgeben."""
+    response = requests.post(f"{endpoint}/api/generate", json=payload, timeout=timeout)
+    response.raise_for_status()
+    return response.json()
 
 
 def test_ollama_model(model: Optional[str] = None, base_url: Optional[str] = None, timeout: int = 20) -> dict:
     """Check whether Ollama can handle the JSON mode used by the recipe planner."""
-    endpoint = (base_url or os.getenv("OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL).rstrip("/")
+    endpoint = _resolve_endpoint(base_url)
     selected_model = resolve_ollama_model(model) or DEFAULT_OLLAMA_MODEL
     names = _local_model_names(endpoint)
     if selected_model not in names:
@@ -117,9 +106,9 @@ def test_ollama_model(model: Optional[str] = None, base_url: Optional[str] = Non
             "error": "Modell ist lokal nicht installiert.",
         }
 
-    response = requests.post(
-        f"{endpoint}/api/generate",
-        json={
+    data = _post_generate(
+        endpoint,
+        {
             "model": selected_model,
             "prompt": (
                 "Antworte nur mit einem JSON-Objekt: "
@@ -133,10 +122,8 @@ def test_ollama_model(model: Optional[str] = None, base_url: Optional[str] = Non
                 "num_predict": 120,
             },
         },
-        timeout=timeout,
+        timeout,
     )
-    response.raise_for_status()
-    data = response.json()
     text = data.get("response") if isinstance(data, dict) else ""
     parsed = {}
     if isinstance(text, str) and text.strip():
@@ -162,26 +149,25 @@ def generate_from_ollama(
     model: Optional[str] = None,
     base_url: Optional[str] = None,
     timeout: int = 30,
-    system: Optional[str] = None,
     num_predict: Optional[int] = None,
     format_json: bool = False,
     temperature: float = 0.2,
-    **_: Any,
 ) -> str:
     """Schickt einen Prompt an die lokale Ollama-Instanz und gibt den Text zurueck.
 
     ``base_url`` faellt auf OLLAMA_BASE_URL bzw. http://127.0.0.1:11434 zurueck,
     das Modell auf das konfigurierte oder erste lokal installierte Modell.
     """
-    endpoint = (base_url or os.getenv("OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL).rstrip("/")
+    endpoint = _resolve_endpoint(base_url)
     selected_model = resolve_ollama_model(model)
     if not selected_model:
-        selected_model = _detect_local_model(endpoint)
-    payload_prompt = _build_prompt(prompt, system=system)
+        # erstes lokal installiertes Modell, sonst Default
+        names = _local_model_names(endpoint)
+        selected_model = names[0] if names else DEFAULT_OLLAMA_MODEL
 
     payload = {
         "model": selected_model,
-        "prompt": payload_prompt,
+        "prompt": prompt,
         "stream": False,
         "think": False,
         "options": {
@@ -192,21 +178,6 @@ def generate_from_ollama(
     if format_json:
         payload["format"] = "json"
 
-    response = requests.post(
-        f"{endpoint}/api/generate",
-        json=payload,
-        timeout=timeout,
-    )
-    response.raise_for_status()
-
-    data = response.json()
-    if isinstance(data, dict):
-        text = data.get("response")
-        if isinstance(text, str):
-            return text.strip()
-        message = data.get("message") or {}
-        if isinstance(message, dict):
-            content = message.get("content")
-            if isinstance(content, str):
-                return content.strip()
-    return str(data).strip()
+    data = _post_generate(endpoint, payload, timeout)
+    text = data.get("response") if isinstance(data, dict) else None
+    return text.strip() if isinstance(text, str) else str(data).strip()

@@ -1,6 +1,8 @@
 :root{
   --bg:#f6f7fb;
   --muted:#6b7280;
+  --ink:#111827;
+  --border:#e5e7eb;
   --accent:#16a34a; /* green */
   --accent-2:#059669;
   --surface:#ffffff;
@@ -21,8 +23,8 @@ html,body{
 
 .sidebar{
   padding:22px 18px;
-  background:linear-gradient(180deg,#ffffff 0%, #f8fafc 100%);
-  border-right:1px solid #e5e7eb;
+  background:linear-gradient(180deg,var(--surface) 0%, #f8fafc 100%);
+  border-right:1px solid var(--border);
   display:flex;
   flex-direction:column;
   gap:14px;
@@ -59,7 +61,7 @@ html,body{
 .sidebar-nav a:hover,
 .link-button:hover{background:#e2e8f0}
 
-.link-button.subtle{background:#ffffff;border:1px solid #e5e7eb}
+.link-button.subtle{background:var(--surface);border:1px solid var(--border)}
 
 .sidebar-footer{margin-top:auto;display:flex;flex-direction:column;gap:10px}
 
@@ -84,6 +86,14 @@ form,
 .page-card{padding:18px}
 
 button.btn{border-radius:10px;font-weight:600}
+
+/* Action-Link (z.B. "Add Food"/"Edit" in Headern) und Button-Varianten. */
+.action{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:12px;background:var(--accent);color:var(--surface);font-weight:700}
+.action:hover{background:var(--accent-2)}
+.secondary{background:#eef2f7;color:var(--ink)}
+.secondary:hover{background:#e2e8f0}
+input.danger,.danger{background:#dc2626;color:var(--surface)}
+input.danger:hover,.danger:hover{background:#b91c1c}
 
 button,
 input[type=submit]{font-family:inherit}
@@ -124,7 +134,7 @@ form{padding:18px}
 
 fieldset{border:1px solid #dbe3ee;border-radius:12px;padding:14px;margin:0 0 14px}
 
-hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
+hr{border:none;border-top:1px solid var(--border);margin:18px 0}
 
 /* small utilities */
 .muted{color:var(--muted)}
@@ -133,7 +143,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 .post > header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;position:relative}
 .post > header .header-actions{position:absolute;right:12px;top:12px;z-index:90;display:flex;gap:8px;align-items:center}
 /* Inline delete style for fridge header */
-.inline-delete{background:transparent;border:none;color:#111827;font-size:1.05rem;padding:0;margin-left:6px;cursor:pointer}
+.inline-delete{background:transparent;border:none;color:var(--ink);font-size:1.05rem;padding:0;margin-left:6px;cursor:pointer}
 .inline-delete:hover{color:#b91c1c}
 
 /* Remove global form styling from inline forms inside post headers. */
@@ -168,7 +178,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 }
 .recipe-card{
   background:var(--surface);
-  border:1px solid #e5e7eb;
+  border:1px solid var(--border);
   border-radius:18px;
   box-shadow:var(--shadow);
   padding:14px;
@@ -177,10 +187,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 }
 .recipe-card.active{outline:2px solid var(--accent);}
 .recipe-meta{display:flex;justify-content:space-between;gap:10px;align-items:center;color:var(--muted);font-size:.92rem}
-.recipe-detail{position:sticky;top:16px;background:var(--surface);border-radius:20px;box-shadow:var(--shadow);padding:18px;border:1px solid #e5e7eb}
+.recipe-detail{position:sticky;top:16px;background:var(--surface);border-radius:20px;box-shadow:var(--shadow);padding:18px;border:1px solid var(--border)}
 .recipe-detail h2{margin-top:0}
 .pill{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#ecfdf5;color:#047857;font-size:.85rem;font-weight:700;margin-right:6px;margin-bottom:6px}
-.muted-box{background:#f8fafc;border:1px solid #e5e7eb;border-radius:14px;padding:12px}
+.muted-box{background:#f8fafc;border:1px solid var(--border);border-radius:14px;padding:12px}
 .section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 10px}
 
 .today-dashboard{
@@ -206,7 +216,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 
 .today-text-button{
   background:transparent;
-  color:#111827;
+  color:var(--ink);
   box-shadow:none;
   padding:0;
   min-width:0;
@@ -240,7 +250,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   height: 124px;
   border-radius: 50%;
   background:
-    conic-gradient(#111827 calc(var(--progress) * 1turn), #ddd5d6 0);
+    conic-gradient(var(--ink) calc(var(--progress) * 1turn), #ddd5d6 0);
   position: relative;
   display:grid;
   place-items:center;
@@ -282,7 +292,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 .macro-donut__caption{
   font-size:1.05rem;
   font-weight:700;
-  color:#111827;
+  color:var(--ink);
   text-transform:lowercase;
 }
 
@@ -304,13 +314,13 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   font-size:1.45rem;
   font-weight:800;
   letter-spacing:-0.03em;
-  color:#111827;
+  color:var(--ink);
 }
 
 .today-progress__label{
   font-size:1rem;
   font-weight:700;
-  color:#111827;
+  color:var(--ink);
 }
 
 .today-progress__bar{
@@ -324,7 +334,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 .today-progress__fill{
   height:100%;
   border-radius:inherit;
-  background:#111827;
+  background:var(--ink);
 }
 
 .today-progress__footer{
@@ -334,7 +344,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   justify-content:space-between;
   gap:12px;
   font-size:1.05rem;
-  color:#111827;
+  color:var(--ink);
 }
 
 .settings-modal{
@@ -385,7 +395,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 .today-food-card__edit{
   border-radius:50%;
   background:#eef2f7;
-  color:#111827;
+  color:var(--ink);
   line-height:1;
   padding:0;
 }
@@ -411,7 +421,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 .goal-slider__label,
 .goal-slider__value{
   font-weight:700;
-  color:#111827;
+  color:var(--ink);
 }
 
 .goal-slider__value{
@@ -428,11 +438,6 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   display:flex;
   justify-content:flex-end;
   gap:10px;
-}
-
-.settings-modal__secondary{
-  background:#eef2f7;
-  color:#111827;
 }
 
 .tab-switch{
@@ -453,8 +458,8 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 }
 
 .tab-switch__button.is-active{
-  background:#ffffff;
-  color:#111827;
+  background:var(--surface);
+  color:var(--ink);
   box-shadow:0 8px 18px rgba(15,23,42,.08);
 }
 
@@ -485,14 +490,14 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   padding:12px 14px;
   border-radius:16px;
   background:#f8fafc;
-  border:1px solid #e5e7eb;
+  border:1px solid var(--border);
 }
 
 .pending-item__main{min-width:0}
 
 .pending-item__meta{
   margin-top:4px;
-  color:#6b7280;
+  color:var(--muted);
   font-size:.92rem;
 }
 
@@ -510,7 +515,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 }
 
 .pending-item__field label{
-  color:#6b7280;
+  color:var(--muted);
   font-size:.74rem;
   font-weight:700;
   text-transform:lowercase;
@@ -533,7 +538,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 
 .search-row{
   display:grid;
-  grid-template-columns:minmax(0, 1fr) auto;
+  grid-template-columns:minmax(0, 1fr) auto auto;
   gap:10px;
   align-items:start;
 }
@@ -545,9 +550,9 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 
 .search-results-panel{
   margin-top:8px;
-  border:1px solid #e5e7eb;
+  border:1px solid var(--border);
   border-radius:16px;
-  background:#fff;
+  background:var(--surface);
   max-height:240px;
   overflow:auto;
 }
@@ -594,14 +599,14 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 
 .search-item__brand{margin-top:4px}
 
-.search-item small{color:#6b7280}
+.search-item small{color:var(--muted)}
 
 .selected-product-panel{
   margin-top:10px;
   padding:12px 14px;
-  border:1px solid #e5e7eb;
+  border:1px solid var(--border);
   border-radius:16px;
-  background:#fff;
+  background:var(--surface);
 }
 
 .selected-product-panel__title{
@@ -613,7 +618,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 
 .selected-product-panel__meta{
   margin-top:4px;
-  color:#6b7280;
+  color:var(--muted);
   font-size:.95rem;
 }
 
@@ -630,10 +635,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 }
 
 .fridge-picker-card{
-  border:1px solid #e5e7eb;
+  border:1px solid var(--border);
   border-radius:18px;
   padding:14px;
-  background:#fff;
+  background:var(--surface);
 }
 
 .fridge-picker-card__head{
@@ -666,7 +671,7 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   align-items:center;
   padding:14px 16px;
   border-radius:16px;
-  background:#ffffff;
+  background:var(--surface);
   box-shadow:var(--shadow);
 }
 
@@ -676,12 +681,12 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 
 .today-food-card__meta,
 .today-food-card__nutri{
-  color:#6b7280;
+  color:var(--muted);
   font-size:.95rem;
 }
 
 .today-food-card__kcal{
-  color:#111827;
+  color:var(--ink);
   font-size:.95rem;
   font-weight:700;
 }
@@ -709,16 +714,144 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
 
 .edit-amount-modal__panel{width:min(92vw, 360px)}
 
+/* ---- Today title button ---- */
+.today-title-btn{
+  background:none;
+  color:#0f172a;
+  font-size:1.5rem;
+  font-weight:700;
+  padding:0;
+  box-shadow:none;
+  margin:0 0 .25rem;
+  line-height:1.2;
+  cursor:pointer;
+}
+.today-title-btn:hover{text-decoration:underline}
+
+.cal-modal__panel{
+  max-height:88vh;
+  overflow-y:auto;
+}
+
+/* ---- Calendar ---- */
+.cal-nav{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:1rem;
+}
+
+.cal-nav__title{
+  font-size:1.05rem;
+  font-weight:700;
+}
+
+.cal-nav__btn{
+  background:#eef2f7;
+  color:#0f172a;
+  border-radius:10px;
+  padding:6px 16px;
+  font-size:1.2rem;
+  font-weight:700;
+  box-shadow:none;
+  line-height:1;
+}
+
+.cal-nav__btn:hover{background:#e2e8f0}
+
+.cal-grid{
+  display:grid;
+  grid-template-columns:repeat(7, 1fr);
+  gap:4px;
+}
+
+.cal-weekday{
+  text-align:center;
+  font-size:.76rem;
+  font-weight:700;
+  color:var(--muted);
+  padding:4px 0 6px;
+}
+
+.cal-day{
+  aspect-ratio:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:10px;
+  font-size:.88rem;
+  font-weight:600;
+  cursor:default;
+  background:#f1f5f9;
+  color:#374151;
+}
+
+.cal-day.is-empty{background:transparent}
+
+.cal-day.is-tracked{
+  background:#dcfce7;
+  color:#166534;
+  cursor:pointer;
+}
+
+.cal-day.is-tracked:hover{background:#bbf7d0}
+
+.cal-day.is-today{
+  outline:2px solid var(--ink);
+  outline-offset:-2px;
+}
+
+.cal-day.is-selected{
+  background:var(--ink);
+  color:var(--surface);
+}
+
+.cal-day.is-tracked.is-selected{
+  background:#166534;
+  color:var(--surface);
+}
+
+.cal-detail__date{
+  font-size:1rem;
+  font-weight:700;
+  margin-bottom:.75rem;
+}
+
+.cal-detail__totals{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:.75rem;
+}
+
+.cal-detail__macro{
+  background:#f8fafc;
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:6px 12px;
+  font-size:.88rem;
+  font-weight:700;
+}
+
+.cal-detail__macro span{
+  color:var(--muted);
+  font-weight:400;
+}
+
 @keyframes spin{
   from{transform:rotate(0deg)}
   to{transform:rotate(360deg)}
 }
 
+.search-loading{padding:.75rem;color:#555;display:flex;gap:.6rem;align-items:center}
+.search-loading__spinner{width:14px;height:14px;border:2px solid #d1d5db;border-top-color:#16a34a;border-radius:50%;animation:spin 1s linear infinite}
+
 .search-item:hover{background:#f8fafc}
 
 @media (max-width:700px){
   .app-shell{grid-template-columns:1fr}
-  .sidebar{border-right:none;border-bottom:1px solid #e5e7eb}
+  .sidebar{border-right:none;border-bottom:1px solid var(--border)}
   .main-pane{padding:14px}
   .page-header{flex-direction:column;align-items:flex-start}
   .planner-shell{grid-template-columns:1fr}
@@ -734,10 +867,61 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:18px 0}
   .settings-modal__actions,
   .add-modal__actions{flex-direction:column}
   .settings-modal__actions input[type=submit],
-  .settings-modal__secondary,
+  .settings-modal__actions button,
   .add-modal__actions input[type=submit],
   .add-modal__actions button{width:100%}
   .search-row{grid-template-columns:1fr}
   .today-food-card{grid-template-columns:1fr}
   .today-food-card__side{align-items:flex-start}
+}
+
+/* Barcode-Scanner Overlay (nutzt die native BarcodeDetector-API) */
+.barcode-scanner{
+  position:fixed;
+  inset:0;
+  z-index:1000;
+  background:rgba(0,0,0,.9);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:18px;
+  padding:24px;
+}
+.barcode-scanner__frame{
+  position:relative;
+  width:min(90vw, 480px);
+  aspect-ratio:4 / 3;
+  border-radius:16px;
+  overflow:hidden;
+  background:#000;
+}
+.barcode-scanner__video{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+.barcode-scanner__reticle{
+  position:absolute;
+  left:10%;
+  right:10%;
+  top:50%;
+  height:2px;
+  transform:translateY(-50%);
+  background:#16a34a;
+}
+.barcode-scanner__hint{
+  color:var(--surface);
+  margin:0;
+  font-size:.95rem;
+}
+.barcode-scanner__close{
+  height:46px;
+  padding:0 22px;
+  border:none;
+  border-radius:12px;
+  background:var(--surface);
+  color:#111;
+  font-weight:600;
+  cursor:pointer;
 }
