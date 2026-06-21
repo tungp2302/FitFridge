@@ -1,72 +1,45 @@
 {% extends 'base.html' %}
 
 {% block header %}
-  <h1>{% block title %}Meal Tracker{% endblock %}</h1>
+  <h1>{% block title %}Mahlzeiten-Tracker{% endblock %}</h1>
 {% endblock %}
 
 {% block content %}
+  {% macro pct(consumed_val, target_val) %}{{ 0 if target_val <= 0 else [consumed_val / target_val * 100, 0]|max }}{% endmacro %}
   {% set target_kcal = summary.targets.kcal|float %}
   {% set consumed_kcal = consumed.kcal|float %}
-  {% set protein_target = summary.targets.protein_g|float %}
-  {% set carbs_target = summary.targets.carbs_g|float %}
-  {% set fat_target = summary.targets.fat_g|float %}
-  {% set protein_consumed = consumed.protein_g|float %}
-  {% set carbs_consumed = consumed.carbs_g|float %}
-  {% set fat_consumed = consumed.fat_g|float %}
-  {% set protein_pct = 0 if protein_target <= 0 else (protein_consumed / protein_target * 100) %}
-  {% set carbs_pct = 0 if carbs_target <= 0 else (carbs_consumed / carbs_target * 100) %}
-  {% set fat_pct = 0 if fat_target <= 0 else (fat_consumed / fat_target * 100) %}
-  {% if protein_pct < 0 %}{% set protein_pct = 0 %}{% endif %}
-  {% if carbs_pct < 0 %}{% set carbs_pct = 0 %}{% endif %}
-  {% if fat_pct < 0 %}{% set fat_pct = 0 %}{% endif %}
-  {% set progress_pct = 0 if target_kcal <= 0 else (consumed_kcal / target_kcal * 100) %}
-  {% if progress_pct < 0 %}{% set progress_pct = 0 %}{% endif %}
-  {% set progress_ratio = progress_pct / 100 %}
-  {% set protein_ratio = protein_pct / 100 %}
-  {% set carbs_ratio = carbs_pct / 100 %}
-  {% set fat_ratio = fat_pct / 100 %}
+  {% set progress_pct = pct(consumed_kcal, target_kcal)|float %}
+  {% set macros = [
+    ("Protein", consumed.protein_g|float, summary.targets.protein_g|float),
+    ("Kohlenhydrate", consumed.carbs_g|float, summary.targets.carbs_g|float),
+    ("Fett", consumed.fat_g|float, summary.targets.fat_g|float),
+  ] %}
 
   <section class="page-card today-dashboard" style="margin-bottom:1rem;">
     <div class="today-dashboard__header">
       <div>
-        <h2>Today</h2>
-        <p class="muted">Simple macros at a glance.</p>
+        <h2>Heute</h2>
       </div>
       <div class="today-dashboard__actions">
-        <button type="button" class="today-text-button" id="open-settings">edit</button>
-        <button type="button" class="today-text-button" id="open-add">add</button>
+        <a class="today-text-button" href="{{ url_for('frontend.meal_tracker', modal='settings') }}">bearbeiten</a>
+        <a class="today-text-button" href="{{ url_for('frontend.meal_tracker', modal='add', tab='product') }}">hinzufügen</a>
       </div>
     </div>
 
     <div class="today-dashboard__body">
       <div class="macro-donut-grid">
+        {% for label, cons, target in macros %}
+        {% set ratio = pct(cons, target)|float / 100 %}
         <div class="macro-donut-block">
-          <div class="macro-donut" style="--progress: {{ protein_ratio }};">
+          <div class="macro-donut" style="--progress: {{ ratio }};">
             <div class="macro-donut__inner">
-              <div class="macro-donut__target">{{ protein_target|round(0) }} g</div>
-              <div class="macro-donut__percent">{{ protein_pct|round(0) }}%</div>
+              <div class="macro-donut__target">{{ target|round(0) }} g</div>
+              <div class="macro-donut__percent">{{ (ratio * 100)|round(0) }}%</div>
             </div>
           </div>
-          <div class="macro-donut__caption">protein</div>
+          <div class="macro-donut__caption">{{ label }}</div>
         </div>
-        <div class="macro-donut-block">
-          <div class="macro-donut" style="--progress: {{ carbs_ratio }};">
-            <div class="macro-donut__inner">
-              <div class="macro-donut__target">{{ carbs_target|round(0) }} g</div>
-              <div class="macro-donut__percent">{{ carbs_pct|round(0) }}%</div>
-            </div>
-          </div>
-          <div class="macro-donut__caption">carbs</div>
-        </div>
-        <div class="macro-donut-block">
-          <div class="macro-donut" style="--progress: {{ fat_ratio }};">
-            <div class="macro-donut__inner">
-              <div class="macro-donut__target">{{ fat_target|round(0) }} g</div>
-              <div class="macro-donut__percent">{{ fat_pct|round(0) }}%</div>
-            </div>
-          </div>
-          <div class="macro-donut__caption">fat</div>
-        </div>
+        {% endfor %}
       </div>
 
       <div class="today-progress-card">
@@ -74,142 +47,20 @@
           <span class="today-progress__percent">{{ progress_pct|round(0) }}%</span>
         </div>
         <div class="today-progress__bar" aria-hidden="true">
-          <div class="today-progress__fill" style="width: {{ progress_pct }}%;"></div>
+          <div class="today-progress__fill" style="width: {{ [progress_pct, 100]|min }}%;"></div>
         </div>
         <div class="today-progress__footer">
           <span>{{ consumed_kcal|round(0) }} / {{ target_kcal|round(0) }} kcal</span>
-          <span class="today-progress__label">calories</span>
+          <span class="today-progress__label">Kalorien</span>
         </div>
       </div>
     </div>
   </section>
 
-  <div class="settings-modal" id="settings-modal" aria-hidden="true">
-    <div class="settings-modal__backdrop" id="settings-modal-backdrop"></div>
-    <div class="settings-modal__panel" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
-      <div class="settings-modal__header">
-        <div>
-          <h2 id="settings-modal-title">Settings</h2>
-          <p class="muted">Daily goal</p>
-        </div>
-        <button type="button" class="settings-modal__close" id="close-settings" aria-label="Close settings">×</button>
-      </div>
-      <form method="post" id="settings-form">
-        <input type="hidden" name="action" value="save_settings">
-        <label for="daily_kcal">Target calories</label>
-        <input type="number" step="1" min="0" name="daily_kcal" id="daily_kcal" value="{{ request.form.get('daily_kcal', settings['daily_kcal']) }}">
-
-        <div class="goal-slider">
-          <div class="goal-slider__meta">
-            <span class="goal-slider__label">Protein</span>
-            <span class="goal-slider__value"><span id="protein_pct_value">{{ settings['protein_pct'] }}</span>% / <span id="protein_g_value">{{ ((settings['daily_kcal']|float) * (settings['protein_pct']|float) / 100.0 / 4.0)|round(0) }}</span> g</span>
-          </div>
-          <input type="range" min="0" max="100" name="protein_pct" id="protein_pct" value="{{ request.form.get('protein_pct', settings['protein_pct']) }}">
-        </div>
-
-        <div class="goal-slider">
-          <div class="goal-slider__meta">
-            <span class="goal-slider__label">Carbs</span>
-            <span class="goal-slider__value"><span id="carbs_pct_value">{{ settings['carbs_pct'] }}</span>% / <span id="carbs_g_value">{{ ((settings['daily_kcal']|float) * (settings['carbs_pct']|float) / 100.0 / 4.0)|round(0) }}</span> g</span>
-          </div>
-          <input type="range" min="0" max="100" name="carbs_pct" id="carbs_pct" value="{{ request.form.get('carbs_pct', settings['carbs_pct']) }}">
-        </div>
-
-        <div class="goal-slider">
-          <div class="goal-slider__meta">
-            <span class="goal-slider__label">Fat</span>
-            <span class="goal-slider__value"><span id="fat_pct_value">{{ settings['fat_pct'] }}</span>% / <span id="fat_g_value">{{ ((settings['daily_kcal']|float) * (settings['fat_pct']|float) / 100.0 / 9.0)|round(0) }}</span> g</span>
-          </div>
-          <input type="range" min="0" max="100" name="fat_pct" id="fat_pct" value="{{ request.form.get('fat_pct', settings['fat_pct']) }}">
-        </div>
-
-        <p class="muted settings-modal__hint">Die drei Anteile werden automatisch auf 100% gehalten. Werte links sind Prozent und Zielgramm pro Tag.</p>
-        <div class="settings-modal__actions">
-          <button type="button" class="settings-modal__secondary" id="cancel-settings">Cancel</button>
-          <input type="submit" value="Save settings">
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div class="settings-modal" id="add-modal" aria-hidden="true">
-    <div class="settings-modal__backdrop" id="add-modal-backdrop"></div>
-    <div class="settings-modal__panel add-modal__panel" role="dialog" aria-modal="true" aria-labelledby="add-modal-title">
-      <div class="settings-modal__header">
-        <div>
-          <h2 id="add-modal-title">Add</h2>
-          <p class="muted">Choose how to log food</p>
-        </div>
-        <button type="button" class="settings-modal__close" id="close-add" aria-label="Close add dialog">×</button>
-      </div>
-
-      <div class="tab-switch" role="tablist" aria-label="Add food mode">
-        <button type="button" class="tab-switch__button is-active" id="tab-new-product" data-add-tab="new">New product</button>
-        <button type="button" class="tab-switch__button" id="tab-fridge" data-add-tab="fridge">Aus Fridge</button>
-      </div>
-
-      <div class="add-panel is-active" id="add-panel-new">
-        <form method="post" id="new-product-form">
-          <input type="hidden" name="action" value="track_meal">
-          <input type="hidden" name="selected_payload" id="selected_payload">
-
-          <label for="search_name">Search product name</label>
-          <div class="search-row">
-            <input type="text" id="search_name" placeholder="Search by product name">
-            <button type="button" class="search-action-button" id="search-button">Search</button>
-          </div>
-
-          <div id="search-results" class="search-results-panel" style="display:none;">
-            <!-- results or loading state injected here -->
-          </div>
-
-          <div id="selected-product" class="selected-product-panel" style="display:none;"></div>
-
-          <div class="pending-items" id="pending-items">
-            <div class="pending-items__empty muted">Noch nichts zur Liste hinzugefuegt.</div>
-          </div>
-
-          <p class="muted">Treffer kommen von Open Food Facts. Nothing is added to the fridge.</p>
-          <div class="add-modal__actions">
-            <button type="button" class="clear-x-button" id="clear-selection" aria-label="Clear selected product">×</button>
-            <input type="submit" value="Log meal">
-          </div>
-        </form>
-      </div>
-
-      <div class="add-panel" id="add-panel-fridge">
-        <div class="fridge-panel-scroll">
-          {% if fridge_items %}
-            <div class="fridge-picker-grid">
-              {% for item in fridge_items %}
-                <div class="fridge-picker-card">
-                  <div class="fridge-picker-card__head">
-                    <strong>{{ item.name }}</strong>
-                    <span class="muted">{{ item.current_amount }} {{ item.unit }}</span>
-                  </div>
-                  <div class="muted fridge-picker-card__meta">{{ item.brand }}<br>Barcode: {{ item.barcode }}</div>
-                  <form method="post" class="fridge-picker-card__form">
-                    <input type="hidden" name="action" value="track_meal">
-                    <input type="hidden" name="fridge_item_id" value="{{ item.id }}">
-                    <label for="amount-{{ item.id }}">Quantity</label>
-                    <input type="number" step="0.1" min="0" name="amount" id="amount-{{ item.id }}" placeholder="e.g. 50">
-                    <input type="submit" value="Log from fridge">
-                  </form>
-                </div>
-              {% endfor %}
-            </div>
-          {% else %}
-            <p class="muted">Noch keine Fridge-Items vorhanden.</p>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <section style="margin-top: 1rem;">
+  <section>
     <article class="insight-card">
       <div class="card-header">
-        <h2>today's foods</h2>
+        <h2>Heutige Mahlzeiten</h2>
       </div>
       {% if recent_meals %}
         <div class="today-foods-list">
@@ -219,14 +70,19 @@
                 <strong>{{ meal.meal_name }}</strong>
                 <div class="today-food-card__meta">{{ meal.amount }} {{ meal.unit }}</div>
                 <div class="today-food-card__nutri">{{ meal.protein_g|round(0) }} p / {{ meal.carbs_g|round(0) }} c / {{ meal.fat_g|round(0) }} f</div>
+                <form method="post" class="flat-form" style="margin-top:6px;display:flex;gap:6px;align-items:center;">
+                  <input type="hidden" name="action" value="edit_meal_amount">
+                  <input type="hidden" name="meal_entry_id" value="{{ meal.id }}">
+                  <input type="number" step="0.1" min="0" name="new_amount" value="{{ meal.amount }}" class="pending-item__amount" aria-label="Neue Menge für {{ meal.meal_name }}">
+                  <button type="submit" class="secondary">Menge ändern</button>
+                </form>
               </div>
               <div class="today-food-card__side">
                 <div class="today-food-card__kcal">{{ meal.kcal|round(0) }} kcal</div>
-                <button type="button" class="today-food-card__edit" data-meal-id="{{ meal.id }}" data-meal-name="{{ meal.meal_name }}" data-current-amount="{{ meal.amount }}" aria-label="Edit amount">↺</button>
-                <form method="post" class="today-food-card__delete-form">
+                <form method="post" class="flat-form">
                   <input type="hidden" name="action" value="delete_meal">
                   <input type="hidden" name="meal_entry_id" value="{{ meal.id }}">
-                  <button type="submit" class="clear-x-button today-food-card__delete" aria-label="Delete meal">×</button>
+                  <button type="submit" class="clear-x-button today-food-card__delete" aria-label="Mahlzeit löschen">×</button>
                 </form>
               </div>
             </div>
@@ -238,409 +94,9 @@
     </article>
   </section>
 
-  <div class="settings-modal" id="edit-amount-modal" aria-hidden="true">
-    <div class="settings-modal__backdrop" id="edit-amount-backdrop"></div>
-    <div class="settings-modal__panel edit-amount-modal__panel" role="dialog" aria-modal="true" aria-labelledby="edit-amount-title">
-      <div class="settings-modal__header">
-        <div>
-          <h2 id="edit-amount-title">Menge aendern</h2>
-          <p class="muted" id="edit-amount-subtitle">Produkt</p>
-        </div>
-        <button type="button" class="settings-modal__close" id="close-edit-amount" aria-label="Close edit amount dialog">×</button>
-      </div>
-      <form method="post" id="edit-amount-form">
-        <input type="hidden" name="action" value="edit_meal_amount">
-        <input type="hidden" name="meal_entry_id" id="edit-meal-entry-id" value="">
-        <label for="edit-meal-amount">Neue Menge</label>
-        <input type="number" step="0.1" min="0" name="new_amount" id="edit-meal-amount" placeholder="z.B. 150">
-        <div class="settings-modal__actions">
-          <button type="button" class="settings-modal__secondary" id="cancel-edit-amount">Cancel</button>
-          <input type="submit" value="Save">
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <script>
-    (function () {
-      const settingsModal = document.getElementById('settings-modal');
-      const addModal = document.getElementById('add-modal');
-      const openSettingsButtons = [document.getElementById('open-settings')].filter(Boolean);
-      const openAddButtons = [document.getElementById('open-add')].filter(Boolean);
-      const closeSettingsButton = document.getElementById('close-settings');
-      const cancelSettingsButton = document.getElementById('cancel-settings');
-      const settingsBackdrop = document.getElementById('settings-modal-backdrop');
-      const closeAddButton = document.getElementById('close-add');
-      const addBackdrop = document.getElementById('add-modal-backdrop');
-      const tabButtons = Array.from(document.querySelectorAll('[data-add-tab]'));
-      const newPanel = document.getElementById('add-panel-new');
-      const fridgePanel = document.getElementById('add-panel-fridge');
-      const protein = document.getElementById('protein_pct');
-      const carbs = document.getElementById('carbs_pct');
-      const fat = document.getElementById('fat_pct');
-      const dailyKcal = document.getElementById('daily_kcal');
-      const pValue = document.getElementById('protein_pct_value');
-      const cValue = document.getElementById('carbs_pct_value');
-      const fValue = document.getElementById('fat_pct_value');
-      const pGramValue = document.getElementById('protein_g_value');
-      const cGramValue = document.getElementById('carbs_g_value');
-      const fGramValue = document.getElementById('fat_g_value');
-      const nameInput = document.getElementById('search_name');
-      const searchButton = document.getElementById('search-button');
-      const results = document.getElementById('search-results');
-      const selectedDiv = document.getElementById('selected-product');
-      const barcodeInput = document.getElementById('barcode');
-      const clearSelection = document.getElementById('clear-selection');
-      const searchForm = document.getElementById('new-product-form');
-      const pendingItemsContainer = document.getElementById('pending-items');
-      const selectedPayloadInput = document.getElementById('selected_payload');
-      const editAmountModal = document.getElementById('edit-amount-modal');
-      const editAmountBackdrop = document.getElementById('edit-amount-backdrop');
-      const closeEditAmountButton = document.getElementById('close-edit-amount');
-      const cancelEditAmountButton = document.getElementById('cancel-edit-amount');
-      const editAmountTitle = document.getElementById('edit-amount-subtitle');
-      const editAmountEntryId = document.getElementById('edit-meal-entry-id');
-      const editAmountInput = document.getElementById('edit-meal-amount');
-      let timer = null;
-      let currentController = null;
-      let pendingItems = [];
-      let currentSelection = null;
-
-      const macroWeights = { protein: 4, carbs: 4, fat: 9 };
-
-      function roundWhole(value) {
-        return Math.round(Number(value) || 0);
-      }
-
-      function gramsFor(slider, pct) {
-        const kcal = Number(dailyKcal.value || 0);
-        return roundWhole((kcal * pct) / 100 / macroWeights[slider]);
-      }
-
-      function updateLabels() {
-        const proteinPct = roundWhole(protein.value);
-        const carbsPct = roundWhole(carbs.value);
-        const fatPct = roundWhole(fat.value);
-        pValue.textContent = proteinPct;
-        cValue.textContent = carbsPct;
-        fValue.textContent = fatPct;
-        pGramValue.textContent = gramsFor('protein', proteinPct);
-        cGramValue.textContent = gramsFor('carbs', carbsPct);
-        fGramValue.textContent = gramsFor('fat', fatPct);
-      }
-
-      function distributeRemainder(changedKey, changedValue) {
-        const sliders = { protein, carbs, fat };
-        const otherKeys = Object.keys(sliders).filter((key) => key !== changedKey);
-        const remaining = 100 - changedValue;
-        const currentOtherTotal = otherKeys.reduce((sum, key) => sum + roundWhole(sliders[key].value), 0);
-
-        if (remaining <= 0) {
-          otherKeys.forEach((key) => {
-            sliders[key].value = 0;
-          });
-          return;
-        }
-
-        if (currentOtherTotal <= 0) {
-          const base = Math.floor(remaining / otherKeys.length);
-          let leftover = remaining - base * otherKeys.length;
-          otherKeys.forEach((key) => {
-            sliders[key].value = base + (leftover > 0 ? 1 : 0);
-            if (leftover > 0) leftover -= 1;
-          });
-          return;
-        }
-
-        const provisional = otherKeys.map((key) => {
-          const oldValue = roundWhole(sliders[key].value);
-          const exact = (remaining * oldValue) / currentOtherTotal;
-          const floorValue = Math.floor(exact);
-          return { key, floorValue, remainder: exact - floorValue };
-        });
-
-        let missing = remaining - provisional.reduce((sum, entry) => sum + entry.floorValue, 0);
-        provisional.sort((a, b) => b.remainder - a.remainder);
-        provisional.forEach((entry) => {
-          sliders[entry.key].value = entry.floorValue + (missing > 0 ? 1 : 0);
-          if (missing > 0) missing -= 1;
-        });
-      }
-
-      function syncFrom(sourceKey) {
-        const source = { protein, carbs, fat }[sourceKey];
-        const nextValue = Math.max(0, Math.min(100, roundWhole(source.value)));
-        source.value = nextValue;
-        distributeRemainder(sourceKey, nextValue);
-        updateLabels();
-      }
-
-      function openSettings() {
-        settingsModal.classList.add('is-open');
-        settingsModal.setAttribute('aria-hidden', 'false');
-      }
-
-      function closeSettings() {
-        settingsModal.classList.remove('is-open');
-        settingsModal.setAttribute('aria-hidden', 'true');
-      }
-
-      function activateAddTab(tabName) {
-        tabButtons.forEach((button) => {
-          button.classList.toggle('is-active', button.getAttribute('data-add-tab') === tabName);
-        });
-        newPanel.classList.toggle('is-active', tabName === 'new');
-        fridgePanel.classList.toggle('is-active', tabName === 'fridge');
-      }
-
-      function openAdd(tabName = 'new') {
-        addModal.classList.add('is-open');
-        addModal.setAttribute('aria-hidden', 'false');
-        activateAddTab(tabName);
-      }
-
-      function openEditAmountModal(entryId, mealName, amount) {
-        editAmountEntryId.value = entryId;
-        editAmountTitle.textContent = mealName || 'Produkt';
-        editAmountInput.value = amount || '';
-        editAmountModal.classList.add('is-open');
-        editAmountModal.setAttribute('aria-hidden', 'false');
-        setTimeout(() => editAmountInput.focus(), 0);
-      }
-
-      function closeEditAmountModal() {
-        editAmountModal.classList.remove('is-open');
-        editAmountModal.setAttribute('aria-hidden', 'true');
-      }
-
-      function closeAdd() {
-        addModal.classList.remove('is-open');
-        addModal.setAttribute('aria-hidden', 'true');
-      }
-
-      function setLoading() {
-        results.style.display = 'block';
-        results.innerHTML = `<div class="loading" style="padding:.75rem; color:#555; display:flex; gap:.6rem; align-items:center;"><div class="spinner" style="width:14px;height:14px;border:2px solid #d1d5db;border-top-color:#16a34a;border-radius:50%;animation:spin 1s linear infinite"></div><div>Produkte werden gesucht…</div></div>`;
-      }
-
-      function clearSearchSelection() {
-        selectedDiv.style.display = 'none';
-        selectedDiv.innerHTML = '';
-        results.style.display = 'none';
-        results.innerHTML = '';
-        currentSelection = null;
-      }
-
-      function updatePendingItems() {
-        if (!pendingItems.length) {
-          pendingItemsContainer.innerHTML = '<div class="pending-items__empty muted">Noch nichts zur Liste hinzugefuegt.</div>';
-          return;
-        }
-
-        pendingItemsContainer.innerHTML = pendingItems.map((item, index) => `
-          <div class="pending-item" data-index="${index}">
-            <div class="pending-item__main">
-              <strong>${escHtml(item.name || '(no name)')}</strong>
-              <div class="pending-item__meta">${item.brand ? escHtml(item.brand) + ' · ' : ''}${escHtml(item.kcal_per_100g || '')} kcal / 100g</div>
-            </div>
-            <div class="pending-item__controls">
-              <div class="pending-item__field">
-                <label>amount</label>
-                <input type="number" step="0.1" min="0" class="pending-item__amount" value="${escHtml(item.amount || 100)}" aria-label="Amount for ${escHtml(item.name || 'product')}">
-              </div>
-              <div class="pending-item__field">
-                <label>uebrig</label>
-                <input type="number" step="0.1" min="0" class="pending-item__remaining" value="${escHtml(item.remaining_amount || '')}" aria-label="Remaining for ${escHtml(item.name || 'product')}">
-              </div>
-              <button type="button" class="clear-x-button pending-item__remove" aria-label="Remove ${escHtml(item.name || 'product')}">×</button>
-            </div>
-          </div>
-        `).join('');
-
-        Array.from(pendingItemsContainer.querySelectorAll('.pending-item')).forEach((element) => {
-          const index = Number(element.getAttribute('data-index'));
-          const amountField = element.querySelector('.pending-item__amount');
-          const remainingField = element.querySelector('.pending-item__remaining');
-          const removeButton = element.querySelector('.pending-item__remove');
-          amountField.addEventListener('input', () => {
-            pendingItems[index].amount = Number(amountField.value) || 0;
-          });
-          remainingField.addEventListener('input', () => {
-            pendingItems[index].remaining_amount = Number(remainingField.value) || 0;
-          });
-          removeButton.addEventListener('click', () => {
-            pendingItems.splice(index, 1);
-            updatePendingItems();
-          });
-        });
-      }
-
-      function addCurrentSelectionToPendingList() {
-        if (!currentSelection) return;
-        pendingItems.push({ ...currentSelection, amount: 100, remaining_amount: 0 });
-        updatePendingItems();
-        clearSearchSelection();
-      }
-
-      function syncHiddenPayload() {
-        selectedPayloadInput.value = JSON.stringify(pendingItems);
-      }
-
-      function render(items) {
-        if (!items || items.length === 0) {
-          results.style.display = 'none';
-          results.innerHTML = '';
-          return;
-        }
-
-        results.style.display = 'block';
-        results.innerHTML = items.map((item, index) => `
-          <div class="search-item" data-idx="${index}">
-            <div class="search-item__top">
-              <strong>${escHtml(item.name || '(no name)')}</strong>
-              <span class="badge is-off">OFF</span>
-            </div>
-            <div class="search-item__brand muted">${escHtml(item.brand || '')}</div>
-            <small>Open Food Facts · ${escHtml(item.kcal_per_100g || '')} kcal/100g</small>
-          </div>
-        `).join('');
-
-        Array.from(results.querySelectorAll('.search-item')).forEach((element) => {
-          element.addEventListener('click', () => {
-            const item = items[Number(element.getAttribute('data-idx'))];
-            currentSelection = {
-              name: item.name || '(no name)',
-              brand: item.brand || '',
-              barcode: item.barcode || '',
-              kcal_per_100g: Number(item.kcal_per_100g || 0),
-              protein_per_100g: Number(item.protein_per_100g || 0),
-              fat_per_100g: Number(item.fat_per_100g || 0),
-              carbs_per_100g: Number(item.carbs_per_100g || 0),
-              unit: item.unit || 'g',
-            };
-            selectedDiv.innerHTML = `
-              <div class="selected-product-panel__title">
-                <strong>${escHtml(currentSelection.name)}</strong>
-                <span class="badge is-off">OFF</span>
-              </div>
-              <div class="selected-product-panel__meta">${currentSelection.brand ? escHtml(currentSelection.brand) + ' · ' : ''}Open Food Facts · ${escHtml(currentSelection.kcal_per_100g || '')} kcal / 100g</div>
-              <div class="selected-product-panel__actions">
-                <button type="button" class="search-action-button" id="log-selected-button">Add</button>
-                <button type="button" class="clear-x-button" id="reset-selected-button" aria-label="Clear selected product">×</button>
-              </div>
-            `;
-            selectedDiv.style.display = 'block';
-            results.style.display = 'none';
-
-            const logSelectedButton = document.getElementById('log-selected-button');
-            const resetSelectedButton = document.getElementById('reset-selected-button');
-
-            logSelectedButton.addEventListener('click', () => {
-              addCurrentSelectionToPendingList();
-            });
-
-            resetSelectedButton.addEventListener('click', clearSearchSelection);
-          });
-        });
-      }
-
-      function doSearch(query) {
-        setLoading();
-        if (currentController) {
-          currentController.abort();
-        }
-        currentController = new AbortController();
-        fetch(`/api/products/search?q=${encodeURIComponent(query)}`, { signal: currentController.signal })
-          .then((response) => response.json())
-          .then((items) => {
-            currentController = null;
-            render(items);
-          })
-          .catch((error) => {
-            if (error && error.name === 'AbortError') return;
-            results.innerHTML = `<div style="padding:.75rem;color:#666;">Fehler bei der Suche</div>`;
-          });
-      }
-
-      openSettingsButtons.forEach((button) => button.addEventListener('click', openSettings));
-      openAddButtons.forEach((button) => button.addEventListener('click', () => openAdd('new')));
-      closeSettingsButton.addEventListener('click', closeSettings);
-      cancelSettingsButton.addEventListener('click', closeSettings);
-      settingsBackdrop.addEventListener('click', closeSettings);
-      closeAddButton.addEventListener('click', closeAdd);
-      addBackdrop.addEventListener('click', closeAdd);
-      tabButtons.forEach((button) => {
-        button.addEventListener('click', () => activateAddTab(button.getAttribute('data-add-tab')));
-      });
-
-      document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
-          if (settingsModal.classList.contains('is-open')) closeSettings();
-          if (addModal.classList.contains('is-open')) closeAdd();
-        }
-      });
-
-      protein.addEventListener('input', () => syncFrom('protein'));
-      carbs.addEventListener('input', () => syncFrom('carbs'));
-      fat.addEventListener('input', () => syncFrom('fat'));
-      dailyKcal.addEventListener('input', updateLabels);
-      updateLabels();
-
-      searchButton.addEventListener('click', () => {
-        const query = nameInput.value.trim();
-        if (!query) return;
-        doSearch(query);
-      });
-
-      nameInput.addEventListener('input', () => {
-        clearSearchSelection();
-      });
-
-      nameInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          const query = nameInput.value.trim();
-          if (!query) return;
-          doSearch(query);
-        }
-      });
-
-      clearSelection.addEventListener('click', clearSearchSelection);
-
-      Array.from(document.querySelectorAll('.today-food-card__edit')).forEach((button) => {
-        button.addEventListener('click', () => {
-          openEditAmountModal(
-            button.getAttribute('data-meal-id') || '',
-            button.getAttribute('data-meal-name') || 'Produkt',
-            button.getAttribute('data-current-amount') || ''
-          );
-        });
-      });
-
-      closeEditAmountButton.addEventListener('click', closeEditAmountModal);
-      cancelEditAmountButton.addEventListener('click', closeEditAmountModal);
-      editAmountBackdrop.addEventListener('click', closeEditAmountModal);
-
-      editAmountInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-          const parsed = Number(editAmountInput.value);
-          if (!Number.isFinite(parsed) || parsed <= 0) {
-            event.preventDefault();
-          }
-        }
-      });
-
-      searchForm.addEventListener('submit', (event) => {
-        if (currentSelection) {
-          addCurrentSelectionToPendingList();
-        }
-        syncHiddenPayload();
-        if (!pendingItems.length) {
-          event.preventDefault();
-        }
-      });
-
-      updatePendingItems();
-    })();
-  </script>
+  {% if modal == 'settings' %}
+    {% include 'fridge/_settings_modal.html' %}
+  {% elif modal == 'add' %}
+    {% include 'fridge/_add_modal.html' %}
+  {% endif %}
 {% endblock %}

@@ -176,8 +176,9 @@ ohne DB-Bezug — nur HTTP über die Standardbibliothek (`urllib`), kein API-Key
 - Pro Tabelle ein Repo: `product_repo`, `fridge_repo`, `meal_tracker_repo`,
   `consumption_log_repo` — reine SQL-Funktionen, sonst nichts.
 - [db.py](flaskr_new/db.py): eine Verbindung pro Request (`get_db`), beim
-  App-Start legt `ensure_core_schema()` die Kerntabellen an, falls sie fehlen;
-  `schema.sql` bleibt das Werkzeug für einen kompletten Reset (`flask init-db`).
+  App-Start setzt `init_db()` das Schema frisch aus `schema.sql` auf (mit `DROP`),
+  damit es immer exakt passt; derselbe Code steht als `flask init-db` bereit.
+  Daten überleben bewusst keinen Neustart, sind zur Laufzeit aber persistent.
 - **User-Scoping:** Lese-/Schreibzugriffe nehmen eine `user_id` und filtern danach
   (`WHERE f.user_id = ? ...`). So sieht und ändert niemand fremde Items, auch nicht
   über geratene IDs.

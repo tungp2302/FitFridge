@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block header %}
-  <h1>{% block title %}Edit "{{ post['name'] }}"{% endblock %}</h1>
+  <h1>{% block title %}"{{ post['name'] }}" bearbeiten{% endblock %}</h1>
 {% endblock %}
 
 {% block content %}
@@ -10,36 +10,36 @@
       <label for="name">Name</label>
       <input name="name" id="name" value="{{ request.form.get('name', post['name']) }}" required>
 
-      <label for="brand">Brand</label>
+      <label for="brand">Marke</label>
       <input name="brand" id="brand" value="{{ request.form.get('brand', post['brand']) }}">
 
       <label for="barcode">Barcode</label>
       <input name="barcode" id="barcode" value="{{ request.form.get('barcode', post['barcode']) }}" readonly>
 
-      <label for="current_amount">Amount</label>
+      <label for="current_amount">Menge</label>
       <input name="current_amount" id="current_amount" value="{{ request.form.get('current_amount', post['current_amount']) }}">
 
-      <label for="unit">Unit</label>
+      <label for="unit">Einheit</label>
       <input name="unit" id="unit" value="{{ request.form.get('unit', post['unit']) }}">
 
       <fieldset>
-        <legend>Total Nutrition (for {{ post['current_amount'] }} {{ post['unit'] }})</legend>
+        <legend>Gesamtnährwerte (für {{ post['current_amount'] }} {{ post['unit'] }})</legend>
         <p>
           <strong>Kcal:</strong> {{ post['total_kcal'] }}<br>
           <strong>Protein:</strong> {{ post['total_protein'] }}g<br>
-          <strong>Fat:</strong> {{ post['total_fat'] }}g<br>
-          <strong>Carbs:</strong> {{ post['total_carbs'] }}g
+          <strong>Fett:</strong> {{ post['total_fat'] }}g<br>
+          <strong>Kohlenhydrate:</strong> {{ post['total_carbs'] }}g
         </p>
         <p class="muted">
-          Per 100g: {{ post['kcal_per_100g'] }} kcal • {{ post['protein_per_100g'] }}g protein • {{ post['fat_per_100g'] }}g fat • {{ post['carbs_per_100g'] }}g carbs
+          Pro 100g: {{ post['kcal_per_100g'] }} kcal • {{ post['protein_per_100g'] }}g Protein • {{ post['fat_per_100g'] }}g Fett • {{ post['carbs_per_100g'] }}g Kohlenhydrate
         </p>
       </fieldset>
 
-      <input type="submit" value="Save">
+      <input type="submit" value="Speichern">
     </form>
     <hr>
     <form action="{{ url_for('frontend.delete_product', item_id=post['id']) }}" method="post">
-      <input class="danger" type="submit" value="Delete" onclick="return confirm('Are you sure?');">
+      <input type="submit" value="Löschen" onclick="return confirm('Bist du sicher?');">
     </form>
   </div>
 {% endblock %}

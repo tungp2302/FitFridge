@@ -19,7 +19,7 @@ def app(tmp_path):
     yield app
 
 
-def test_add_product_search_uses_single_combined_endpoint(app):
+def test_add_product_page_renders_server_side_search_form(app):
     with app.test_client() as client:
         with client.session_transaction() as session:
             session["user_id"] = 1
@@ -28,5 +28,7 @@ def test_add_product_search_uses_single_combined_endpoint(app):
 
     assert response.status_code == 200
     page = response.get_data(as_text=True)
-    assert "/api/products/search" in page
-    assert "/api/products/ai" not in page
+    # Server-rendered search: a POST form with the search action, no client JS endpoint.
+    assert 'name="action" value="search"' in page
+    assert "/api/products/search" not in page
+    assert "<script" not in page

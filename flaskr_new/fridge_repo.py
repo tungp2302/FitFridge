@@ -38,18 +38,11 @@ def get_item(item_id, user_id=None):
 def add_item(product_id, current_amount, unit, user_id=None):
     """Ein neues FridgeItem zur Datenbank hinzufügen."""
     db = get_db()
-    if user_id is None:
-        cursor = db.execute(
-            "INSERT INTO fridge_item (product_id, current_amount, unit)"
-            " VALUES (?, ?, ?)",
-            (product_id, current_amount, unit),
-        )
-    else:
-        cursor = db.execute(
-            "INSERT INTO fridge_item (user_id, product_id, current_amount, unit)"
-            " VALUES (?, ?, ?, ?)",
-            (user_id, product_id, current_amount, unit),
-        )
+    cursor = db.execute(
+        "INSERT INTO fridge_item (user_id, product_id, current_amount, unit)"
+        " VALUES (?, ?, ?, ?)",
+        (user_id, product_id, current_amount, unit),
+    )
     db.commit()
     return cursor.lastrowid
 
@@ -68,10 +61,10 @@ def update_amount(item_id, current_amount):
 def delete_item(item_id, user_id=None):
     """Ein FridgeItem aus dem Kühlschrank entfernen."""
     db = get_db()
-    if user_id is None:
-        cursor = db.execute("DELETE FROM fridge_item WHERE id = ?", (item_id,))
-    else:
+    if user_id is not None:
         cursor = db.execute("DELETE FROM fridge_item WHERE id = ? AND user_id = ?", (item_id, user_id))
+    else:
+        cursor = db.execute("DELETE FROM fridge_item WHERE id = ?", (item_id,))
     db.commit()
     return cursor.rowcount
 

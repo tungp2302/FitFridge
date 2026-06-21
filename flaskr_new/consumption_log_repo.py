@@ -1,17 +1,7 @@
 """Schreibt Verbrauchs-/Auffuell-Eintraege in die Tabelle consumption_log,
 damit nachvollziehbar bleibt, wie viel von einem Produkt bewegt wurde."""
 
-from datetime import datetime, timezone
-
-from .db import get_db
-
-
-def _now():
-    return datetime.now(timezone.utc).replace(tzinfo=None)
-
-
-def _iso(dt):
-    return dt.strftime("%Y-%m-%d %H:%M:%S")
+from .db import get_db, _iso, _now
 
 
 def _log_event(product_id, amount, unit, event_type, note):

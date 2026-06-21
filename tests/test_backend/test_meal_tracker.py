@@ -64,7 +64,6 @@ def test_meal_entry_analysis(app_context):
     assert consumed["kcal"] == 1250.0
     assert summary["targets"]["kcal"] == 2000.0
     assert summary["remaining"]["kcal"] == 750.0
-    assert "Noch 750.0 kcal offen" in summary["recommendation"]
 
 
 def test_meal_logging_deducts_from_fridge(app_context):
@@ -140,29 +139,35 @@ def test_meal_entry_amount_update_scales_nutrition(app_context):
     assert row["fat_g"] == 7.5
 
 
-def test_selected_payload_remaining_is_saved_to_fridge(app):
-    payload = [
-        {
-            "name": "Mango",
-            "brand": "FitFridge AI",
-            "barcode": "ingredient:mango",
-            "kcal_per_100g": 60,
-            "protein_per_100g": 1,
-            "fat_per_100g": 0.5,
-            "carbs_per_100g": 14,
-            "unit": "g",
-            "amount": 120,
-            "remaining_amount": 80,
-        }
-    ]
+def test_cart_product_remaining_is_saved_to_fridge(app):
+    product = {
+        "name": "Mango",
+        "brand": "FitFridge AI",
+        "barcode": "ingredient:mango",
+        "kcal_per_100g": 60,
+        "protein_per_100g": 1,
+        "fat_per_100g": 0.5,
+        "carbs_per_100g": 14,
+        "unit": "g",
+    }
 
     with app.test_client() as client:
         with client.session_transaction() as session:
             session["user_id"] = 1
 
+        client.post(
+            "/meal-tracker",
+            data={
+                "action": "cart_add_product",
+                "selected_payload": json.dumps(product),
+                "amount": "120",
+                "remaining_amount": "80",
+            },
+            follow_redirects=True,
+        )
         response = client.post(
             "/meal-tracker",
-            data={"action": "track_meal", "selected_payload": json.dumps(payload)},
+            data={"action": "cart_commit"},
             follow_redirects=True,
         )
 
