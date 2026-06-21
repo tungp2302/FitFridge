@@ -65,15 +65,12 @@ def log_meal_from_product(user_id, product, amount, unit, fridge_item_id=None):
     entry_id = add_meal_entry(
         user_id=user_id,
         meal_name=meal_name,
-        product_id=product.get("id"),
-        barcode=product.get("barcode"),
         amount=amount,
         unit=unit,
         kcal=nutrition["kcal"],
         protein_g=nutrition["protein"],
         carbs_g=nutrition["carbs"],
         fat_g=nutrition["fat"],
-        note="meal tracker meal",
     )
 
     deducted = False
@@ -87,7 +84,6 @@ def log_meal_from_product(user_id, product, amount, unit, fridge_item_id=None):
             update_dashboard_item(
                 fridge_item_id,
                 current_amount=remaining_amount,
-                unit=fridge_item["unit"],
                 user_id=user_id if fridge_item_dict.get("user_id") is not None else None,
             )
             deducted = True

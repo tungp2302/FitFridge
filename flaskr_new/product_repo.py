@@ -10,12 +10,7 @@ def get_by_barcode(barcode):
     return get_db().execute(f"{_PRODUCT_SELECT} WHERE barcode = ?", (barcode,)).fetchone()
 
 
-def get_by_id(product_id):
-    """Produkt nach ID abrufen."""
-    return get_db().execute(f"{_PRODUCT_SELECT} WHERE id = ?", (product_id,)).fetchone()
-
-
-def create_product(name, brand, barcode, kcal_per_100g, 
+def create_product(name, brand, barcode, kcal_per_100g,
                    protein_per_100g, fat_per_100g, carbs_per_100g):
     """Ein neues Produkt anlegen (z.B. von OpenFoodFacts API)."""
     db = get_db()

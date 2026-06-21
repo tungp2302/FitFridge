@@ -55,7 +55,7 @@ python3 -m pytest -q
 ### Windows (PowerShell)
 
 Im Projektordner ein Terminal öffnen.
-
+```
 powershell
 # 1. Virtuelle Umgebung anlegen und aktivieren
 python -m venv .venv
@@ -69,7 +69,7 @@ flask --app flaskr_new run --debug
 
 
 Dann im Browser öffnen: **http://127.0.0.1:5000**
-
+```
 
 ### Seiten
 Kühlschrank (Dashboard) http://127.0.0.1:5000/ 

@@ -90,28 +90,21 @@ def add_meal_entry(
     protein_g=0.0,
     carbs_g=0.0,
     fat_g=0.0,
-    note=None,
-    product_id=None,
-    barcode=None,
     amount=None,
     unit=None,
 ):
     db = get_db()
     cur = db.execute(
-        "INSERT INTO meal_tracker_entry (user_id, meal_name, product_id, barcode, amount, unit, kcal, protein_g, carbs_g, fat_g, note, eaten_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO meal_tracker_entry (user_id, meal_name, amount, unit, kcal, protein_g, carbs_g, fat_g) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (
             user_id,
             meal_name,
-            product_id,
-            barcode,
             float(amount) if amount is not None else None,
             unit,
             float(kcal),
             float(protein_g),
             float(carbs_g),
             float(fat_g),
-            note,
-            _iso(_now()),
         ),
     )
     db.commit()

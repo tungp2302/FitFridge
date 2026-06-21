@@ -30,10 +30,8 @@ from .meal_tracker_service import (
 from .fridge_repo import delete_item as delete_dashboard_item, get_item, list_items
 from .fridge_service import (
     calculate_total_nutrition,
-    consume_amount,
     create_dashboard_item,
     create_dashboard_item_from_data,
-    refill_amount,
     update_dashboard_item,
 )
 from .openfoodfacts_client import search_product, search_products
@@ -65,8 +63,16 @@ def load_logged_in_user():
         ).fetchone()
 
 
-@bp.route("/")
+@bp.route("/", methods=("GET", "POST"))
 def dashboard():
+    if g.user is not None and request.method == "POST":
+        update_dashboard_item(
+            request.form.get("item_id"),
+            current_amount=request.form.get("current_amount"),
+            user_id=g.user["id"],
+        )
+        return redirect(url_for("frontend.dashboard"))
+
     if g.user is None:
         posts = []
     else:
@@ -187,46 +193,6 @@ def _cart_float(value):
         return float((value or "").replace(",", ".")) if isinstance(value, str) else float(value)
     except (TypeError, ValueError):
         return 0.0
-
-
-@bp.route("/fridge/<int:item_id>", methods=("GET", "POST"))
-@login_required
-def product_detail(item_id):
-    post = get_item(item_id, user_id=g.user["id"])
-
-    if post is None:
-        abort(404, f"Item id {item_id} doesn't exist.")
-
-    # Calculate total nutrition based on current_amount
-    post = dict(post)
-    nutrition = calculate_total_nutrition(post)
-    post.update(nutrition)
-
-    if request.method == "POST":
-        name = request.form.get("name")
-        brand = request.form.get("brand")
-        current_amount = request.form.get("current_amount")
-        unit = request.form.get("unit")
-        error = None
-
-        if not name:
-            error = "Name is required."
-
-        if error is not None:
-            flash(error)
-        else:
-            # update amount and optional product metadata
-            update_dashboard_item(
-                item_id,
-                current_amount=current_amount,
-                unit=unit,
-                name=name,
-                brand=brand,
-                user_id=g.user["id"],
-            )
-            return redirect(url_for("frontend.dashboard"))
-
-    return render_template("fridge/product_detail.html", post=post)
 
 
 @bp.route("/fridge/add", methods=("GET", "POST"))
@@ -385,37 +351,3 @@ def logout():
     session.clear()
     return redirect(url_for("frontend.dashboard"))
 
-def _handle_amount_change(item_id, service_fn):
-    """Gemeinsamer Ablauf fuer consume/refill: validieren, Service, Flash."""
-    raw = (request.form.get("amount", "") or "").replace(",", ".").strip()
-    try:
-        amount = float(raw) if raw else 0.0
-    except ValueError:
-        flash(f"'{raw}' ist keine gültige Zahl.", "error")
-        return redirect(url_for("frontend.product_detail", item_id=item_id))
-
-    if amount <= 0:
-        flash("Die Menge muss größer als 0 sein.", "error")
-        return redirect(url_for("frontend.product_detail", item_id=item_id))
-
-    if amount > 10000:
-        flash(f"Die Menge {amount} scheint sehr hoch. Bitte prüfe deine Eingabe (max. 10000).", "warning")
-        return redirect(url_for("frontend.product_detail", item_id=item_id))
-
-    result = service_fn(item_id, amount, user_id=g.user["id"])
-    flash(result["message"], "success" if result["success"] else "error")
-    return redirect(url_for("frontend.product_detail", item_id=item_id))
-
-
-@bp.route("/fridge/<int:item_id>/consume", methods=("POST",))
-@login_required
-def consume_product(item_id):
-    """Verbraucht eine Menge eines Fridge-Items."""
-    return _handle_amount_change(item_id, consume_amount)
-
-
-@bp.route("/fridge/<int:item_id>/refill", methods=("POST",))
-@login_required
-def refill_product(item_id):
-    """Füllt eine Menge zu einem Fridge-Item hinzu."""
-    return _handle_amount_change(item_id, refill_amount)

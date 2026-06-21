@@ -8,7 +8,6 @@ Erwartet einen leeren, frisch initialisierten Datenbestand (siehe ``init_db``).
 
 from werkzeug.security import generate_password_hash
 
-from .consumption_log_repo import log_consume, log_refill
 from .db import get_db
 from .fridge_repo import add_item
 from .meal_tracker_repo import add_meal_entry, save_settings
@@ -40,12 +39,9 @@ _DEMO_PRODUCTS = [
 ]
 
 _DEMO_MEALS = [
-    {"name": "Nutella Toast", "product": "Nutella", "barcode": "demo-nutella-001",
-     "kcal": 320, "protein_g": 8, "carbs_g": 40, "fat_g": 12, "amount": 30, "unit": "g"},
-    {"name": "Greek Yogurt Bowl", "product": "Greek Yogurt", "barcode": "demo-yogurt-001",
-     "kcal": 220, "protein_g": 18, "carbs_g": 20, "fat_g": 6, "amount": 150, "unit": "g"},
-    {"name": "Parmesan Pasta", "product": "Parmesan", "barcode": "demo-parmesan-001",
-     "kcal": 540, "protein_g": 24, "carbs_g": 62, "fat_g": 18, "amount": 80, "unit": "g"},
+    {"name": "Nutella Toast", "kcal": 320, "protein_g": 8, "carbs_g": 40, "fat_g": 12, "amount": 30, "unit": "g"},
+    {"name": "Greek Yogurt Bowl", "kcal": 220, "protein_g": 18, "carbs_g": 20, "fat_g": 6, "amount": 150, "unit": "g"},
+    {"name": "Parmesan Pasta", "kcal": 540, "protein_g": 24, "carbs_g": 62, "fat_g": 18, "amount": 80, "unit": "g"},
 ]
 
 
@@ -65,7 +61,6 @@ def seed_demo_data():
         ("demo", generate_password_hash("demo")),
     ).lastrowid
 
-    product_ids = {}
     for product in _DEMO_PRODUCTS:
         product_id = create_product(
             product["name"], product["brand"], product["barcode"],
@@ -73,10 +68,6 @@ def seed_demo_data():
             product["fat_per_100g"], product["carbs_per_100g"],
         )
         add_item(product_id, product["current_amount"], product["unit"], user_id=user_id)
-        product_ids[product["name"]] = product_id
-
-    log_consume(product_ids["Nutella"], 20, "g", note="demo consumption")
-    log_refill(product_ids["Parmesan"], 150, "g", note="demo refill")
 
     save_settings(user_id, daily_kcal=2200, protein_pct=30, carbs_pct=40, fat_pct=30)
 
@@ -84,7 +75,6 @@ def seed_demo_data():
         add_meal_entry(
             user_id, meal["name"], kcal=meal["kcal"], protein_g=meal["protein_g"],
             carbs_g=meal["carbs_g"], fat_g=meal["fat_g"],
-            product_id=product_ids[meal["product"]], barcode=meal["barcode"],
             amount=meal["amount"], unit=meal["unit"],
         )
 

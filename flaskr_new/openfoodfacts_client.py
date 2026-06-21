@@ -9,12 +9,9 @@ from urllib.parse import quote
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-logger = logging.getLogger(__name__)
+import certifi
 
-try:
-    import certifi
-except ModuleNotFoundError:  
-    certifi = None
+logger = logging.getLogger(__name__)
 
 OFF_API_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
 
@@ -115,10 +112,8 @@ def _kJ_to_kcal(kj):
 
 
 def _make_ssl_context():
-    """Return an SSL context using certifi if available, else system defaults."""
-    if certifi is not None:
-        return ssl.create_default_context(cafile=certifi.where())
-    return ssl.create_default_context()
+    """Return an SSL context using certifi's CA bundle."""
+    return ssl.create_default_context(cafile=certifi.where())
 
 
 def _kcal_from_nutriments(nutriments):

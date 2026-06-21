@@ -56,9 +56,9 @@ def test_daily_totals_and_remaining_values(app_context):
 
 
 def test_log_meal_from_fridge_item_deducts_stock(app_context):
-    product_id = add_product()
-    item_id = fridge_repo.add_item(product_id, 400.0, "g")
-    product = dict(product_repo.get_by_id(product_id))
+    add_product()
+    product = dict(product_repo.get_by_barcode("3017620422003"))
+    item_id = fridge_repo.add_item(product["id"], 400.0, "g")
 
     result = service.log_meal_from_product(1, product, 100.0, "g", fridge_item_id=item_id)
     meal = db.get_db().execute("SELECT * FROM meal_tracker_entry").fetchone()
