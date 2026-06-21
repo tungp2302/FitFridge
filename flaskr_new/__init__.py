@@ -20,11 +20,6 @@ def create_app(test_config=None):
     from . import db
     db.init_app(app)
 
-    # Uni-Projekt: Daten muessen Neustarts nicht ueberleben. Wir setzen das
-    # Schema bei jedem Start frisch auf (mit DROP), damit es immer exakt zu
-    # schema.sql passt. Waehrend der Laufzeit ist die Datei-DB persistent und
-    # fuer mehrere Accounts geteilt. Anschliessend kommt der demo/demo-Account
-    # mit Beispieldaten rein (im Test-Modus nicht, damit Tests sauber starten).
     with app.app_context():
         db.init_db()
         if not app.config.get("TESTING"):
