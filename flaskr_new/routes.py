@@ -108,15 +108,21 @@ def meal_tracker():
             session["meal_cart"] = []
             return redirect(url_for("frontend.meal_tracker"))
         elif action == "cart_add_fridge":
-            amount = _cart_float(request.form.get("amount"))
-            fridge_item = get_item(request.form.get("fridge_item_id"), user_id=user_id)
-            if fridge_item is None:
-                flash("Fridge-Item nicht gefunden.")
-            elif amount <= 0:
-                flash("Bitte eine Menge groesser als 0 angeben.")
-            else:
+            added = 0
+            for key, value in request.form.items():
+                if not key.startswith("amount_"):
+                    continue
+                amount = _cart_float(value)
+                if amount <= 0:
+                    continue
+                fridge_item = get_item(key[len("amount_"):], user_id=user_id)
+                if fridge_item is None:
+                    continue
                 cart.append({"kind": "fridge", "fridge_item_id": fridge_item["id"],
                              "name": fridge_item["name"], "unit": fridge_item["unit"], "amount": amount})
+                added += 1
+            if added == 0:
+                flash("Bitte bei mindestens einem Produkt eine Menge groesser als 0 angeben.")
             session["meal_cart"] = cart
             return redirect(url_for("frontend.meal_tracker", modal="add", tab="fridge"))
         elif action == "cart_add_product":

@@ -1,4 +1,3 @@
-"""Tests fuer das Verbrauchs-/Auffuell-Log."""
 import pytest
 
 from flaskr_new import create_app, db

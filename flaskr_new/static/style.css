@@ -144,7 +144,6 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
 /* shared reset for transparent inline buttons/forms */
 .flat-form,
 .today-text-button,
-.today-food-card__delete-form,
 .inline-delete{background:transparent;box-shadow:none;padding:0;margin:0}
 
 .post{padding:16px;margin-bottom:14px;position:relative;overflow:hidden}
@@ -259,8 +258,6 @@ hr{border:none;border-top:1px solid var(--line);margin:18px 0}
   color:var(--ink);
 }
 
-.clear-x-button{border-radius:50%;background:var(--chip);color:var(--ink);line-height:1;padding:0}
-
 .add-modal__actions{display:flex;justify-content:flex-end;gap:10px}
 
 button.secondary{background:var(--chip);color:var(--ink)}
@@ -317,8 +314,6 @@ button.secondary{background:var(--chip);color:var(--ink)}
 
 .pending-item__amount,
 .pending-item__remaining{width:84px;margin-bottom:0}
-
-.clear-x-button{width:36px;height:36px;display:grid;place-items:center;font-size:var(--fs-lg);box-shadow:none}
 
 .search-action-button{white-space:nowrap;height:46px}
 
@@ -383,8 +378,6 @@ button.secondary{background:var(--chip);color:var(--ink)}
 .today-food-card__nutri{color:var(--muted);font-size:var(--fs-sm)}
 
 .today-food-card__kcal{color:var(--ink);font-size:var(--fs-sm);font-weight:700}
-
-.today-food-card__delete{width:28px;height:28px;font-size:var(--fs-base)}
 
 .fridge-overview{max-width:640px}
 
