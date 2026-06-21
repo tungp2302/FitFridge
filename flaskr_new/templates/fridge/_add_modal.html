@@ -25,7 +25,7 @@
               <input type="hidden" name="action" value="cart_remove">
               <input type="hidden" name="tab" value="{{ tab }}">
               <input type="hidden" name="index" value="{{ loop.index0 }}">
-              <button type="submit" class="clear-x-button" aria-label="Entfernen">×</button>
+              <button type="submit" class="inline-delete" aria-label="Entfernen">×</button>
             </form>
           </div>
         {% endfor %}
@@ -45,24 +45,23 @@
     {% if tab == 'fridge' %}
       <div class="fridge-panel-scroll">
         {% if fridge_items %}
-          <div class="fridge-picker-grid">
-            {% for item in fridge_items %}
-              <div class="fridge-picker-card">
-                <div class="fridge-picker-card__head">
-                  <strong>{{ item.name }}</strong>
-                  <span class="muted">{{ item.current_amount }} {{ item.unit }}</span>
-                </div>
-                <div class="muted fridge-picker-card__meta">{{ item.brand }}</div>
-                <form method="post">
-                  <input type="hidden" name="action" value="cart_add_fridge">
-                  <input type="hidden" name="fridge_item_id" value="{{ item.id }}">
+          <form method="post">
+            <input type="hidden" name="action" value="cart_add_fridge">
+            <div class="fridge-picker-grid">
+              {% for item in fridge_items %}
+                <div class="fridge-picker-card">
+                  <div class="fridge-picker-card__head">
+                    <strong>{{ item.name }}</strong>
+                    <span class="muted">{{ item.current_amount }} {{ item.unit }}</span>
+                  </div>
+                  <div class="muted fridge-picker-card__meta">{{ item.brand }}</div>
                   <label for="famount-{{ item.id }}">Menge</label>
-                  <input type="number" step="0.1" min="0" name="amount" id="famount-{{ item.id }}" placeholder="z.B. 50">
-                  <button type="submit" class="secondary">In den Warenkorb</button>
-                </form>
-              </div>
-            {% endfor %}
-          </div>
+                  <input type="number" step="0.1" min="0" name="amount_{{ item.id }}" id="famount-{{ item.id }}" placeholder="z.B. 50">
+                </div>
+              {% endfor %}
+            </div>
+            <button type="submit" class="secondary" style="margin-top:10px;">zur Mahlzeit</button>
+          </form>
         {% else %}
           <p class="muted">Noch keine Produkte im Kühlschrank.</p>
         {% endif %}
@@ -99,7 +98,7 @@
                     <label>übrig</label>
                     <input type="number" step="0.1" min="0" name="remaining_amount" class="pending-item__remaining" placeholder="0">
                   </div>
-                  <button type="submit" class="secondary">In den Warenkorb</button>
+                  <button type="submit" class="secondary">zur Mahlzeit</button>
                 </div>
               </form>
             {% endfor %}
