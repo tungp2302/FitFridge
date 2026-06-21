@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="de">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,38 +16,37 @@
     };
   </script>
 </head>
+
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <a class="brand-button" href="{{ url_for('frontend.dashboard') }}">FitFridge</a>
-      <p class="brand-copy">Deine Lebensmittel. Der Überblick.</p>
-      <nav class="sidebar-nav" aria-label="Primary">
+  <div id="logo">
+    <h1>FitFridge</h1>
+  </div>
+  <nav>
+    <div id="menubar">
+      <div id="menuleft">
         <a href="{{ url_for('frontend.dashboard') }}">Kühlschrank</a>
         <a href="{{ url_for('frontend.meal_tracker') }}">Mahlzeiten-Tracker</a>
-      </nav>
-
-      <div class="sidebar-footer">
+      </div>
+      <div id="usermenu">
         {% if g.user %}
-          <div class="user-chip">{{ g.user['username'] }}</div>
-          <a class="link-button subtle" href="{{ url_for('frontend.logout') }}">Abmelden</a>
+        <a href="{{ url_for('frontend.logout') }}">Log Out</a>
+        <a href="{{ url_for('frontend.dashboard')}}">{{ g.user['username'] }}</a>
         {% else %}
-          <a class="link-button" href="{{ url_for('frontend.register') }}">Registrieren</a>
-          <a class="link-button subtle" href="{{ url_for('frontend.login') }}">Anmelden</a>
+        <a href="{{ url_for('frontend.register') }}">Register</a>
+        <a href="{{ url_for('frontend.login') }}">Log In</a>
         {% endif %}
       </div>
-    </aside>
-
-    <main class="main-pane">
-      <section class="content">
-        <header class="page-header">
-          {% block header %}{% endblock %}
-        </header>
-        {% for message in get_flashed_messages() %}
-          <div class="flash">{{ message }}</div>
-        {% endfor %}
-        {% block content %}{% endblock %}
-      </section>
-    </main>
-  </div>
+    </div>
+  </nav>
+  <section class="content">
+    <header>
+      {% block header %}{% endblock %}
+    </header>
+    {% for message in get_flashed_messages() %}
+    <div class="flash">{{ message }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </section>
 </body>
+
 </html>

@@ -1,88 +1,48 @@
 {% extends 'base.html' %}
 
 {% block header %}
-  <h1>{% block title %}Kühlschrank{% endblock %}</h1>
-  {% if g.user %}
-    <a class="action" href="{{ url_for('frontend.add_product') }}">+</a>
-  {% endif %}
+<h1>{% block title %}Fridge Overview{% endblock %}</h1>
+{% if g.user %}
+{% endif %}
 {% endblock %}
 
 {% block content %}
-  <section class="page-card today-dashboard fridge-overview" style="margin-bottom:1rem;">
-    <div class="today-dashboard__header">
-      <div>
-        <h2 style="margin:0 0 .25rem 0;">Kühlschrank-Übersicht</h2>
-        <p class="muted" style="margin:0;">Gesamtwerte ohne Zielvorgaben.</p>
+<h2>Thats what is inside ur fridge</h2>
+<div id="stats">
+  <p>{{ overview.totals.protein|round(0) }}<br>g protein</p>
+  <p>{{ overview.totals.carbs|round(0) }}<br>g carbs</p>
+  <p>{{ overview.totals.fat|round(0) }}<br>g fat</p>
+</div>
+<p id="statsfooter">{{ overview.totals.kcal|round(0) }}kcal over {{ overview.totals.item_count }} items </p>
+<div id="productmenu">
+  <h2>Your Products:</h2>
+  <a class="action" href="{{ url_for('frontend.add_product') }}"><button id="addbutton">Add Food</button></a>
+</div>
+{% for post in posts %}
+<article class="post">
+  <header>
+    <div>
+      <div id="headeractions">
+        <h2>{{ post['name'] }}</h2>
       </div>
+      <a class="action" href="{{ url_for('frontend.product_detail', item_id=post['id']) }}"><button id="productbutton">Edit</button></a>
+      <form method="post" action="{{ url_for('frontend.delete_product', item_id=post['id']) }}" style="display:inline;">
+        <button id="productbutton" type="submit" class="inline-delete" aria-label="Delete product">Delete Product</button>
+      </form>
+      <div class="about">{{ post['brand'] }} • {{ post['barcode'] }} • {{ post['created'].strftime('%Y-%m-%d') }}</div>
     </div>
-
-    <div class="today-dashboard__body">
-      <div class="macro-donut-grid">
-        <div class="macro-donut-block">
-          <div class="macro-donut" style="--progress: 1;">
-            <div class="macro-donut__inner">
-              <div class="macro-donut__target">{{ overview.totals.protein|round(0) }} g</div>
-            </div>
-          </div>
-          <div class="macro-donut__caption">Protein gesamt</div>
-        </div>
-        <div class="macro-donut-block">
-          <div class="macro-donut" style="--progress: 1;">
-            <div class="macro-donut__inner">
-              <div class="macro-donut__target">{{ overview.totals.carbs|round(0) }} g</div>
-            </div>
-          </div>
-          <div class="macro-donut__caption">Kohlenhydrate gesamt</div>
-        </div>
-        <div class="macro-donut-block">
-          <div class="macro-donut" style="--progress: 1;">
-            <div class="macro-donut__inner">
-              <div class="macro-donut__target">{{ overview.totals.fat|round(0) }} g</div>
-            </div>
-          </div>
-          <div class="macro-donut__caption">Fett gesamt</div>
-        </div>
-      </div>
-
-      <div class="today-progress-card">
-        <div class="today-progress__bar" aria-hidden="true">
-          <div class="today-progress__fill" style="width: 100%;"></div>
-        </div>
-        <div class="today-progress__footer">
-          <span>{{ overview.totals.kcal|round(0) }} kcal gesamt</span>
-          <span class="today-progress__label">{{ overview.totals.item_count }} Produkte</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  {% for post in posts %}
-    <article class="post">
-      <header>
-          <div>
-            <h1>{{ post['name'] }}</h1>
-            <div class="about">{{ post['brand'] }} • {{ post['barcode'] }} • {{ post['created'].strftime('%Y-%m-%d') }}</div>
-          </div>
-          {% if g.user %}
-            <div class="header-actions">
-              <a class="action" href="{{ url_for('frontend.product_detail', item_id=post['id']) }}">Bearbeiten</a>
-              <form method="post" action="{{ url_for('frontend.delete_product', item_id=post['id']) }}" style="display:inline;">
-                <button type="submit" class="inline-delete" aria-label="Delete product">×</button>
-              </form>
-            </div>
-          {% endif %}
-        </header>
-      <p class="body">
-        <strong>Menge:</strong> {{ post['current_amount'] }} {{ post['unit'] }}<br>
-        <strong>Nährwerte:</strong>
-        {{ post['total_kcal'] }} kcal •
-        {{ post['total_protein'] }}g Protein •
-        {{ post['total_fat'] }}g Fett •
-        {{ post['total_carbs'] }}g KH
-      </p>
-    </article>
-    {% if not loop.last %}
-      <hr>
-    {% endif %}
-  {% endfor %}
-{% endblock %}
+  </header>
+  Amount:{{ post['current_amount'] }} {{ post['unit'] }}
+  Total Nutrition:
+  <p id="itemstats">
+    {{ post['total_kcal'] }} kcal
+    {{ post['total_protein'] }}g protein
+    {{ post['total_fat'] }}g fat
+    {{ post['total_carbs'] }}g carbs
+  </p>
+</article>
+{% if not loop.last %}
+<hr>
+{% endif %}
+{% endfor %}
+{%endblock%}
