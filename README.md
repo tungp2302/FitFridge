@@ -6,9 +6,8 @@
 1. Registrieren / Einloggen: Jeder Nutzer hat seinen eigenen Kühlschrank.
 2. Produkt hinzufügen: (`/fridge/add`): Barcode oder Name eingeben → Treffer aus
    Open Food Facts auswählen → landet mit Nährwerten im Kühlschrank.
-3. Kühlschrank: (`/`): Bestände + hochgerechnete Nährwerte ansehen, bearbeiten,
-   verbrauchen / auffüllen.
-4.*Mahlzeiten-Tracker: (`/meal-tracker`): Tagesziel setzen und Mahlzeiten loggen
+3. Kühlschrank: (`/`):  Menge ändern und löschen.
+4. Mahlzeiten-Tracker: (`/meal-tracker`): Tagesziel setzen und Mahlzeiten loggen
    (aus einem Kühlschrank-Item oder per Barcode) – die Tagesübersicht zeigt
    verbraucht vs. übrig.
 
@@ -55,21 +54,21 @@ python3 -m pytest -q
 ### Windows (PowerShell)
 
 Im Projektordner ein Terminal öffnen.
-```
+
 powershell
-# 1. Virtuelle Umgebung anlegen und aktivieren
+1. Virtuelle Umgebung anlegen und aktivieren
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-# 2. Abhängigkeiten installieren
+2. Abhängigkeiten installieren
 pip install -r requirements.txt
 
-# 3. Dev-Server starten
+3. Dev-Server starten
 flask --app flaskr_new run --debug
 
 
-Dann im Browser öffnen: **http://127.0.0.1:5000**
-```
+Dann im Browser öffnen: http://127.0.0.1:5000
+
 
 ### Seiten
 Kühlschrank (Dashboard) http://127.0.0.1:5000/ 
