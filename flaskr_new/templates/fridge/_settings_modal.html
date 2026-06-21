@@ -1,0 +1,35 @@
+<div class="modal">
+  <a class="modal__backdrop" href="{{ url_for('frontend.meal_tracker') }}" aria-label="Schließen"></a>
+  <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+    <div class="modal__header">
+      <div>
+        <h2 id="settings-modal-title">Einstellungen</h2>
+        <p class="muted">Tagesziel</p>
+      </div>
+      <a class="modal__close" href="{{ url_for('frontend.meal_tracker') }}" aria-label="Schließen">×</a>
+    </div>
+
+    {% set kcal = settings['daily_kcal']|float %}
+    <p class="muted">Die Anteile werden beim Speichern auf 100&nbsp;% normalisiert.</p>
+    <form method="post">
+      <input type="hidden" name="action" value="save_settings">
+
+      <label for="daily_kcal">Zielkalorien</label>
+      <input type="number" step="1" min="0" name="daily_kcal" id="daily_kcal" value="{{ settings['daily_kcal'] }}">
+
+      <label for="protein_pct">Protein – {{ settings['protein_pct'] }}% / {{ (kcal * (settings['protein_pct']|float) / 100.0 / 4.0)|round(0) }} g</label>
+      <input type="range" min="0" max="100" name="protein_pct" id="protein_pct" value="{{ settings['protein_pct'] }}">
+
+      <label for="carbs_pct">Kohlenhydrate – {{ settings['carbs_pct'] }}% / {{ (kcal * (settings['carbs_pct']|float) / 100.0 / 4.0)|round(0) }} g</label>
+      <input type="range" min="0" max="100" name="carbs_pct" id="carbs_pct" value="{{ settings['carbs_pct'] }}">
+
+      <label for="fat_pct">Fett – {{ settings['fat_pct'] }}% / {{ (kcal * (settings['fat_pct']|float) / 100.0 / 9.0)|round(0) }} g</label>
+      <input type="range" min="0" max="100" name="fat_pct" id="fat_pct" value="{{ settings['fat_pct'] }}">
+
+      <div class="add-modal__actions" style="margin-top:1rem;">
+        <a class="link-button subtle" href="{{ url_for('frontend.meal_tracker') }}">Abbrechen</a>
+        <input type="submit" value="Speichern">
+      </div>
+    </form>
+  </div>
+</div>

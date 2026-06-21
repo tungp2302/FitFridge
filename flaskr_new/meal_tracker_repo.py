@@ -1,8 +1,8 @@
 """Repository Meal Tracker (Tagesziele + Mahlzeiten)."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 
-from .db import get_db
+from .db import get_db, _iso, _now
 
 
 DEFAULT_SETTINGS = {
@@ -13,60 +13,9 @@ DEFAULT_SETTINGS = {
 }
 
 
-def _row_to_dict(row):
-    return dict(row) if row is not None else None
-
-
-def _now():
-    return datetime.now(timezone.utc).replace(tzinfo=None)
-
-
-def _iso(dt):
-    return dt.strftime("%Y-%m-%d %H:%M:%S")
-
-
 def _start_of_today():
     now = _now()
     return datetime(now.year, now.month, now.day)
-
-
-def ensure_schema():
-    db = get_db()
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS meal_tracker_settings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER UNIQUE NOT NULL,
-            daily_kcal REAL NOT NULL DEFAULT 2000,
-            protein_pct REAL NOT NULL DEFAULT 30,
-            carbs_pct REAL NOT NULL DEFAULT 40,
-            fat_pct REAL NOT NULL DEFAULT 30,
-            updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES user (id)
-        )
-        """
-    )
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS meal_tracker_entry (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            meal_name TEXT NOT NULL,
-            product_id INTEGER,
-            barcode TEXT,
-            amount REAL,
-            unit TEXT,
-            kcal REAL NOT NULL,
-            protein_g REAL NOT NULL DEFAULT 0,
-            carbs_g REAL NOT NULL DEFAULT 0,
-            fat_g REAL NOT NULL DEFAULT 0,
-            note TEXT,
-            eaten_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES user (id)
-        )
-        """
-    )
-    db.commit()
 
 
 def get_settings(user_id):
@@ -82,20 +31,14 @@ def get_settings(user_id):
 
 def save_settings(user_id, daily_kcal, protein_pct, carbs_pct, fat_pct):
     db = get_db()
-    existing = db.execute(
-        "SELECT id FROM meal_tracker_settings WHERE user_id = ?",
-        (user_id,),
-    ).fetchone()
-    if existing is None:
-        db.execute(
-            "INSERT INTO meal_tracker_settings (user_id, daily_kcal, protein_pct, carbs_pct, fat_pct, updated) VALUES (?, ?, ?, ?, ?, ?)",
-            (user_id, float(daily_kcal), float(protein_pct), float(carbs_pct), float(fat_pct), _iso(_now())),
-        )
-    else:
-        db.execute(
-            "UPDATE meal_tracker_settings SET daily_kcal = ?, protein_pct = ?, carbs_pct = ?, fat_pct = ?, updated = ? WHERE user_id = ?",
-            (float(daily_kcal), float(protein_pct), float(carbs_pct), float(fat_pct), _iso(_now()), user_id),
-        )
+    db.execute(
+        "INSERT INTO meal_tracker_settings (user_id, daily_kcal, protein_pct, carbs_pct, fat_pct, updated)"
+        " VALUES (?, ?, ?, ?, ?, ?)"
+        " ON CONFLICT(user_id) DO UPDATE SET"
+        " daily_kcal=excluded.daily_kcal, protein_pct=excluded.protein_pct,"
+        " carbs_pct=excluded.carbs_pct, fat_pct=excluded.fat_pct, updated=excluded.updated",
+        (user_id, float(daily_kcal), float(protein_pct), float(carbs_pct), float(fat_pct), _iso(_now())),
+    )
     db.commit()
 
 
@@ -181,15 +124,15 @@ def get_today_meals(user_id):
         "SELECT * FROM meal_tracker_entry WHERE user_id = ? AND eaten_at >= ? ORDER BY eaten_at DESC",
         (user_id, _iso(_start_of_today())),
     ).fetchall()
-    return [_row_to_dict(row) for row in rows]
+    return [dict(row) for row in rows]
 
 
 def get_today_totals(user_id):
-    meals = get_today_meals(user_id)
-    totals = {"kcal": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0}
-    for meal in meals:
-        totals["kcal"] += float(meal.get("kcal", 0.0))
-        totals["protein_g"] += float(meal.get("protein_g", 0.0))
-        totals["carbs_g"] += float(meal.get("carbs_g", 0.0))
-        totals["fat_g"] += float(meal.get("fat_g", 0.0))
-    return {key: round(value, 1) for key, value in totals.items()}
+    db = get_db()
+    row = db.execute(
+        "SELECT COALESCE(SUM(kcal),0) AS kcal, COALESCE(SUM(protein_g),0) AS protein_g,"
+        " COALESCE(SUM(carbs_g),0) AS carbs_g, COALESCE(SUM(fat_g),0) AS fat_g"
+        " FROM meal_tracker_entry WHERE user_id = ? AND eaten_at >= ?",
+        (user_id, _iso(_start_of_today())),
+    ).fetchone()
+    return {k: round(float(row[k]), 1) for k in ("kcal", "protein_g", "carbs_g", "fat_g")}

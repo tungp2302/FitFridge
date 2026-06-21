@@ -2,8 +2,9 @@
 
 import json
 
-from . import fridge_repo, product_repo
-from .fridge_service import create_dashboard_item_from_data, list_dashboard_items, update_dashboard_item
+from . import fridge_repo
+from .calculations import calculate_for_amount
+from .fridge_service import create_dashboard_item_from_data, update_dashboard_item
 from .meal_tracker_repo import (
     DEFAULT_SETTINGS,
     add_meal_entry,
@@ -14,8 +15,6 @@ from .meal_tracker_repo import (
     save_settings,
     update_meal_entry_amount,
 )
-from .nutrition_service import calculate_for_amount
-from .openfoodfacts_client import lookup_product
 
 
 def normalize_macro_percentages(protein_pct, carbs_pct, fat_pct):
@@ -54,63 +53,9 @@ def build_daily_summary(settings, consumed):
         settings["carbs_pct"],
         settings["fat_pct"],
     )
-    remaining = {
-        "kcal": round(targets["kcal"] - consumed.get("kcal", 0.0), 1),
-        "protein_g": round(targets["protein_g"] - consumed.get("protein_g", 0.0), 1),
-        "carbs_g": round(targets["carbs_g"] - consumed.get("carbs_g", 0.0), 1),
-        "fat_g": round(targets["fat_g"] - consumed.get("fat_g", 0.0), 1),
-    }
+    remaining = {k: round(targets[k] - consumed.get(k, 0.0), 1) for k in targets}
 
-    recommendation_parts = []
-    if remaining["kcal"] > 0:
-        recommendation_parts.append(f"Noch {remaining['kcal']} kcal offen")
-    else:
-        recommendation_parts.append(f"{abs(remaining['kcal'])} kcal ueber dem Ziel")
-
-    for key, label in (("protein_g", "Protein"), ("carbs_g", "Kohlenhydrate"), ("fat_g", "Fett")):
-        if remaining[key] > 0:
-            recommendation_parts.append(f"{label}: {remaining[key]} g offen")
-        else:
-            recommendation_parts.append(f"{label}: {abs(remaining[key])} g ueberschritten")
-
-    return {
-        "targets": targets,
-        "remaining": remaining,
-        "recommendation": "; ".join(recommendation_parts),
-    }
-
-
-def resolve_product_from_barcode(barcode, user_id=None):
-    """Sucht ein Produkt per Barcode und gibt (Produkt, Fridge-Item) zurueck."""
-    barcode = (barcode or "").strip()
-    if not barcode:
-        return None, None
-
-    product = product_repo.get_by_barcode(barcode)
-    if product is None:
-        product_data = lookup_product(barcode)
-        if not product_data:
-            return None, None
-        product_id = product_repo.create_product(
-            name=product_data.get("name") or "Unnamed",
-            brand=product_data.get("brand") or "",
-            barcode=product_data.get("barcode") or barcode,
-            kcal_per_100g=float(product_data.get("kcal_per_100g") or 0.0),
-            protein_per_100g=float(product_data.get("protein_per_100g") or 0.0),
-            fat_per_100g=float(product_data.get("fat_per_100g") or 0.0),
-            carbs_per_100g=float(product_data.get("carbs_per_100g") or 0.0),
-        )
-        product = product_repo.get_by_id(product_id)
-
-    fridge_item = None
-    # Nur die Items des Nutzers durchsuchen - kein Fallback auf fremde Items.
-    fridge_items = fridge_repo.list_items(user_id=user_id)
-    for item in fridge_items:
-        if item["product_id"] == product["id"]:
-            fridge_item = dict(item)
-            break
-
-    return dict(product), fridge_item
+    return {"targets": targets, "remaining": remaining}
 
 
 def log_meal_from_product(user_id, product, amount, unit, fridge_item_id=None):
@@ -218,102 +163,43 @@ def edit_meal_amount_action(user_id, entry_id_raw, new_amount_raw):
     return "Menge aktualisiert." if updated else "Neue Menge konnte nicht gespeichert werden."
 
 
-def track_meals_from_payload(user_id, selected_payload_raw):
-    """Loggt mehrere ausgewaehlte Produkte; Restmengen wandern in den Fridge."""
-    try:
-        selected_payload = json.loads(selected_payload_raw)
-    except json.JSONDecodeError:
-        selected_payload = None
-
-    if not isinstance(selected_payload, list) or not selected_payload:
-        return "Bitte mindestens ein Produkt in die Liste aufnehmen."
-
-    logged_names = []
+def commit_meal_cart(user_id, cart):
+    """Loggt alle Eintraege des Warenkorbs: Fridge-Items werden abgezogen,
+    Produkt-Reste landen im Kuehlschrank."""
+    logged = 0
     fridge_saved = 0
-    for item in selected_payload:
+    for item in cart:
         if not isinstance(item, dict):
             continue
         amount = _safe_float(item.get("amount"), 0.0)
         if amount <= 0:
             continue
-        unit = item.get("unit") or "g"
-        selected_product = _product_from_payload_item(item)
-        log_meal_from_product(
-            user_id,
-            selected_product,
-            amount,
-            unit,
-            fridge_item_id=None,
-        )
-        remaining_amount = _safe_float(item.get("remaining_amount"), 0.0)
-        if remaining_amount > 0:
-            fridge_payload = {
-                **selected_product,
-                "brand": item.get("brand") or "",
-                "unit": unit,
-                "total_amount": remaining_amount,
-            }
-            create_dashboard_item_from_data(fridge_payload, user_id)
-            fridge_saved += 1
-        logged_names.append(selected_product["name"])
 
-    if not logged_names:
-        return "Bitte mindestens eine Menge groesser als 0 angeben."
+        if item.get("kind") == "fridge":
+            fridge_item = fridge_repo.get_item(item.get("fridge_item_id"), user_id=user_id)
+            if fridge_item is None:
+                continue
+            log_meal_from_product(
+                user_id, dict(fridge_item), amount, fridge_item["unit"],
+                fridge_item_id=fridge_item["id"],
+            )
+            logged += 1
+        else:
+            unit = item.get("unit") or "g"
+            product = _product_from_payload_item(item)
+            log_meal_from_product(user_id, product, amount, unit, fridge_item_id=None)
+            remaining = _safe_float(item.get("remaining_amount"), 0.0)
+            if remaining > 0:
+                create_dashboard_item_from_data(
+                    {**product, "brand": item.get("brand") or "", "unit": unit, "total_amount": remaining},
+                    user_id,
+                )
+                fridge_saved += 1
+            logged += 1
 
-    message = f"{len(logged_names)} Produkt(e) gespeichert."
+    if not logged:
+        return "Der Warenkorb ist leer."
+    message = f"{logged} Eintrag/Eintraege erfasst."
     if fridge_saved:
-        message += f" {fridge_saved} Produkt(e) als uebrig in den Kuehlschrank uebernommen."
-    return message
-
-
-def track_meal_from_form(user_id, form):
-    """Loggt eine einzelne Mahlzeit aus Fridge-Item oder Barcode."""
-    amount = _safe_float(form.get("amount"), 0.0)
-    if amount <= 0:
-        return "Bitte eine Menge groesser als 0 angeben."
-
-    fridge_item_id = form.get("fridge_item_id")
-    barcode = (form.get("barcode") or "").strip()
-    selected_product = None
-    selected_fridge_item_id = None
-    unit = "g"
-
-    if fridge_item_id:
-        fridge_item = next(
-            (item for item in list_dashboard_items(user_id) if str(item["id"]) == str(fridge_item_id)),
-            None,
-        )
-        if fridge_item is None:
-            return "Ausgewaehltes Fridge-Item wurde nicht gefunden."
-        selected_product = {
-            "id": fridge_item["product_id"],
-            "name": fridge_item["name"],
-            "barcode": fridge_item["barcode"],
-            "kcal_per_100g": fridge_item["kcal_per_100g"],
-            "protein_per_100g": fridge_item["protein_per_100g"],
-            "fat_per_100g": fridge_item["fat_per_100g"],
-            "carbs_per_100g": fridge_item["carbs_per_100g"],
-        }
-        selected_fridge_item_id = fridge_item["id"]
-        unit = fridge_item["unit"]
-    elif barcode:
-        selected_product, fridge_item = resolve_product_from_barcode(barcode, user_id)
-        if selected_product is None:
-            return "Barcode konnte keinem Produkt zugeordnet werden."
-        if fridge_item is not None:
-            selected_fridge_item_id = fridge_item["id"]
-            unit = fridge_item["unit"]
-    else:
-        return "Bitte ein Barcode oder ein Fridge-Item auswaehlen."
-
-    result = log_meal_from_product(
-        user_id,
-        selected_product,
-        amount,
-        unit,
-        fridge_item_id=selected_fridge_item_id,
-    )
-    message = f"{selected_product['name']} mit {amount} {unit} gespeichert."
-    if result["deducted"]:
-        message += " Bestand im Kuehlschrank wurde reduziert."
+        message += f" {fridge_saved} Rest(e) in den Kuehlschrank uebernommen."
     return message

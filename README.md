@@ -53,15 +53,9 @@ flask --app flaskr_new run --debug
 
 Dann im Browser öffnen: **http://127.0.0.1:5000**
 
-> Die Datenbank wird beim ersten Start automatisch angelegt.
-> Ein kompletter Reset geht mit `flask --app flaskr_new init-db`.
-
-**Demo-Daten laden (optional):**
-
-```bash
-python3 scripts/seed_demo.py
-# Login: demo / demo
-```
+> Die Datenbank wird bei **jedem** Serverstart frisch aus `schema.sql` aufgesetzt
+> und automatisch mit Demo-Daten befüllt. **Login: demo / demo.**
+> Daten überleben bewusst keinen Neustart, sind zur Laufzeit aber persistent.
 
 **Tests ausführen:**
 
@@ -90,8 +84,8 @@ flask --app flaskr_new run --debug
 
 Dann im Browser öffnen: **http://127.0.0.1:5000**
 
-> Die Datenbank wird beim ersten Start automatisch angelegt (fehlende Tabellen).
-> Ein kompletter Reset geht mit `flask --app flaskr_new init-db`.
+> Die Datenbank wird bei **jedem** Serverstart frisch aufgesetzt und automatisch
+> mit Demo-Daten befüllt. **Login: demo / demo.**
 
 ### Wichtige Seiten
 
@@ -100,13 +94,6 @@ Dann im Browser öffnen: **http://127.0.0.1:5000**
 | Kühlschrank (Dashboard) | http://127.0.0.1:5000/ |
 | Produkt hinzufügen | http://127.0.0.1:5000/fridge/add |
 | Mahlzeiten-Tracker | http://127.0.0.1:5000/meal-tracker |
-
-### Demo-Daten (optional, Windows)
-
-```powershell
-python scripts/seed_demo.py
-# Login: demo / demo
-```
 
 ## Tests (Windows)
 
@@ -120,3 +107,4 @@ python -m pytest -q
 Wenn „Flask not available in the active interpreter" erscheint: die `.venv` als
 Interpreter wählen – Command Palette → *Python: Select Interpreter* → `.venv`,
 danach *Developer: Reload Window*.
+

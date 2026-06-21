@@ -3,19 +3,11 @@
 import logging
 
 from . import fridge_repo, product_repo
+from .calculations import calculate_for_amount
 from .consumption_log_repo import log_consume, log_refill
 from .openfoodfacts_client import lookup_product
-from flaskr_new.nutrition_service import calculate_for_amount
 
 logger = logging.getLogger(__name__)
-
-def list_dashboard_items(user_id=None):
-    return fridge_repo.list_items(user_id=user_id)
-
-
-def get_dashboard_item(item_id, user_id=None):
-    return fridge_repo.get_item(item_id, user_id=user_id)
-
 
 def _resolve_or_create_product(product_data, fallback_barcode):
     """Find an existing product by barcode or create it from the payload."""
@@ -95,20 +87,14 @@ def update_dashboard_item(item_id, current_amount=None, unit=None, name=None, br
         elif delta > 0:
             log_refill(current_item["product_id"], delta, item_unit, note="Korrektur Bestand")
 
-    # update product metadata if provided
     if name is not None or brand is not None:
-        # Find linked product and update its metadata via product_repo
         product_id = current_item["product_id"]
-        # Use existing values as fallback if name/brand not provided
         current_name = current_item.get("name") or ""
         current_brand = current_item.get("brand") or ""
         updated += product_repo.update_product(product_id, name or current_name, brand or current_brand)
 
     return updated
 
-
-def delete_dashboard_item(item_id):
-    return fridge_repo.delete_item(item_id)
 
 def _change_amount(item_id, amount, user_id, *, consume):
     """Verbrauchen/Auffuellen. Beim Verbrauchen faellt der Bestand nicht unter 0.
@@ -164,30 +150,6 @@ def refill_amount(item_id, amount, user_id=None):
     return _change_amount(item_id, amount, user_id, consume=False)
 
 def calculate_total_nutrition(item):
-    """
-    Thin wrapper: nutzt nutrition_service.calculate_for_amount und
-    mapped das Ergebnis zu den legacy-Routen-Keys.
-    Erwartetes item: enthält current_amount, unit und die per-100g-Felder.
-    Defensive Defaults werden benutzt, falls Felder fehlen.
-    """
-    # Defensive reads, fallbacks zu 0 / leerer Einheit falls nötig
-    amount = item.get("current_amount")
-    unit = item.get("unit")
-
-    product_nutrients = {
-        "kcal_per_100g": item.get("kcal_per_100g", 0.0),
-        "protein_per_100g": item.get("protein_per_100g", 0.0),
-        "fat_per_100g": item.get("fat_per_100g", 0.0),
-        "carbs_per_100g": item.get("carbs_per_100g", 0.0),
-    }
-
-    # Delegation an den Nutrition-Service (Edge-Cases werden dort behandelt)
-    calc = calculate_for_amount(product_nutrients, amount, unit)
-
-    # Mappe auf die bisherigen Keys, die routes.py erwartet
-    return {
-        "total_kcal": calc.get("kcal", 0.0),
-        "total_protein": calc.get("protein", 0.0),
-        "total_fat": calc.get("fat", 0.0),
-        "total_carbs": calc.get("carbs", 0.0),
-    }
+    """Rechnet per-100g-Werte auf current_amount um, Keys prefixed mit total_."""
+    calc = calculate_for_amount(item, item.get("current_amount"), item.get("unit"))
+    return {f"total_{k}": v for k, v in calc.items()}

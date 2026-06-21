@@ -22,10 +22,7 @@ OFF_SEARCH_API_URL = "https://search.openfoodfacts.org/search"
 
 
 def _first_string(*values):
-    for v in values:
-        if v:
-            return str(v)
-    return ""
+    return next((str(v) for v in values if v), "")
 
 
 def _float_value(value, default=0.0):
@@ -47,19 +44,15 @@ def _normalize_text(value):
 
 def _score_off_product(query, product):
     """Ranking OpenFoodFacts products by text closeness."""
-    normalized_query = _normalize_text(query)
+    q = _normalize_text(query)
     name = _normalize_text(product.get("name", ""))
-
-    score = 0.0
-
-    if normalized_query and normalized_query == name:
-        score += 60
-    elif normalized_query and normalized_query in name:
-        score += 35
-    elif name and any(token in name for token in normalized_query.split()):
-        score += 15
-
-    return score
+    if not q or not name:
+        return 0.0
+    if q == name:
+        return 60.0
+    if q in name:
+        return 35.0
+    return 15.0 if any(t in name for t in q.split()) else 0.0
 
 
 def _rank_off_products(query, products):
@@ -107,7 +100,7 @@ def _parse_total_quantity(product_data):
     # Normalisierung
     unit_map = {
         "gramm": "g", "grams": "g", "g": "g",
-        "milliliter": "ml", "ml": "ml",
+        "ml": "ml",
         "l": "l", "liter": "l", "litre": "l",
         "mg": "mg",
         "stk": "stk", "stueck": "stk", "piece": "stk", "pieces": "stk",

@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
 
 {% block header %}
-  <h1>{% block title %}Kühlschrank{% endblock %}</h1>
+  <h1>{% block title %}Fridge{% endblock %}</h1>
   {% if g.user %}
-    <a class="action" href="{{ url_for('frontend.add_product') }}">+</a>
+    <a href="{{ url_for('frontend.add_product') }}">Lebensmittel hinzufügen</a>
   {% endif %}
 {% endblock %}
 
@@ -11,37 +11,22 @@
   <section class="page-card today-dashboard fridge-overview" style="margin-bottom:1rem;">
     <div class="today-dashboard__header">
       <div>
-        <h2 style="margin:0 0 .25rem 0;">Kühlschrank-Übersicht</h2>
-        <p class="muted" style="margin:0;">Gesamtwerte ohne Zielvorgaben.</p>
+        <h2>Kühlschrank-Übersicht</h2>
       </div>
     </div>
 
     <div class="today-dashboard__body">
       <div class="macro-donut-grid">
+        {% for label, value in [("Protein", overview.totals.protein), ("Kohlenhydrate", overview.totals.carbs), ("Fett", overview.totals.fat)] %}
         <div class="macro-donut-block">
           <div class="macro-donut" style="--progress: 1;">
             <div class="macro-donut__inner">
-              <div class="macro-donut__target">{{ overview.totals.protein|round(0) }} g</div>
+              <div class="macro-donut__target">{{ value|round(0) }} g</div>
             </div>
           </div>
-          <div class="macro-donut__caption">Protein gesamt</div>
+          <div class="macro-donut__caption">{{ label }}</div>
         </div>
-        <div class="macro-donut-block">
-          <div class="macro-donut" style="--progress: 1;">
-            <div class="macro-donut__inner">
-              <div class="macro-donut__target">{{ overview.totals.carbs|round(0) }} g</div>
-            </div>
-          </div>
-          <div class="macro-donut__caption">Kohlenhydrate gesamt</div>
-        </div>
-        <div class="macro-donut-block">
-          <div class="macro-donut" style="--progress: 1;">
-            <div class="macro-donut__inner">
-              <div class="macro-donut__target">{{ overview.totals.fat|round(0) }} g</div>
-            </div>
-          </div>
-          <div class="macro-donut__caption">Fett gesamt</div>
-        </div>
+        {% endfor %}
       </div>
 
       <div class="today-progress-card">
@@ -50,7 +35,7 @@
         </div>
         <div class="today-progress__footer">
           <span>{{ overview.totals.kcal|round(0) }} kcal gesamt</span>
-          <span class="today-progress__label">{{ overview.totals.item_count }} Produkte</span>
+          <span class="today-progress__label">{{ overview.totals.item_count }} Einträge</span>
         </div>
       </div>
     </div>
@@ -65,20 +50,20 @@
           </div>
           {% if g.user %}
             <div class="header-actions">
-              <a class="action" href="{{ url_for('frontend.product_detail', item_id=post['id']) }}">Bearbeiten</a>
+              <a href="{{ url_for('frontend.product_detail', item_id=post['id']) }}">Bearbeiten</a>
               <form method="post" action="{{ url_for('frontend.delete_product', item_id=post['id']) }}" style="display:inline;">
-                <button type="submit" class="inline-delete" aria-label="Delete product">×</button>
+                <button type="submit" class="inline-delete" aria-label="Produkt löschen">×</button>
               </form>
             </div>
           {% endif %}
         </header>
-      <p class="body">
+      <p>
         <strong>Menge:</strong> {{ post['current_amount'] }} {{ post['unit'] }}<br>
-        <strong>Nährwerte:</strong>
+        <strong>Gesamtnährwerte:</strong>
         {{ post['total_kcal'] }} kcal •
         {{ post['total_protein'] }}g Protein •
         {{ post['total_fat'] }}g Fett •
-        {{ post['total_carbs'] }}g KH
+        {{ post['total_carbs'] }}g Kohlenhydrate
       </p>
     </article>
     {% if not loop.last %}

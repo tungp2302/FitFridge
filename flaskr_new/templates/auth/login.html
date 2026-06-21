@@ -1,17 +1,10 @@
 {% extends 'base.html' %}
 
 {% block header %}
-  <h1>{% block title %}Log In{% endblock %}</h1>
+  <h1>{% block title %}Anmelden{% endblock %}</h1>
 {% endblock %}
 
 {% block content %}
-  <div class="page-card" style="max-width:520px;">
-    <form method="post">
-      <label for="username">Username</label>
-      <input name="username" id="username" required>
-      <label for="password">Password</label>
-      <input type="password" name="password" id="password" required>
-      <input type="submit" value="Log In">
-    </form>
-  </div>
+  {% set submit_label = 'Anmelden' %}
+  {% include 'auth/_form.html' %}
 {% endblock %}
