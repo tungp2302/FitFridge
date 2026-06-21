@@ -81,5 +81,11 @@ Mahlzeiten-Tracker http://127.0.0.1:5000/meal-tracker
 powershell
 pip install -r requirements-dev.txt
 python -m pytest -q
+python -m pytest tests/test_backend/test_meal_tracker.py
 
+# Either activate it once per terminal session:
+.\.venv\Scripts\Activate.ps1
+python -m pytest tests/test_backend/test_meal_tracker.py
 
+# Or call it directly without activating:
+.\.venv\Scripts\python.exe -m pytest tests/test_backend/test_meal_tracker.py
