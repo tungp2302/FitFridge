@@ -4,7 +4,9 @@ from .freestyle_recipe_support import (
     has_term,
     invalid_recipe_warning,
     is_savory_category,
+    is_sweet_category,
     is_supplement,
+    MEAT_FISH,
     item_label,
     limit_items,
     macro_target_ranges,
@@ -65,6 +67,7 @@ def _macro_strategy_hint(fridge_items, daily_goal, recipe_category=None):
     if not macro_target_ranges(daily_goal):
         return ""
     savory = is_savory_category(recipe_category)
+    sweet = is_sweet_category(recipe_category)
     starch_terms = ("reis", "rice", "nudel", "noodle", "pasta", "spaghetti", "bun", "buns", "broetchen", "brötchen", "brot", "bread", "wrap", "tortilla")
     secondary_protein_terms = ("kaese", "käse", "cheddar", "parmesan", "acciughe", "sardelle", "anchovy", "olive", "oliven")
     protein_items, starch_items, fat_items = [], [], []
@@ -73,7 +76,7 @@ def _macro_strategy_hint(fridge_items, daily_goal, recipe_category=None):
         protein = safe_float(item.get("protein_per_100g")) or 0.0
         carbs = safe_float(item.get("carbs_per_100g")) or 0.0
         fat = safe_float(item.get("fat_per_100g")) or 0.0
-        if protein >= 15 and (not savory or not is_supplement(name)) and not has_term(name, secondary_protein_terms):
+        if protein >= 15 and (not savory or not is_supplement(name)) and not has_term(name, secondary_protein_terms) and not (sweet and has_term(name, MEAT_FISH)):
             protein_items.append((protein, name))
         if carbs >= 20 and has_term(name, starch_terms):
             starch_items.append((carbs, name))
@@ -84,10 +87,12 @@ def _macro_strategy_hint(fridge_items, daily_goal, recipe_category=None):
         return ", ".join(name for _, name in sorted(rows, reverse=True)[:limit])
 
     parts = []
+    if sweet:
+        parts.append("fuer Fruehstueck, Nachspeise oder Snack KEIN Fleisch und keinen Fisch; Protein ueber Eier, Joghurt, Quark, Haferflocken oder Proteinpulver, wenige Zutaten und kleine Mengen (Haferflocken 40-60g, Nuesse/Honig/Oel sparsam), damit das kcal-Ziel nicht ueberschritten wird")
     protein_target = safe_float((daily_goal or {}).get("protein")) or 0.0
-    if protein_target >= 50:
+    if protein_target >= 50 and not sweet:
         parts.append("bei Protein-Ziel ab 50g ist 150g Hauptprotein meist zu wenig; fuer Rumpsteak, Haehnchen oder Hack eher ca. 200g verwenden")
-    if protein_items:
+    if protein_items and not sweet:
         parts.append(f"Protein eher ueber {names(protein_items)} erreichen, meist 180-260g")
     if starch_items:
         parts.append(f"fuer kcal/carbs eher {names(starch_items)} nutzen, bei Reis/Nudeln meist 100-130g trocken; nicht Kartoffeln oder Gemuese allein")
@@ -114,7 +119,7 @@ def build_prompt(fridge_items, daily_goal=None, recipe_category=None, retry_reas
     f"Rezeptart: {category}.{_goal_hint(daily_goal)}{_macro_strategy_hint(fridge_items, daily_goal, recipe_category)}{_exclude_hint(exclude)} "
 
     f"Kuehlschrank-Zutaten, nur diese IDs erlaubt: {fridge_list}. "
-    "Zusaetzlich erlaubt sind nur Wasser, Oel, Salz, Pfeffer, Gewuerze und Saucen wie Ketchup, Mayonnaise und Senf. "
+    "Zusaetzlich erlaubt sind nur Wasser, Oel, Salz, Zucker, Süßungsmittel, Pfeffer, Gewuerze und Saucen wie Ketchup, Mayonnaise und Senf. "
     "Keine anderen Lebensmittel verwenden. "
     "Pantry-Zutaten nur auffuehren, wenn sie wirklich verwendet werden; nicht die erlaubte Pantry-Liste als Zutaten kopieren. "
 
@@ -205,7 +210,7 @@ def _run(fridge_items, daily_goal, recipe_category, model, base_url, timeout, co
     profile = _profile(model)
     prompt_items = limit_items(fridge_items, profile["max_items"])
     temperature = 0.7 if count > 1 else 0.15
-    max_attempts = 2 if count <= 1 else count + 1
+    max_attempts = 3 if count <= 1 else count + 1
 
     def ask(retry_reason=None, extra_exclude=None):
         prompt = build_prompt(

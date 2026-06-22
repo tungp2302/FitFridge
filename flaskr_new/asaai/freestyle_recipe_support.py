@@ -39,6 +39,9 @@ MAIN_STARCH_GROUPS = (
     ("getreide", ("bulgur", "couscous", "quinoa")),
 )
 SAVORY_CATS = ("hauptspeise", "abendessen", "mittag", "lunch", "dinner", "main")
+# Kein-Fleisch-Kategorien: hier sind Fleisch/Fisch als Hauptprotein unpassend.
+SWEET_CATS = ("fruehstueck", "frühstück", "breakfast", "nachspeise", "nachtisch", "dessert", "snack")
+MEAT_FISH = tuple(t for label, terms in MAIN_PROTEIN_GROUPS if label != "tofu" for t in terms)
 SWEET_DISH = ("porridge", "haferbrei", "muesli", "smoothie", "shake", "joghurtbowl", "yogurt bowl", "dessert", "nachspeise", "pfannkuchen", "pancake")
 SUPP_BLOCK = VEG + ("reis", "rice", "kartoffel", "potato", "nudel", "noodle", "pasta", "brot", "bread", "huhn", "chicken", "haehnchen", "hähnchen", "rind", "beef", "steak", "fisch", "fish", "lachs", "salmon", "tofu", "tempeh", "pfanne", "brat", "auflauf", "curry", "suppe", "salat", "gemuese", "gemüse")
 SUPP_OK = ("pfannkuchen", "pancake", "porridge", "haferbrei", "shake", "smoothie", "joghurt", "yogurt", "quark", "skyr", "bowl", "gebaeck", "gebäck", "muffin", "waffel", "waffle")
@@ -63,6 +66,8 @@ def is_supplement(name):
     return has_term(name, SUPPLEMENT)
 def is_savory_category(category):
     return has_term(category or "", SAVORY_CATS)
+def is_sweet_category(category):
+    return has_term(category or "", SWEET_CATS)
 def _sweetish(name):
     return has_term(name, SWEET) or is_supplement(name)
 def _tokens(value):
@@ -254,6 +259,8 @@ def _recipe_conflicts(recipe, category, used_names):
     if any(is_supplement(name) for name in used_names) and (has_term(full_text, SUPP_BLOCK) or not has_term(full_text, SUPP_OK)):
         return True
     if is_savory_category(category) and any(_sweetish(name) for name in used_names) and (not has_term(text, SAVORY) or has_term(title, SWEET_DISH) and not has_term(text, SAVORY)):
+        return True
+    if is_sweet_category(category) and any(has_term(name, MEAT_FISH) for name in used_names):
         return True
     title_foods = _food_words(title)
     if len(title_foods) >= 2:
