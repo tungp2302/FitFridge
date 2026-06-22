@@ -9,10 +9,10 @@ from .ollama_client import generate_from_ollama
 
 
 _PROMPT = (
-    "Du bist ein Naehrwert-Schaetzer fuer FitFridge. "
-    "Schaetze die Naehrwerte pro 100g fuer das genannte Lebensmittel moeglichst praezise. "
-    "Nimm die unverarbeitete Primaerquelle an (z.B. 'Mango' = frische Mango, nicht Mango-Lassi). "
-    "Bei Unsicherheit gib eine plausible Durchschnittsschaetzung statt 0. "
+    "Du bist ein Lebensmittel Experte und Nährwert-Schätzer für FitFridge. "
+    "Schätze die Nährwerte pro 100g für das genannte Lebensmittel möglichst präzise. "
+    "Auf 100g immer die Protein-, Fett- und Kohlenhydratmenge sowie die Kalorien angeben. "
+    "Bei Unsicherheit gib eine plausible Durchschnittsschätzung statt 0. "
     "Antworte nur als JSON, ohne Markdown:\n"
     '{"name":"string","kcal":number,"protein":number,"fat":number,"carbs":number}\n\n'
     "Lebensmittel: "

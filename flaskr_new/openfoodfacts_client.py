@@ -86,7 +86,7 @@ def _parse_total_quantity(product_data):
     raw = raw.replace(",", ".").lower().strip()
 
     # Pattern: multiplicator e.g. "4 x 100 g" or "4x100g"
-    m = re.search(r"(?:(\d+(?:\.\d+)?)\s*[x×]\s*)?(\d+(?:\.\d+)?)(?:\s*)(mg|g|gramm|grams|ml|l|liter|litre|stk|stueck|piece|pieces)?", raw)
+    m = re.search(r"(?:(\d+(?:\.\d+)?)\s*[x×]\s*)?(\d+(?:\.\d+)?)(?:\s*)(mg|kg|kilogramm|gramm|grams|g|ml|cl|liter|litre|l|stk|stueck|piece|pieces)?", raw)
     if not m:
         return None, None
 
@@ -97,7 +97,8 @@ def _parse_total_quantity(product_data):
     # Normalisierung
     unit_map = {
         "gramm": "g", "grams": "g", "g": "g",
-        "ml": "ml",
+        "kg": "kg", "kilogramm": "kg",
+        "ml": "ml", "cl": "cl",
         "l": "l", "liter": "l", "litre": "l",
         "mg": "mg",
         "stk": "stk", "stueck": "stk", "piece": "stk", "pieces": "stk",
