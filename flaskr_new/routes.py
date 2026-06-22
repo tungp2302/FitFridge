@@ -38,6 +38,7 @@ from .openfoodfacts_client import search_product, search_products
 from .product_repo import search_by_name
 from .app_settings_repo import get_settings as get_app_settings, save_settings as save_app_settings
 from .asaai.ollama_client import OLLAMA_MODEL_CHOICES, resolve_ollama_model, test_ollama_model
+from .asaai.food_estimate import estimate_food
 
 bp = Blueprint("frontend", __name__, template_folder="templates", static_folder="static")
 
@@ -287,8 +288,8 @@ def unified_search(q):
             return []
         return [_to_result(product)]
 
-    # Text-Suche: erst lokale Treffer aus der DB, dann die OFF-Textsuche.
-    # search_products faengt Netzfehler selbst ab und liefert dann [].
+    # Text-Suche: KI-Schaetzung zuerst (Primaerquelle), dann lokale DB-Treffer
+    # und die OFF-Textsuche. search_products faengt Netzfehler selbst ab.
     results = []
     seen_barcodes = set()
 
@@ -299,6 +300,10 @@ def unified_search(q):
         if barcode:
             seen_barcodes.add(barcode)
         results.append(_to_result(item))
+
+    estimate = estimate_food(q)  # ponytail: ein Ollama-Call pro Textsuche, bewusst
+    if estimate:
+        results.append(_to_result(estimate))
 
     for r in search_by_name(q, limit=10):
         add(dict(r))

@@ -1,5 +1,9 @@
 let requestToken = 0;
 
+function escHtml(value){
+  return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 function readGoalValue(id){
   const raw = document.getElementById(id).value.trim();
   if(raw === '') return null;
