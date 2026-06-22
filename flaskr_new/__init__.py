@@ -29,4 +29,7 @@ def create_app(test_config=None):
     from .routes import bp as frontend_bp
     app.register_blueprint(frontend_bp)
 
+    from .asaai import routes_asaai
+    app.register_blueprint(routes_asaai.asaai_bp)
+
     return app
