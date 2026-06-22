@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from .db import get_db, _iso, _now
+from .db import get_db, _now
 
 
 DEFAULT_SETTINGS = {
@@ -11,11 +11,6 @@ DEFAULT_SETTINGS = {
     "carbs_pct": 40.0,
     "fat_pct": 30.0,
 }
-
-
-def _start_of_today():
-    now = _now()
-    return datetime(now.year, now.month, now.day)
 
 
 def get_settings(user_id):
@@ -37,7 +32,7 @@ def save_settings(user_id, daily_kcal, protein_pct, carbs_pct, fat_pct):
         " ON CONFLICT(user_id) DO UPDATE SET"
         " daily_kcal=excluded.daily_kcal, protein_pct=excluded.protein_pct,"
         " carbs_pct=excluded.carbs_pct, fat_pct=excluded.fat_pct, updated=excluded.updated",
-        (user_id, float(daily_kcal), float(protein_pct), float(carbs_pct), float(fat_pct), _iso(_now())),
+        (user_id, float(daily_kcal), float(protein_pct), float(carbs_pct), float(fat_pct), _now().strftime("%Y-%m-%d %H:%M:%S")),
     )
     db.commit()
 
@@ -115,7 +110,7 @@ def get_today_meals(user_id):
     db = get_db()
     rows = db.execute(
         "SELECT * FROM meal_tracker_entry WHERE user_id = ? AND eaten_at >= ? ORDER BY eaten_at DESC",
-        (user_id, _iso(_start_of_today())),
+        (user_id, _now().strftime("%Y-%m-%d 00:00:00")),
     ).fetchall()
     return [dict(row) for row in rows]
 
@@ -126,6 +121,6 @@ def get_today_totals(user_id):
         "SELECT COALESCE(SUM(kcal),0) AS kcal, COALESCE(SUM(protein_g),0) AS protein_g,"
         " COALESCE(SUM(carbs_g),0) AS carbs_g, COALESCE(SUM(fat_g),0) AS fat_g"
         " FROM meal_tracker_entry WHERE user_id = ? AND eaten_at >= ?",
-        (user_id, _iso(_start_of_today())),
+        (user_id, _now().strftime("%Y-%m-%d 00:00:00")),
     ).fetchone()
     return {k: round(float(row[k]), 1) for k in ("kcal", "protein_g", "carbs_g", "fat_g")}

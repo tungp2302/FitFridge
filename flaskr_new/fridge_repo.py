@@ -11,10 +11,8 @@ _FRIDGE_ITEM_SELECT = (
 )
 
 
-def list_items(user_id=None):
+def list_items(user_id):
     """Alle Produkte im Kühlschrank mit Produktdetails abrufen."""
-    if user_id is None:
-        return get_db().execute(f"{_FRIDGE_ITEM_SELECT} ORDER BY f.created DESC").fetchall()
     return get_db().execute(
         f"{_FRIDGE_ITEM_SELECT} WHERE f.user_id = ? ORDER BY f.created DESC",
         (user_id,),

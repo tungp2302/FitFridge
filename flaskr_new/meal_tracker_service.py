@@ -1,19 +1,13 @@
 """Fachlogik fuer den Meal Tracker (Tagesziel, Makros, Mahlzeiten loggen)."""
 
-import json
-
 from . import fridge_repo
-from .calculations import calculate_for_amount
+from .calculations import calculate_for_amount, safe_float
 from .fridge_service import create_dashboard_item_from_data, update_dashboard_item
 from .meal_tracker_repo import (
     DEFAULT_SETTINGS,
     add_meal_entry,
-    delete_meal_entry,
-    get_today_meals,
     get_settings,
-    get_today_totals,
     save_settings,
-    update_meal_entry_amount,
 )
 
 
@@ -75,7 +69,6 @@ def log_meal_from_product(user_id, product, amount, unit, fridge_item_id=None):
 
     deducted = False
     if fridge_item_id is not None:
-        # Scoped lookup: eigene oder besitzerlose Items, nie fremde.
         fridge_item = fridge_repo.get_item(fridge_item_id, user_id=user_id)
         if fridge_item is not None:
             fridge_item_dict = dict(fridge_item)
@@ -95,37 +88,13 @@ def log_meal_from_product(user_id, product, amount, unit, fridge_item_id=None):
     }
 
 
-# ---------------------------------------------------------------------------
-# Action-Handler fuer die /meal-tracker Route.
-# Jeder Handler kapselt eine POST-Action und gibt die Flash-Nachricht zurueck.
-# ---------------------------------------------------------------------------
-
-
-def _safe_float(value, default):
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return float(default)
-
-
-def _product_from_payload_item(item):
-    return {
-        "name": item.get("name") or "Product",
-        "barcode": item.get("barcode") or item.get("name") or "selected-product",
-        "kcal_per_100g": _safe_float(item.get("kcal_per_100g"), 0.0),
-        "protein_per_100g": _safe_float(item.get("protein_per_100g"), 0.0),
-        "fat_per_100g": _safe_float(item.get("fat_per_100g"), 0.0),
-        "carbs_per_100g": _safe_float(item.get("carbs_per_100g"), 0.0),
-    }
-
-
 def save_settings_action(user_id, form):
     """Speichert Tagesziel + Makroverteilung aus dem Formular."""
     current = get_settings(user_id)
-    daily_kcal = _safe_float(form.get("daily_kcal"), current["daily_kcal"])
-    protein_pct = _safe_float(form.get("protein_pct"), current["protein_pct"])
-    carbs_pct = _safe_float(form.get("carbs_pct"), current["carbs_pct"])
-    fat_pct = _safe_float(form.get("fat_pct"), current["fat_pct"])
+    daily_kcal = safe_float(form.get("daily_kcal"), current["daily_kcal"])
+    protein_pct = safe_float(form.get("protein_pct"), current["protein_pct"])
+    carbs_pct = safe_float(form.get("carbs_pct"), current["carbs_pct"])
+    fat_pct = safe_float(form.get("fat_pct"), current["fat_pct"])
     normalized = normalize_macro_percentages(protein_pct, carbs_pct, fat_pct)
     save_settings(
         user_id,
@@ -137,28 +106,6 @@ def save_settings_action(user_id, form):
     return "Tagesziel und Macroverteilung gespeichert."
 
 
-def delete_meal_action(user_id, entry_id_raw):
-    """Loescht einen Meal-Eintrag des Nutzers."""
-    if not entry_id_raw:
-        return "Mahlzeit konnte nicht geloescht werden."
-    try:
-        deleted = delete_meal_entry(int(entry_id_raw), user_id)
-    except ValueError:
-        deleted = False
-    return "Mahlzeit geloescht." if deleted else "Mahlzeit konnte nicht geloescht werden."
-
-
-def edit_meal_amount_action(user_id, entry_id_raw, new_amount_raw):
-    """Skaliert einen Meal-Eintrag auf eine neue Menge."""
-    if not entry_id_raw or not new_amount_raw:
-        return "Neue Menge konnte nicht gespeichert werden."
-    try:
-        updated = update_meal_entry_amount(int(entry_id_raw), user_id, float(new_amount_raw))
-    except ValueError:
-        updated = False
-    return "Menge aktualisiert." if updated else "Neue Menge konnte nicht gespeichert werden."
-
-
 def commit_meal_cart(user_id, cart):
     """Loggt alle Eintraege des Warenkorbs: Fridge-Items werden abgezogen,
     Produkt-Reste landen im Kuehlschrank."""
@@ -167,7 +114,7 @@ def commit_meal_cart(user_id, cart):
     for item in cart:
         if not isinstance(item, dict):
             continue
-        amount = _safe_float(item.get("amount"), 0.0)
+        amount = safe_float(item.get("amount"), 0.0)
         if amount <= 0:
             continue
 
@@ -182,9 +129,16 @@ def commit_meal_cart(user_id, cart):
             logged += 1
         else:
             unit = item.get("unit") or "g"
-            product = _product_from_payload_item(item)
+            product = {
+                "name": item.get("name") or "Product",
+                "barcode": item.get("barcode") or item.get("name") or "selected-product",
+                "kcal_per_100g": safe_float(item.get("kcal_per_100g"), 0.0),
+                "protein_per_100g": safe_float(item.get("protein_per_100g"), 0.0),
+                "fat_per_100g": safe_float(item.get("fat_per_100g"), 0.0),
+                "carbs_per_100g": safe_float(item.get("carbs_per_100g"), 0.0),
+            }
             log_meal_from_product(user_id, product, amount, unit, fridge_item_id=None)
-            remaining = _safe_float(item.get("remaining_amount"), 0.0)
+            remaining = safe_float(item.get("remaining_amount"), 0.0)
             if remaining > 0:
                 create_dashboard_item_from_data(
                     {**product, "brand": item.get("brand") or "", "unit": unit, "total_amount": remaining},

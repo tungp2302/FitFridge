@@ -2,6 +2,9 @@
 import copy
 import json
 import re
+
+from ..calculations import safe_float
+
 NUTRITION_FIELDS = ("kcal_per_100g", "protein_per_100g", "fat_per_100g", "carbs_per_100g")
 MACRO_FIELDS = (("kcal", "kcal_per_100g"), ("protein", "protein_per_100g"), ("fat", "fat_per_100g"), ("carbs", "carbs_per_100g"))
 MACRO_TOLERANCES = {
@@ -45,11 +48,6 @@ ALIASES = {"egg": ("ei", "eier"), "eggs": ("ei", "eier"), "ei": ("egg", "eggs", 
 def normalize(value):
     text = (value or "").lower()
     return text.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")
-def safe_float(value):
-    try:
-        return None if value in (None, "") else float(str(value).replace(",", "."))
-    except (TypeError, ValueError):
-        return None
 def has_term(text, terms):
     text = normalize(text)
     words = re.findall(r"[a-zA-ZäöüÄÖÜß]+", text)

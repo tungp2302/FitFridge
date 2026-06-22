@@ -16,15 +16,18 @@ from flask import (
 from werkzeug.exceptions import abort
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from .calculations import safe_float
 from .db import get_db
-from .meal_tracker_service import (
-    build_daily_summary,
-    commit_meal_cart,
-    delete_meal_action,
-    edit_meal_amount_action,
+from .meal_tracker_repo import (
+    delete_meal_entry,
     get_today_meals,
     get_settings,
     get_today_totals,
+    update_meal_entry_amount,
+)
+from .meal_tracker_service import (
+    build_daily_summary,
+    commit_meal_cart,
     save_settings_action,
 )
 from .fridge_repo import delete_item as delete_dashboard_item, get_item, list_items
@@ -143,10 +146,21 @@ def meal_tracker():
         tab = request.form.get("tab", "product")
 
         if action == "delete_meal":
-            flash(delete_meal_action(user_id, request.form.get("meal_entry_id")))
+            entry_id_raw = request.form.get("meal_entry_id")
+            try:
+                deleted = delete_meal_entry(int(entry_id_raw), user_id) if entry_id_raw else False
+            except (TypeError, ValueError):
+                deleted = False
+            flash("Mahlzeit geloescht." if deleted else "Mahlzeit konnte nicht geloescht werden.")
             return redirect(url_for("frontend.meal_tracker"))
         elif action == "edit_meal_amount":
-            flash(edit_meal_amount_action(user_id, request.form.get("meal_entry_id"), request.form.get("new_amount")))
+            entry_id_raw = request.form.get("meal_entry_id")
+            new_amount_raw = request.form.get("new_amount")
+            try:
+                updated = update_meal_entry_amount(int(entry_id_raw), user_id, float(new_amount_raw)) if entry_id_raw and new_amount_raw else False
+            except (TypeError, ValueError):
+                updated = False
+            flash("Menge aktualisiert." if updated else "Neue Menge konnte nicht gespeichert werden.")
             return redirect(url_for("frontend.meal_tracker"))
         elif action == "save_settings":
             flash(save_settings_action(user_id, request.form))
@@ -160,7 +174,7 @@ def meal_tracker():
             for key, value in request.form.items():
                 if not key.startswith("amount_"):
                     continue
-                amount = _cart_float(value)
+                amount = safe_float(value, 0.0)
                 if amount <= 0:
                     continue
                 fridge_item = get_item(key[len("amount_"):], user_id=user_id)
@@ -174,7 +188,7 @@ def meal_tracker():
             session["meal_cart"] = cart
             return redirect(url_for("frontend.meal_tracker", modal="add", tab="fridge"))
         elif action == "cart_add_product":
-            amount = _cart_float(request.form.get("amount"))
+            amount = safe_float(request.form.get("amount"), 0.0)
             try:
                 product = json.loads(request.form.get("selected_payload", ""))
             except json.JSONDecodeError:
@@ -184,9 +198,9 @@ def meal_tracker():
             elif amount <= 0:
                 flash("Bitte eine Menge groesser als 0 angeben.")
             else:
-                entry = {k: product.get(k) for k in _CART_PRODUCT_KEYS}
+                entry = {k: product.get(k) for k in _RESULT_KEYS}
                 entry.update(kind="product", unit=product.get("unit") or "g",
-                             amount=amount, remaining_amount=_cart_float(request.form.get("remaining_amount")))
+                             amount=amount, remaining_amount=safe_float(request.form.get("remaining_amount"), 0.0))
                 cart.append(entry)
             session["meal_cart"] = cart
             return redirect(url_for("frontend.meal_tracker", modal="add", tab="product"))
@@ -224,17 +238,6 @@ def meal_tracker():
         fridge_items=fridge_items,
         cart=cart,
     )
-
-
-_CART_PRODUCT_KEYS = ("name", "brand", "barcode", "kcal_per_100g",
-                      "protein_per_100g", "fat_per_100g", "carbs_per_100g", "unit")
-
-
-def _cart_float(value):
-    try:
-        return float((value or "").replace(",", ".")) if isinstance(value, str) else float(value)
-    except (TypeError, ValueError):
-        return 0.0
 
 
 @bp.route("/fridge/add", methods=("GET", "POST"))

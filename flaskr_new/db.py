@@ -9,10 +9,6 @@ def _now():
     """UTC now without tzinfo (matches SQLite CURRENT_TIMESTAMP)."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
-
-def _iso(dt):
-    return dt.strftime("%Y-%m-%d %H:%M:%S")
-
 def init_app(app):
     app.teardown_appcontext(close_db)
     app.cli.add_command(init_db_command)

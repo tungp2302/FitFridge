@@ -21,3 +21,12 @@ def calculate_for_amount(product, amount, unit):
         "fat": round(product["fat_per_100g"] * m, 1),
         "carbs": round(product["carbs_per_100g"] * m, 1),
     }
+
+
+def safe_float(value, default=None):
+    try:
+        if value is None or value == "":
+            return default
+        return float(str(value).replace(",", "."))
+    except (TypeError, ValueError):
+        return default
