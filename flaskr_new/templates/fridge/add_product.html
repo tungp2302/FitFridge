@@ -18,9 +18,10 @@
       {% if results %}
         <div class="search-results-panel" style="margin-top:.5rem;">
           {% for item in results %}
-            <div class="search-item">
+            {% set is_ai = item.brand == 'KI-Schätzung' %}
+            <div class="search-item{% if is_ai %} is-ai{% endif %}">
               <div class="search-item__top">
-                <strong>{{ item.name or '(no name)' }}</strong>
+                <strong>{{ item.name or '(no name)' }} <span class="badge {{ 'is-ai' if is_ai else 'is-off' }}">{{ 'KI' if is_ai else 'OFF' }}</span></strong>
                 <form method="post" class="flat-form">
                   <input type="hidden" name="selected_payload" value='{{ item|tojson }}'>
                   <button type="submit" class="search-action-button">Hinzufügen</button>

@@ -81,12 +81,13 @@
         {% if results %}
           <div class="search-results-panel" style="margin-top:.5rem;">
             {% for item in results %}
-              <form method="post" class="search-item">
+              {% set is_ai = item.brand == 'KI-Schätzung' %}
+              <form method="post" class="search-item{% if is_ai %} is-ai{% endif %}">
                 <input type="hidden" name="action" value="cart_add_product">
                 <input type="hidden" name="selected_payload" value='{{ item|tojson }}'>
                 <div class="search-item__top">
                   <strong>{{ item.name or '(ohne Name)' }}</strong>
-                  <span class="badge is-off">OFF</span>
+                  <span class="badge {{ 'is-ai' if is_ai else 'is-off' }}">{{ 'KI' if is_ai else 'OFF' }}</span>
                 </div>
                 <div class="search-item__brand muted">{{ item.brand or '' }} · {{ item.kcal_per_100g or '' }} kcal/100g</div>
                 <div class="pending-item__controls" style="margin-top:8px;">

@@ -346,6 +346,8 @@ button.secondary{background:var(--chip);color:var(--ink)}
 }
 
 .badge.is-off{background:#e2e8f0;color:#334155}
+.badge.is-ai{background:var(--accent);color:#fff}
+.search-item.is-ai{border-color:var(--accent);background:#f0fdf4}
 
 .search-item__brand{margin-top:4px}
 
