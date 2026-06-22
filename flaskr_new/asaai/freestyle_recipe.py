@@ -88,7 +88,7 @@ def _macro_strategy_hint(fridge_items, daily_goal, recipe_category=None):
 
     parts = []
     if sweet:
-        parts.append("fuer Fruehstueck, Nachspeise oder Snack KEIN Fleisch und keinen Fisch; Protein ueber Eier, Joghurt, Quark, Haferflocken oder Proteinpulver, wenige Zutaten und kleine Mengen (Haferflocken 40-60g, Nuesse/Honig/Oel sparsam), damit das kcal-Ziel nicht ueberschritten wird")
+        parts.append("fuer Fruehstueck, Nachspeise oder Snack KEIN Fleisch und keinen Fisch; Protein vor allem ueber magere, kcal-arme Quellen wie Joghurt/Quark (150-300g), Eier und Haferflocken (40-70g); fettreiche Zutaten wie Nuesse, Oel, Nutella nur sehr sparsam, sonst wird das kcal-Ziel gesprengt bevor das Protein-Ziel erreicht ist")
     protein_target = safe_float((daily_goal or {}).get("protein")) or 0.0
     if protein_target >= 50 and not sweet:
         parts.append("bei Protein-Ziel ab 50g ist 150g Hauptprotein meist zu wenig; fuer Rumpsteak, Haehnchen oder Hack eher ca. 200g verwenden")
