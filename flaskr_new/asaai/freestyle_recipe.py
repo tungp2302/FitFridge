@@ -1,4 +1,4 @@
-"""Rezeptvorschlaege aus Kuehlschrank-Zutaten via Ollama."""
+"""Rezeptvorschläge aus Kühlschrank-Zutaten via Ollama."""
 from .freestyle_recipe_support import (
     empty_fridge_recipe,
     has_term,
@@ -88,19 +88,19 @@ def _macro_strategy_hint(fridge_items, daily_goal, recipe_category=None):
 
     parts = []
     if sweet:
-        parts.append("fuer Fruehstueck, Nachspeise oder Snack KEIN Fleisch und keinen Fisch; Protein vor allem ueber magere, kcal-arme Quellen wie Joghurt/Quark (150-300g), Eier und Haferflocken (40-70g), Käse (20-100g); fettreiche Zutaten wie Nuesse, Oel, Nutella nur sehr sparsam, sonst wird das kcal-Ziel gesprengt bevor das Protein-Ziel erreicht ist")
+        parts.append("für Frühstück, Nachspeise oder Snack KEIN Fleisch und keinen Fisch; Protein vor allem über magere, kcal-arme Quellen wie Joghurt/Quark (150-300g), Eier und Haferflocken (40-70g), Käse (20-100g); fettreiche Zutaten wie Nüsse, Öl, Nutella nur sehr sparsam, sonst wird das kcal-Ziel gesprengt bevor das Protein-Ziel erreicht ist")
     protein_target = safe_float((daily_goal or {}).get("protein")) or 0.0
     if protein_target >= 50 and not sweet:
-        parts.append("bei Protein-Ziel ab 50g ist 150g Hauptprotein meist zu wenig; fuer Rumpsteak, Haehnchen oder Hack eher ca. 200-300g verwenden")
+        parts.append("bei Protein-Ziel ab 50g ist 150g Hauptprotein meist zu wenig; für Rumpsteak, Hähnchen oder Hack eher ca. 200-300g verwenden")
     if protein_items and not sweet:
-        parts.append(f"Protein eher ueber {names(protein_items)} erreichen, meist 180-300g")
+        parts.append(f"Protein eher über {names(protein_items)} erreichen, meist 180-300g")
     if starch_items:
-        parts.append(f"fuer kcal/carbs eher {names(starch_items)} nutzen, bei Reis/Nudeln meist 100-150g trocken; nicht Kartoffeln oder Gemuese allein")
+        parts.append(f"für kcal/carbs eher {names(starch_items)} nutzen, bei Reis/Nudeln meist 100-150g trocken; nicht Kartoffeln oder Gemüse allein")
     if fat_items:
-        parts.append(f"Fett bei Bedarf ueber 10-20g Oel und passende Fettquellen wie {names(fat_items)} erhoehen")
+        parts.append(f"Fett bei Bedarf über 10-20g Öl und passende Fettquellen wie {names(fat_items)} erhöhen")
     else:
-        parts.append("Fett bei Bedarf ueber 10-20g Oel erhoehen")
-    return f" Makro-Strategie fuer diese Zutaten: {'; '.join(parts)}." if parts else ""
+        parts.append("Fett bei Bedarf über 10-20g Öl erhöhen")
+    return f" Makro-Strategie für diese Zutaten: {'; '.join(parts)}." if parts else ""
 
 
 def _target_fit_recipes(recipes, daily_goal):
@@ -118,91 +118,91 @@ def build_prompt(fridge_items, daily_goal=None, recipe_category=None, retry_reas
     f"{retry_hint}"
     f"Rezeptart: {category}.{_goal_hint(daily_goal)}{_macro_strategy_hint(fridge_items, daily_goal, recipe_category)}{_exclude_hint(exclude)} "
 
-    f"Kuehlschrank-Zutaten, nur diese IDs erlaubt: {fridge_list}. "
-    "Zusaetzlich erlaubt sind nur Wasser, Oel, Salz, Zucker, Süßungsmittel, Pfeffer, Gewuerze und Saucen wie Ketchup, Mayonnaise und Senf. "
+    f"Kühlschrank-Zutaten, nur diese IDs erlaubt: {fridge_list}. "
+    "Zusätzlich erlaubt sind nur Wasser, Öl, Salz, Zucker, Süßungsmittel, Pfeffer, Gewürze und Saucen wie Ketchup, Mayonnaise und Senf. "
     "Keine anderen Lebensmittel verwenden. "
-    "Pantry-Zutaten nur auffuehren, wenn sie wirklich verwendet werden; nicht die erlaubte Pantry-Liste als Zutaten kopieren. "
+    "Pantry-Zutaten nur aufführen, wenn sie wirklich verwendet werden; nicht die erlaubte Pantry-Liste als Zutaten kopieren. "
 
     "REZEPTLOGIK: "
-    "Waehle zuerst ein real existierendes, kulinarisch plausibles Gericht, das eine Person freiwillig essen wuerde. "
-    "Geschmack, Textur und Kuechenlogik haben Vorrang vor kuenstlichen Makro-Konstruktionen. "
-    "Vermeide kuenstliche Fitness-Rezepte, fragwuerdige Zutatenkombinationen und reine Makro-Konstruktionen. "
-    "Verwende nur Zutaten, die sinnvoll zum gewaehlten Gericht beitragen. "
+    "Wähle zuerst ein real existierendes, kulinarisch plausibles Gericht, das eine Person freiwillig essen würde. "
+    "Geschmack, Textur und Küchenlogik haben Vorrang vor künstlichen Makro-Konstruktionen. "
+    "Vermeide künstliche Fitness-Rezepte, fragwürdige Zutatenkombinationen und reine Makro-Konstruktionen. "
+    "Verwende nur Zutaten, die sinnvoll zum gewählten Gericht beitragen. "
     "Verwende weder unnoetig viele noch unnoetig wenige Zutaten. "
     "Wenn Zielwerte angegeben sind, muss die berechnete Summe aus amount_g innerhalb der erlaubten Bereiche liegen. "
-    "Kalorien duerfen das Ziel um hoechstens 5% ueberschreiten. "
-    "Protein darf ueber dem Zielwert liegen, aber nicht deutlich darunter. "
-    "Fett und Kohlenhydrate muessen innerhalb der angegebenen Toleranzen bleiben. "
+    "Kalorien dürfen das Ziel um höchstens 5% überschreiten. "
+    "Protein darf über dem Zielwert liegen, aber nicht deutlich darunter. "
+    "Fett und Kohlenhydrate müssen innerhalb der angegebenen Toleranzen bleiben. "
 
     "GERICHTSART: "
-    "Fuer Hauptspeise oder Abendessen bevorzuge herzhafte Gerichte. "
-    "Diese sollten typischerweise Protein, Staerke und/oder Gemuese enthalten, sofern passende Zutaten vorhanden sind. "
-    "Waehle genau EINE Hauptproteinquelle und genau EINE Haupt-Staerkebeilage pro Gericht. "
-    "Kombiniere niemals mehrere Fleisch- oder Fischsorten (z.B. nicht Rind und Haehnchen zusammen) "
-    "und niemals mehrere Staerkebeilagen (z.B. nicht Spaghetti und Kartoffeln, nicht Reis und Nudeln zusammen). "
-    "Nutze nicht alle vorhandenen Zutaten, nur weil sie da sind; lass ueberzaehlige Protein- oder Staerkequellen weg. "
-    "Brot, Broetchen, Buns, Wraps, Reis, Kartoffeln, Nudeln und aehnliche Beilagen zaehlen als passende Staerke. "
-    "Wenn solche Staerken fuer ein herzhaftes Gericht vorhanden sind, nutze sie lieber als suesse Zutaten. "
-    "Keine Fruehstuecks-, Dessert-, Shake-, Porridge- oder suesse Bowl-Ideen, ausser die Rezeptart verlangt dies ausdruecklich. "
-    "Suess und herzhaft nicht unnatuerlich vermischen. "
+    "Für Hauptspeise oder Abendessen bevorzuge herzhafte Gerichte. "
+    "Diese sollten typischerweise Protein, Stärke und/oder Gemüse enthalten, sofern passende Zutaten vorhanden sind. "
+    "Wähle genau EINE Hauptproteinquelle und genau EINE Haupt-Stärkebeilage pro Gericht. "
+    "Kombiniere niemals mehrere Fleisch- oder Fischsorten (z.B. nicht Rind und Hähnchen zusammen) "
+    "und niemals mehrere Stärkebeilagen (z.B. nicht Spaghetti und Kartoffeln, nicht Reis und Nudeln zusammen). "
+    "Nutze nicht alle vorhandenen Zutaten, nur weil sie da sind; lass überzählige Protein- oder Stärkequellen weg. "
+    "Brot, Brötchen, Buns, Wraps, Reis, Kartoffeln, Nudeln und ähnliche Beilagen zählen als passende Stärke. "
+    "Wenn solche Stärken für ein herzhaftes Gericht vorhanden sind, nutze sie lieber als süße Zutaten. "
+    "Keine Frühstücks-, Dessert-, Shake-, Porridge- oder süße Bowl-Ideen, außer die Rezeptart verlangt dies ausdrücklich. "
+    "Süß und herzhaft nicht unnatürlich vermischen. "
 
     "ZUTATENREGELN: "
-    "Suesse Zutaten oder Supplements nicht mit Gemuese, Reis, Kartoffeln, Fleisch, Fisch, Tofu oder herzhaften Pfannengerichten kombinieren. "
-    "Ei, Milch oder Frischkaese nur dann mit Supplements kombinieren, wenn das Gericht klar suess ist "
-    "(z.B. Pfannkuchen, Porridge, Shake, Joghurt oder Gebaeck). "
+    "Süße Zutaten oder Supplements nicht mit Gemüse, Reis, Kartoffeln, Fleisch, Fisch, Tofu oder herzhaften Pfannengerichten kombinieren. "
+    "Ei, Milch oder Frischkäse nur dann mit Supplements kombinieren, wenn das Gericht klar süß ist "
+    "(z.B. Pfannkuchen, Porridge, Shake, Joghurt oder Gebäck). "
     "Protein-Pulver/Whey niemals in herzhafte Hauptgerichte, Pfannen, Reisgerichte, Kartoffelgerichte oder Fleischgerichte geben; "
-    "fuer Proteinziele lieber natuerliche Proteinquellen nutzen oder das Ziel verfehlen. "
-    "Bei Hauptspeise oder Abendessen Supplements auslassen, sobald passende natuerliche Proteinquellen, Staerken oder Gemuese vorhanden sind. "
-    "Gemuese nur in klar herzhaften Gerichten verwenden. "
-    "Mit [Supplement] markierte Zutaten nur in Shakes, Porridge, Pfannkuchen, Gebaeck oder Joghurt verwenden. "
-    "Mit [Naehrwerte fehlen] markierte Zutaten duerfen kulinarisch verwendet werden, zaehlen aber nicht zum Erreichen von Makrozielen. "
+    "für Proteinziele lieber natürliche Proteinquellen nutzen oder das Ziel verfehlen. "
+    "Bei Hauptspeise oder Abendessen Supplements auslassen, sobald passende natürliche Proteinquellen, Stärken oder Gemüse vorhanden sind. "
+    "Gemüse nur in klar herzhaften Gerichten verwenden. "
+    "Mit [Supplement] markierte Zutaten nur in Shakes, Porridge, Pfannkuchen, Gebäck oder Joghurt verwenden. "
+    "Mit [Nährwerte fehlen] markierte Zutaten dürfen kulinarisch verwendet werden, zählen aber nicht zum Erreichen von Makrozielen. "
 
     "MENGEN: "
-    "Waehle realistische Portionsgroessen fuer eine Person. "
-    "Typische Mengen sind 50-160g trockenes Getreide, Reis, Nudeln oder Mehl, 100-300g Kartoffeln oder Gemuese, "
+    "Wähle realistische Portionsgrößen für eine Person. "
+    "Typische Mengen sind 50-160g trockenes Getreide, Reis, Nudeln oder Mehl, 100-300g Kartoffeln oder Gemüse, "
     "120-300g Proteinquelle, ca. 30g Proteinpulver und 50-100g Ei. "
-    "Kaese, Oliven und sehr fettreiche Toppings meist 15-50g verwenden; Oel meist 5-20g. "
-    "Salz, Pfeffer und Gewuerze nur ohne Menge oder mit 1-2g angeben, niemals 10g. "
-    "Broetchen, Buns, Wraps und Brot immer als realistische Grammmenge angeben, nicht als 1g. "
-    "Reis und Nudeln als trockene Grammmenge passend zu den /100g-Naehrwerten angeben, nicht als gekocht deklarieren. "
+    "Käse, Oliven und sehr fettreiche Toppings meist 15-50g verwenden; Öl meist 5-20g. "
+    "Salz, Pfeffer und Gewürze nur ohne Menge oder mit 1-2g angeben, niemals 10g. "
+    "Brötchen, Buns, Wraps und Brot immer als realistische Grammmenge angeben, nicht als 1g. "
+    "Reis und Nudeln als trockene Grammmenge passend zu den /100g-Nährwerten angeben, nicht als gekocht deklarieren. "
     "Nicht den gesamten Vorrat verbrauchen. "
 
     "KONSISTENZREGELN: "
-    "Jede verwendete Kuehlschrank-Zutat muss in fridge_ingredients stehen mit exakter id, amount_g pro Person und label. "
+    "Jede verwendete Kühlschrank-Zutat muss in fridge_ingredients stehen mit exakter id, amount_g pro Person und label. "
     "used_fridge_item_ids darf keine ID enthalten, die nicht in fridge_ingredients vorkommt. "
-    "ingredients, fridge_ingredients, title, why_this_works und used_fridge_item_ids muessen exakt dieselbe Gerichtsidee beschreiben. "
+    "ingredients, fridge_ingredients, title, why_this_works und used_fridge_item_ids müssen exakt dieselbe Gerichtsidee beschreiben. "
     "ingredients muss einzelne Zutaten nennen, niemals den Rezepttitel als Zutatenzeile. "
     "Der title darf keine Lebensmittel nennen, die nicht in fridge_ingredients vorkommen. "
-    "Der title soll ein kurzer deutscher Gerichtname sein, maximal 3-4 Woerter, keine Zutatenliste, keine Marken. "
+    "Der title soll ein kurzer deutscher Gerichtname sein, maximal 3-4 Wörter, keine Zutatenliste, keine Marken. "
     "Kein 'Whey' oder 'Protein Powder' im Titel; stattdessen z.B. 'Protein-Pfannkuchen'. "
 
-    "QUALITAET: "
-    "Bei mehreren Rezepten muessen sich Gerichtstyp, Zubereitungsart oder Hauptzutaten deutlich unterscheiden. "
+    "QUALITÄT: "
+    "Bei mehreren Rezepten müssen sich Gerichtstyp, Zubereitungsart oder Hauptzutaten deutlich unterscheiden. "
     "Vermeide triviale Varianten desselben Rezepts. "
 
-    "NAEHRWERTE: "
-    "FitFridge berechnet Naehrwerte aus amount_g. "
+    "NÄHRWERTE: "
+    "FitFridge berechnet Nährwerte aus amount_g. "
     "Rechne vor der Ausgabe mit den angegebenen /100g-Werten nach. "
-    "Wenn kcal oder Protein zu niedrig sind, erhoehe zuerst eine passende Proteinquelle und eine passende Staerke. "
-    "Wenn Fett zu niedrig ist, erhoehe Oel, Oliven, Kaese, Hackfleisch oder andere passende Fettquellen. "
-    "Prioritaet: kcal hoechstens 5% ueber Ziel, protein mindestens nahe Ziel, fat und carbs innerhalb Toleranz. "
-    "estimated_macros nur plausibel fuellen und niemals schoenrechnen. "
+    "Wenn kcal oder Protein zu niedrig sind, erhöhe zuerst eine passende Proteinquelle und eine passende Stärke. "
+    "Wenn Fett zu niedrig ist, erhöhe Öl, Oliven, Käse, Hackfleisch oder andere passende Fettquellen. "
+    "Priorität: kcal höchstens 5% über Ziel, protein mindestens nahe Ziel, fat und carbs innerhalb Toleranz. "
+    "estimated_macros nur plausibel füllen und niemals schönrechnen. "
 
     "AUSGABE: "
-    "why_this_works soll auf Deutsch in genau einem kurzen Satz erklaeren, warum Geschmack, Textur und Zubereitung zusammenpassen. "
+    "why_this_works soll auf Deutsch in genau einem kurzen Satz erklären, warum Geschmack, Textur und Zubereitung zusammenpassen. "
     "Kein Marketingtext und keine reine Makro-Begruendung. "
     "Schreibe so viele kurze instructions, wie das Gericht wirklich braucht: einfache Gerichte 3-4 Schritte, "
     "ein durchschnittliches Hauptgericht 5-8 klare Schritte. "
     "Jeder Schritt ist genau eine konkrete Koch-Handlung in der richtigen Reihenfolge "
-    "(z.B. vorbereiten/schneiden, anbraten, koechen lassen, wuerzen, anrichten); "
-    "fasse nicht mehrere Arbeitsschritte in einem Satz zusammen und erfinde keine Fuellschritte. "
-    "Instructions duerfen keine Makroberechnung, Kalorienzeile, Anpassungsnotiz oder Erklaerung enthalten. "
-    "Jedes Objekt muss vollstaendig valides JSON sein. "
+    "(z.B. vorbereiten/schneiden, anbraten, kochen lassen, würzen, anrichten); "
+    "fasse nicht mehrere Arbeitsschritte in einem Satz zusammen und erfinde keine Füllschritte. "
+    "Instructions dürfen keine Makroberechnung, Kalorienzeile, Anpassungsnotiz oder Erklärung enthalten. "
+    "Jedes Objekt muss vollständig valides JSON sein. "
     "Keine Kommentare. "
     "Keine Markdown-Formatierung. "
-    "Keine Erklaerungen vor oder nach dem JSON. "
+    "Keine Erklärungen vor oder nach dem JSON. "
 
-    f"Antworte ausschliesslich mit einem JSON-Array aus genau {count} Objekten dieser Form: [{_SCHEMA}]"
+    f"Antworte ausschließlich mit einem JSON-Array aus genau {count} Objekten dieser Form: [{_SCHEMA}]"
 )
 
 def _run(fridge_items, daily_goal, recipe_category, model, base_url, timeout, count, exclude=None):
@@ -247,7 +247,7 @@ def _run(fridge_items, daily_goal, recipe_category, model, base_url, timeout, co
         daily_goal=daily_goal,
     )
 
-    # fehlt was, nachfordern und gefundene Titel ausschliessen
+    # fehlt was, nachfordern und gefundene Titel ausschließen
     attempt = 1
     while len(recipes) < count and attempt < max_attempts:
         attempt += 1
@@ -302,7 +302,7 @@ def generate_freestyle_recipes(fridge_items, daily_goal=None, recipe_category=No
         detail = result.get("feedback") or "Die Antwort war leer, kein valides JSON oder hat die Rezept-/Makro-Regeln nicht eingehalten."
         recipes = [invalid_recipe_warning(
             "Kein valides Rezept",
-            "Das Modell hat keinen Rezeptvorschlag erzeugt, dessen berechnete Naehrwerte und Zutaten die Regeln einhalten. "
+            "Das Modell hat keinen Rezeptvorschlag erzeugt, dessen berechnete Nährwerte und Zutaten die Regeln einhalten. "
             f"{detail}",
         )]
     return {"recipes": recipes, "prompt_used": result["prompt"], "raw_response": result["raw"]}

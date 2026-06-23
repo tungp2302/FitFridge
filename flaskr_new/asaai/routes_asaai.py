@@ -1,4 +1,4 @@
-"""HTTP-Routen fuer den Rezeptplaner."""
+"""HTTP-Routen für den Rezeptplaner."""
 from flask import Blueprint, g, jsonify, render_template, request
 
 from .. import fridge_repo

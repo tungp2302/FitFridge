@@ -1,8 +1,8 @@
-"""Demo-Daten fuer FitFridge.
+"""Demo-Daten für FitFridge.
 
 Im Uni-Setup wird die DB bei jedem Serverstart frisch aufgesetzt. Damit der
 ``demo``-Account (Login: demo / demo) inkl. Beispiel-Inhalten trotzdem immer
-verfuegbar ist, spielt ``seed_demo_data`` die Daten in die aktuelle DB ein.
+verfügbar ist, spielt ``seed_demo_data`` die Daten in die aktuelle DB ein.
 Erwartet einen leeren, frisch initialisierten Datenbestand (siehe ``init_db``).
 """
 
@@ -37,7 +37,7 @@ _DEMO_PRODUCTS = [
      "kcal_per_100g": 34, "protein_per_100g": 2.8, "fat_per_100g": 0.4,
      "carbs_per_100g": 7.0, "current_amount": 300, "unit": "g"},
     # Herzhaft: Hauptspeise / Abendessen
-    {"name": "Haehnchenbrust", "brand": "FitFridge Demo", "barcode": "demo-chicken-001",
+    {"name": "Hähnchenbrust", "brand": "FitFridge Demo", "barcode": "demo-chicken-001",
      "kcal_per_100g": 165, "protein_per_100g": 31.0, "fat_per_100g": 3.6,
      "carbs_per_100g": 0.0, "current_amount": 400, "unit": "g"},
     {"name": "Reis", "brand": "FitFridge Demo", "barcode": "demo-rice-001",
@@ -55,10 +55,10 @@ _DEMO_PRODUCTS = [
     {"name": "Paprika", "brand": "FitFridge Demo", "barcode": "demo-pepper-001",
      "kcal_per_100g": 31, "protein_per_100g": 1.0, "fat_per_100g": 0.3,
      "carbs_per_100g": 6.0, "current_amount": 300, "unit": "g"},
-    {"name": "Olivenoel", "brand": "FitFridge Demo", "barcode": "demo-oil-001",
+    {"name": "Olivenöl", "brand": "FitFridge Demo", "barcode": "demo-oil-001",
      "kcal_per_100g": 884, "protein_per_100g": 0.0, "fat_per_100g": 100.0,
      "carbs_per_100g": 0.0, "current_amount": 500, "unit": "ml"},
-    # Suess: Fruehstueck / Nachspeise / Snack
+    # Süß: Frühstück / Nachspeise / Snack
     {"name": "Haferflocken", "brand": "FitFridge Demo", "barcode": "demo-oats-001",
      "kcal_per_100g": 372, "protein_per_100g": 13.5, "fat_per_100g": 7.0,
      "carbs_per_100g": 59.0, "current_amount": 500, "unit": "g"},
@@ -96,7 +96,7 @@ _DEMO_MEALS = [
 
 
 def seed_demo_data():
-    """Legt den demo-Account samt Beispiel-Kuehlschrank und -Mahlzeiten an.
+    """Legt den demo-Account samt Beispiel-Kühlschrank und -Mahlzeiten an.
 
     Idempotent: existiert der demo-Account bereits (z.B. weil der Dev-Reloader
     ``create_app`` mehrfach aufruft), passiert nichts.

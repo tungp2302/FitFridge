@@ -1,4 +1,4 @@
-"""Fachlogik fuer den Meal Tracker (Tagesziel, Makros, Mahlzeiten loggen)."""
+"""Fachlogik für den Meal Tracker (Tagesziel, Makros, Mahlzeiten loggen)."""
 
 from . import fridge_repo
 from .calculations import calculate_for_amount, safe_float
@@ -108,7 +108,7 @@ def save_settings_action(user_id, form):
 
 def commit_meal_cart(user_id, cart):
     """Loggt alle Eintraege des Warenkorbs: Fridge-Items werden abgezogen,
-    Produkt-Reste landen im Kuehlschrank."""
+    Produkt-Reste landen im Kühlschrank."""
     logged = 0
     fridge_saved = 0
     for item in cart:
@@ -151,5 +151,5 @@ def commit_meal_cart(user_id, cart):
         return "Der Warenkorb ist leer."
     message = f"{logged} Eintrag/Eintraege erfasst."
     if fridge_saved:
-        message += f" {fridge_saved} Rest(e) in den Kuehlschrank uebernommen."
+        message += f" {fridge_saved} Rest(e) in den Kühlschrank übernommen."
     return message

@@ -1,4 +1,4 @@
-"""Parsing, Validierung und Makro-Berechnung fuer Freestyle-Rezepte."""
+"""Parsing, Validierung und Makro-Berechnung für Freestyle-Rezepte."""
 import copy
 import json
 import re
@@ -21,7 +21,7 @@ PROTEIN = ("ei", "egg", "eier", "tofu", "tempeh", "huhn", "chicken", "rind", "be
 DAIRY = ("milch", "milk", "joghurt", "yogurt", "quark", "skyr")
 FOOD = set(SWEET + VEG + STARCH + PROTEIN + DAIRY)
 SAVORY = VEG + STARCH + PROTEIN
-# erste passende Gruppe gewinnt; Eier/Kaese/Joghurt sind kein Hauptprotein
+# erste passende Gruppe gewinnt; Eier/Käse/Joghurt sind kein Hauptprotein
 MAIN_PROTEIN_GROUPS = (
     ("fisch", ("fisch", "fish", "lachs", "salmon", "thunfisch", "tuna", "forelle", "garnele", "shrimp")),
     ("gefluegel", ("huhn", "chicken", "haehnchen", "hähnchen", "pute", "turkey", "gefluegel", "geflügel")),
@@ -110,7 +110,7 @@ def item_label(item):
     if bits:
         label += f' ({" ".join(bits)} /100g)'
         if not any((safe_float(item.get(field)) or 0) > 0 for field in NUTRITION_FIELDS):
-            label += " [Naehrwerte fehlen]"
+            label += " [Nährwerte fehlen]"
     if is_supplement(item["name"]):
         label += " [Supplement]"
     return label
@@ -324,7 +324,7 @@ def _scale_fridge_amounts(recipe, factor):
         raw["label"] = ""
     return scaled
 def _repair_macros(recipe, fridge_items, daily_goal):
-    # ausserhalb der Ziele: Portion aufs kcal-Ziel skalieren, nur wenn danach alles passt
+    # außerhalb der Ziele: Portion aufs kcal-Ziel skalieren, nur wenn danach alles passt
     if not has_macro_targets(daily_goal):
         return recipe
     macros = computed_macros(recipe, fridge_items)
@@ -416,10 +416,10 @@ def validation_feedback(response, fridge_items, daily_goal=None):
     for raw in extract_recipes(response):
         macros = computed_macros(raw, fridge_items)
         if not macros:
-            return "Naehrwerte konnten nicht berechnet werden, weil fridge_ingredients mit amount_g fehlen."
+            return "Nährwerte konnten nicht berechnet werden, weil fridge_ingredients mit amount_g fehlen."
         if not macros_within_targets(macros, daily_goal):
             macro_text = ", ".join(f"{key}={macros.get(key, 0)}" for key in ("kcal", "protein", "fat", "carbs"))
-            return f"Berechnete Naehrwerte aus amount_g waren {macro_text}; erlaubt ist {range_text}."
+            return f"Berechnete Nährwerte aus amount_g waren {macro_text}; erlaubt ist {range_text}."
     return ""
 def _stub_recipe(title, message, instructions, warning=False):
     stub = {"title": title, "why_this_works": message, "ingredients": [], "instructions": instructions, "estimated_macros": {"kcal": 0, "protein": 0, "fat": 0, "carbs": 0}, "macro_source": "none", "used_fridge_items": [], "pantry_assumptions": []}
@@ -427,7 +427,7 @@ def _stub_recipe(title, message, instructions, warning=False):
         stub["warning"] = True
     return stub
 def warning_recipe(title, message):
-    return _stub_recipe(title, message, ["Pruefe, ob Ollama laeuft und das gewaehlte Modell installiert ist.", "Waehle in den Einstellungen bei Bedarf ein anderes Modell.", "Starte die Rezeptgenerierung danach erneut."], warning=True)
+    return _stub_recipe(title, message, ["Prüfe, ob Ollama laeuft und das gewaehlte Modell installiert ist.", "Wähle in den Einstellungen bei Bedarf ein anderes Modell.", "Starte die Rezeptgenerierung danach erneut."], warning=True)
 def invalid_recipe_warning(title, message):
     return _stub_recipe(title, message, [], warning=True)
 def empty_fridge_recipe():

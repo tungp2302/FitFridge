@@ -1,14 +1,14 @@
-"""Einheiten-Umrechnung und Naehrwert-Berechnung."""
+"""Einheiten-Umrechnung und Nährwert-Berechnung."""
 
 # Faktoren auf die Basiseinheit (g bzw. ml); Volumen wird als 1 ml = 1 g behandelt.
 _TO_BASE = {"mg": 0.001, "g": 1.0, "kg": 1000.0, "ml": 1.0, "cl": 10.0, "l": 1000.0}
 
 
 def calculate_for_amount(product, amount, unit):
-    """Naehrwerte fuer eine konkrete Menge (z.B. 30 g Nutella).
+    """Nährwerte für eine konkrete Menge (z.B. 30 g Nutella).
 
     Volumen wird vereinfachend als 1 ml = 1 g behandelt.
-    Gibt bei ungueltiger Menge/Einheit Nullen zurueck.
+    Gibt bei ungültiger Menge/Einheit Nullen zurück.
     """
     empty = {"kcal": 0.0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
     if amount is None or amount <= 0 or unit not in _TO_BASE:

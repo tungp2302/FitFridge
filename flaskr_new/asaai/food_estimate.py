@@ -1,4 +1,4 @@
-"""KI-Schaetzung der Naehrwerte pro 100g fuer einen Suchbegriff (Add Food).
+"""KI-Schätzung der Nährwerte pro 100g für einen Suchbegriff (Add Food).
 
 Liefert ein Result im selben Format wie die OpenFoodFacts-Suche, damit es
 als erster Treffer neben den OFF-Ergebnissen angezeigt werden kann.
@@ -20,7 +20,7 @@ _PROMPT = (
 
 
 def estimate_food(query, model=None):
-    """Naehrwert-Schaetzung als Result-Dict, oder None bei Fehler/leerer Eingabe."""
+    """Nährwert-Schätzung als Result-Dict, oder None bei Fehler/leerer Eingabe."""
     query = (query or "").strip()
     if not query:
         return None

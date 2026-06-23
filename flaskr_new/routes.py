@@ -291,7 +291,7 @@ def unified_search(q):
             return []
         return [_to_result(product)]
 
-    # Text-Suche: KI-Schaetzung zuerst (Primaerquelle), dann lokale DB-Treffer
+    # Text-Suche: KI-Schätzung zuerst (Primärquelle), dann lokale DB-Treffer
     # und die OFF-Textsuche. search_products faengt Netzfehler selbst ab.
     results = []
     seen_barcodes = set()

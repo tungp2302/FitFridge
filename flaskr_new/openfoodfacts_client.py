@@ -131,8 +131,8 @@ def _kcal_from_nutriments(nutriments):
 def search_product(barcode):
     """Holt ein Produkt per Barcode von Open Food Facts.
 
-    Gibt ein Dict mit Name, Marke, Naehrwerten (pro 100g) und - falls
-    erkennbar - der Packungsmenge zurueck, oder None wenn nicht gefunden.
+    Gibt ein Dict mit Name, Marke, Nährwerten (pro 100g) und - falls
+    erkennbar - der Packungsmenge zurück, oder None wenn nicht gefunden.
     """
     if not barcode:
         raise ValueError("barcode is required")
@@ -175,7 +175,7 @@ def search_product(barcode):
 def lookup_product(query):
     """Loest einen Barcode (nur Ziffern) oder einen Produktnamen auf.
 
-    Gibt den besten Treffer zurueck oder None, wenn nichts gefunden wurde.
+    Gibt den besten Treffer zurück oder None, wenn nichts gefunden wurde.
     """
     if not query:
         raise ValueError("query is required")
@@ -190,9 +190,9 @@ def lookup_product(query):
 def search_products(query, limit=10):
     """Textsuche bei Open Food Facts.
 
-    Die Such-API liefert nur Barcodes; fuer jeden Treffer laden wir die
-    vollen Naehrwerte ueber ``search_product`` nach. Sortiert nach
-    Namensaehnlichkeit. Leere Liste, wenn nichts gefunden wurde.
+    Die Such-API liefert nur Barcodes; für jeden Treffer laden wir die
+    vollen Nährwerte über ``search_product`` nach. Sortiert nach
+    Namensähnlichkeit. Leere Liste, wenn nichts gefunden wurde.
     """
     if not query:
         raise ValueError("query is required")
@@ -211,7 +211,7 @@ def search_products(query, limit=10):
         with urlopen(request, timeout=10, context=_make_ssl_context()) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except Exception:
-        logger.warning("OFF-Textsuche fehlgeschlagen fuer %r", query, exc_info=True)
+        logger.warning("OFF-Textsuche fehlgeschlagen für %r", query, exc_info=True)
         return []
 
     hits = payload.get("hits") or []
@@ -225,7 +225,7 @@ def search_products(query, limit=10):
         try:
             full = search_product(code)
         except Exception:
-            logger.warning("OFF-Barcode-Detail fehlgeschlagen fuer %s", code, exc_info=True)
+            logger.warning("OFF-Barcode-Detail fehlgeschlagen für %s", code, exc_info=True)
             full = None
         if full and full.get("name"):
             results.append(full)

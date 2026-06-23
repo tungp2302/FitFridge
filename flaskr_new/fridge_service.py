@@ -1,4 +1,4 @@
-"""Fachlogik fuer den Fridge-Bereich."""
+"""Fachlogik für den Fridge-Bereich."""
 
 from . import fridge_repo, product_repo
 from .calculations import calculate_for_amount
@@ -59,7 +59,7 @@ def update_dashboard_item(item_id, current_amount=None, name=None, brand=None, u
     """Menge und optional Name/Marke eines Fridge-Items aktualisieren.
 
     Die Suche ist auf den Nutzer gescoped (``user_id``), damit niemand
-    ueber geratene IDs fremde Items aendert.
+    über geratene IDs fremde Items ändert.
     """
     updated = 0
 

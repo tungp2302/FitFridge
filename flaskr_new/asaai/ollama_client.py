@@ -1,4 +1,4 @@
-"""Client fuer eine lokale Ollama-Instanz (HTTP /api/generate)."""
+"""Client für eine lokale Ollama-Instanz (HTTP /api/generate)."""
 import os
 import json
 from typing import Optional
@@ -84,7 +84,7 @@ def _resolve_endpoint(base_url: Optional[str] = None) -> str:
 
 
 def _post_generate(endpoint: str, payload: dict, timeout: int) -> dict:
-    """POST an /api/generate, Status pruefen, JSON zurueckgeben."""
+    """POST an /api/generate, Status prüfen, JSON zurückgeben."""
     response = requests.post(f"{endpoint}/api/generate", json=payload, timeout=timeout)
     response.raise_for_status()
     return response.json()
@@ -153,9 +153,9 @@ def generate_from_ollama(
     format_json: bool = False,
     temperature: float = 0.2,
 ) -> str:
-    """Schickt Prompt an lokale Ollama-Instanz und gibt den Text zurueck.
+    """Schickt Prompt an lokale Ollama-Instanz und gibt den Text zurück.
 
-    ``base_url`` faellt auf OLLAMA_BASE_URL bzw. http://127.0.0.1:11434 zurueck,
+    ``base_url`` fällt auf OLLAMA_BASE_URL bzw. http://127.0.0.1:11434 zurück,
     das Modell auf das konfigurierte oder erste lokal installierte Modell.
     """
     endpoint = _resolve_endpoint(base_url)
