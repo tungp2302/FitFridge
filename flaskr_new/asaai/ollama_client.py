@@ -2,8 +2,8 @@
 import os
 import json
 from typing import Optional
+from urllib.request import Request, urlopen
 
-import requests
 from flask import g, has_app_context
 
 
@@ -60,23 +60,22 @@ def _stored_ollama_model() -> Optional[str]:
         return None
 
 
+def _http_json(url: str, payload: Optional[dict], timeout: int) -> dict:
+    """GET (payload=None) oder POST JSON; urlopen wirft bei HTTP-Fehlern."""
+    body = json.dumps(payload).encode("utf-8") if payload is not None else None
+    req = Request(url, data=body, headers={"Content-Type": "application/json"})
+    with urlopen(req, timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
 def _local_model_names(endpoint: str) -> list[str]:
     """Return locally installed Ollama model names."""
-    response = requests.get(f"{endpoint}/api/tags", timeout=10)
-    response.raise_for_status()
-
-    payload = response.json()
+    payload = _http_json(f"{endpoint}/api/tags", None, 10)
     models = payload.get("models") if isinstance(payload, dict) else None
-    names = []
-    if isinstance(models, list) and models:
-        for model_info in models:
-            if isinstance(model_info, dict):
-                name = model_info.get("name")
-            else:
-                name = None
-            if isinstance(name, str) and name.strip():
-                names.append(name.strip())
-    return names
+    if not isinstance(models, list):
+        return []
+    return [s for m in models
+            if isinstance(m, dict) and isinstance(m.get("name"), str) and (s := m["name"].strip())]
 
 
 def _resolve_endpoint(base_url: Optional[str] = None) -> str:
@@ -84,10 +83,8 @@ def _resolve_endpoint(base_url: Optional[str] = None) -> str:
 
 
 def _post_generate(endpoint: str, payload: dict, timeout: int) -> dict:
-    """POST an /api/generate, Status prüfen, JSON zurückgeben."""
-    response = requests.post(f"{endpoint}/api/generate", json=payload, timeout=timeout)
-    response.raise_for_status()
-    return response.json()
+    """POST an /api/generate, JSON zurückgeben."""
+    return _http_json(f"{endpoint}/api/generate", payload, timeout)
 
 
 def test_ollama_model(model: Optional[str] = None, base_url: Optional[str] = None, timeout: int = 20) -> dict:

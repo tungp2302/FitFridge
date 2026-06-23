@@ -7,6 +7,7 @@ from .freestyle_recipe_support import (
     is_sweet_category,
     is_supplement,
     MEAT_FISH,
+    format_ranges,
     item_label,
     limit_items,
     macro_target_ranges,
@@ -44,16 +45,7 @@ def _goal_hint(daily_goal):
     parts = [f"{k}={v}" for k, v in (daily_goal or {}).items() if v not in (None, "")]
     if not parts:
         return ""
-    ranges = macro_target_ranges(daily_goal)
-    range_parts = []
-    for key in ("kcal", "protein", "fat", "carbs"):
-        if key not in ranges:
-            continue
-        low, high = ranges[key]
-        if high is None:
-            range_parts.append(f"{key}>={low}")
-        else:
-            range_parts.append(f"{key}={low}-{high}")
+    range_parts = format_ranges(macro_target_ranges(daily_goal))
     range_hint = f" Erlaubte berechnete Bereiche: {', '.join(range_parts)}." if range_parts else ""
     return f" Zielwerte: {', '.join(parts)}.{range_hint} Diese Zielbereiche sind harte Validierungsregeln."
 
@@ -71,11 +63,13 @@ def _macro_strategy_hint(fridge_items, daily_goal, recipe_category=None):
     starch_terms = ("reis", "rice", "nudel", "noodle", "pasta", "spaghetti", "bun", "buns", "broetchen", "brötchen", "brot", "bread", "wrap", "tortilla")
     secondary_protein_terms = ("kaese", "käse", "cheddar", "parmesan", "acciughe", "sardelle", "anchovy", "olive", "oliven")
     protein_items, starch_items, fat_items = [], [], []
+    has_supplement = False
     for item in numbered_items(fridge_items):
         name = item["name"]
         protein = safe_float(item.get("protein_per_100g")) or 0.0
         carbs = safe_float(item.get("carbs_per_100g")) or 0.0
         fat = safe_float(item.get("fat_per_100g")) or 0.0
+        has_supplement = has_supplement or is_supplement(name)
         if protein >= 15 and (not savory or not is_supplement(name)) and not has_term(name, secondary_protein_terms) and not (sweet and has_term(name, MEAT_FISH)):
             protein_items.append((protein, name))
         if carbs >= 20 and has_term(name, starch_terms):
@@ -88,8 +82,11 @@ def _macro_strategy_hint(fridge_items, daily_goal, recipe_category=None):
 
     parts = []
     if sweet:
-        parts.append("für Frühstück, Nachspeise oder Snack KEIN Fleisch und keinen Fisch; Protein vor allem über magere, kcal-arme Quellen wie Joghurt/Quark (150-300g), Eier und Haferflocken (40-70g), Käse (20-100g); fettreiche Zutaten wie Nüsse, Öl, Nutella nur sehr sparsam, sonst wird das kcal-Ziel gesprengt bevor das Protein-Ziel erreicht ist")
+        parts.append("für Frühstück, Nachspeise oder Snack KEIN Fleisch und keinen Fisch; Protein vor allem über magere, kcal-arme Quellen wie Joghurt/Quark (150-300g), Eier und Haferflocken (40-70g), Käse (20-100g), Proteinpulver oder Whey (5-60g); " \
+        "fettreiche Zutaten wie Nüsse, Öl, Nutella nur sehr sparsam, sonst wird das kcal-Ziel gesprengt bevor das Protein-Ziel erreicht ist")
     protein_target = safe_float((daily_goal or {}).get("protein")) or 0.0
+    if sweet and protein_target >= 40 and has_supplement:
+        parts.append("bei diesem Protein-Ziel ist Whey/Proteinpulver (30-60g) im Shake, Porridge oder Protein-Pfannkuchen die kcal-effizienteste Proteinquelle und sollte priorisiert werden, weil magere Quellen wie Joghurt das kcal-Ziel sprengen, bevor das Protein-Ziel erreicht ist")
     if protein_target >= 50 and not sweet:
         parts.append("bei Protein-Ziel ab 50g ist 150g Hauptprotein meist zu wenig; für Rumpsteak, Hähnchen oder Hack eher ca. 200-300g verwenden")
     if protein_items and not sweet:
@@ -299,10 +296,16 @@ def generate_freestyle_recipes(fridge_items, daily_goal=None, recipe_category=No
         return {"recipes": [warning_recipe("LLM nicht erreichbar", message)], "prompt_used": "", "raw_response": "", "error": result["error"]}
     recipes = _target_fit_recipes(result["recipes"], daily_goal)
     if not recipes:
-        detail = result.get("feedback") or "Die Antwort war leer, kein valides JSON oder hat die Rezept-/Makro-Regeln nicht eingehalten."
-        recipes = [invalid_recipe_warning(
-            "Kein valides Rezept",
-            "Das Modell hat keinen Rezeptvorschlag erzeugt, dessen berechnete Nährwerte und Zutaten die Regeln einhalten. "
-            f"{detail}",
-        )]
+        if macro_target_ranges(daily_goal):
+            # Makro-Kombinations-Fehler: Ziel mit diesen Zutaten nicht erreichbar
+            recipes = [invalid_recipe_warning(
+                "Makro-Kombination nicht erreichbar",
+                "Mit dieser Makro-Kombination und deinen Zutaten ließ sich kein passendes Rezept erstellen. "
+                "Passe die Makro-Kombination an, z. B. mehr Kalorien fürs Protein-Ziel oder ein niedrigeres Protein-Ziel.",
+            )]
+        else:
+            recipes = [invalid_recipe_warning(
+                "Kein valides Rezept",
+                "Das Modell hat keinen brauchbaren Rezeptvorschlag erzeugt. Bitte versuche es erneut.",
+            )]
     return {"recipes": recipes, "prompt_used": result["prompt"], "raw_response": result["raw"]}

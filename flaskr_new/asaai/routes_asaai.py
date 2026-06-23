@@ -46,14 +46,7 @@ def freestyle_recipe():
     count = max(1, min(count, 5))
     exclude = data.get("exclude") if isinstance(data.get("exclude"), list) else None
 
-    try:
-        items = _current_fridge_items()
-    except Exception as exc:
-        return jsonify({
-            "error": f"Kühlschrank konnte nicht geladen werden: {exc}",
-            "recipes": [],
-        }), 500
-
+    items = _current_fridge_items()  # swallows DB errors -> [] selbst
     fridge_items = [
         {
             "name": item["name"],

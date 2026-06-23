@@ -1,7 +1,6 @@
 import sqlite3
 from datetime import datetime, timezone
 
-import click
 from flask import current_app, g
 
 
@@ -11,7 +10,6 @@ def _now():
 
 def init_app(app):
     app.teardown_appcontext(close_db)
-    app.cli.add_command(init_db_command)
 
 def init_db():
     db = get_db()
@@ -34,12 +32,6 @@ def close_db(exception=None):
 
     if db is not None:
         db.close()
-
-@click.command("init-db")
-def init_db_command():
-    """Vorhandene Daten loeschen und neue Tabellen anlegen."""
-    init_db()
-    click.echo("Initialized the database.")
 
 sqlite3.register_converter(
     "timestamp", lambda value: datetime.fromisoformat(value.decode())

@@ -86,6 +86,9 @@ _DEMO_PRODUCTS = [
     {"name": "Zucker", "brand": "FitFridge Demo", "barcode": "demo-sugar-001",
      "kcal_per_100g": 400, "protein_per_100g": 0.0, "fat_per_100g": 0.0,
      "carbs_per_100g": 100.0, "current_amount": 500, "unit": "g"},
+    {"name": "Whey Proteinpulver", "brand": "FitFridge Demo", "barcode": "demo-whey-001",
+     "kcal_per_100g": 380, "protein_per_100g": 80.0, "fat_per_100g": 6.0,
+     "carbs_per_100g": 8.0, "current_amount": 1000, "unit": "g"},
 ]
 
 _DEMO_MEALS = [

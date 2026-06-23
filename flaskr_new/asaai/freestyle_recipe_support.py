@@ -285,6 +285,8 @@ def macro_target_ranges(daily_goal):
         high = None if key == "protein" else target * 1.05 if key == "kcal" else target + tolerance(target)
         ranges[key] = (round(low, 1), None if high is None else round(high, 1))
     return ranges
+def format_ranges(ranges):
+    return [f"{key}>={low}" if high is None else f"{key}={low}-{high}" for key, (low, high) in ranges.items()]
 def macros_within_targets(macros, daily_goal):
     if not has_macro_targets(daily_goal):
         return True
@@ -411,8 +413,7 @@ def valid_recipes(response, fridge_items, count, exclude=None, recipe_category=N
 def validation_feedback(response, fridge_items, daily_goal=None):
     if not has_macro_targets(daily_goal):
         return ""
-    ranges = macro_target_ranges(daily_goal)
-    range_text = ", ".join(f"{key}>={low}" if high is None else f"{key}={low}-{high}" for key, (low, high) in ranges.items())
+    range_text = ", ".join(format_ranges(macro_target_ranges(daily_goal)))
     for raw in extract_recipes(response):
         macros = computed_macros(raw, fridge_items)
         if not macros:

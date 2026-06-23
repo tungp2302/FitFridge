@@ -11,24 +11,19 @@ from urllib.request import Request, urlopen
 
 import certifi
 
+from .calculations import safe_float
+
 logger = logging.getLogger(__name__)
 
 OFF_API_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
 
 OFF_SEARCH_API_URL = "https://search.openfoodfacts.org/search"
 
+_SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
+
 
 def _first_string(*values):
     return next((str(v) for v in values if v), "")
-
-
-def _float_value(value, default=0.0):
-    try:
-        if value is None or value == "":
-            return default
-        return float(value)
-    except (TypeError, ValueError):
-        return default
 
 
 def _normalize_text(value):
@@ -108,23 +103,15 @@ def _parse_total_quantity(product_data):
     return mult * amount, unit_norm
 
 
-def _kJ_to_kcal(kj):
-    return kj / 4.184 if kj else 0.0
-
-
-def _make_ssl_context():
-    """Return an SSL context using certifi's CA bundle."""
-    return ssl.create_default_context(cafile=certifi.where())
-
-
 def _kcal_from_nutriments(nutriments):
     """Normalize energy value from the nutriments dict to kcal per 100g."""
     if nutriments.get("energy-kcal_100g") is not None:
-        return _float_value(nutriments.get("energy-kcal_100g"))
+        return safe_float(nutriments.get("energy-kcal_100g"), 0.0)
     if nutriments.get("energy-kcal_value") is not None:
-        return _float_value(nutriments.get("energy-kcal_value"))
+        return safe_float(nutriments.get("energy-kcal_value"), 0.0)
     if nutriments.get("energy_100g") is not None:
-        return _kJ_to_kcal(_float_value(nutriments.get("energy_100g")))
+        kj = safe_float(nutriments.get("energy_100g"), 0.0)
+        return kj / 4.184 if kj else 0.0
     return 0.0
 
 
@@ -143,7 +130,7 @@ def search_product(barcode):
     )
 
     try:
-        with urlopen(req, timeout=10, context=_make_ssl_context()) as resp:
+        with urlopen(req, timeout=10, context=_SSL_CONTEXT) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
     except HTTPError as e:
         if e.code == 404:
@@ -164,9 +151,9 @@ def search_product(barcode):
         "brand": _first_string(product.get("brands"), product.get("brand_owner")),
         "barcode": _first_string(product.get("code"), barcode),
         "kcal_per_100g": _kcal_from_nutriments(nutriments),
-        "protein_per_100g": _float_value(nutriments.get("proteins_100g")),
-        "fat_per_100g": _float_value(nutriments.get("fat_100g")),
-        "carbs_per_100g": _float_value(nutriments.get("carbohydrates_100g")),
+        "protein_per_100g": safe_float(nutriments.get("proteins_100g"), 0.0),
+        "fat_per_100g": safe_float(nutriments.get("fat_100g"), 0.0),
+        "carbs_per_100g": safe_float(nutriments.get("carbohydrates_100g"), 0.0),
         "total_amount": total_amount,
         "unit": unit,
     }
@@ -208,7 +195,7 @@ def search_products(query, limit=10):
     )
 
     try:
-        with urlopen(request, timeout=10, context=_make_ssl_context()) as response:
+        with urlopen(request, timeout=10, context=_SSL_CONTEXT) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except Exception:
         logger.warning("OFF-Textsuche fehlgeschlagen für %r", query, exc_info=True)
