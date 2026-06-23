@@ -40,7 +40,7 @@ source .venv/bin/activate
 flask --app flaskr_new run --debug
 ```
 
-Dann im Browser öffnen: **http://127.0.0.1:5000**
+Dann im Browser öffnen: http://127.0.0.1:5000
 
 **Tests ausführen:**
 
@@ -88,3 +88,15 @@ python -m pytest tests/test_backend/test_meal_tracker.py
 
 # Or call it directly without activating:
 .\.venv\Scripts\python.exe -m pytest tests/test_backend/test_meal_tracker.py
+
+# Setup MacOS
+pip install -r requirements-dev.txt
+python -m pytest -q
+python -m pytest tests/test_backend/test_meal_tracker.py
+
+# venv aktivieren (einmalig pro Terminal-Session):
+source .venv/bin/activate
+python -m pytest tests/test_backend/test_meal_tracker.py
+
+# Oder ohne aktivieren:
+.venv/bin/python -m pytest tests/test_backend/test_meal_tracker.py

@@ -88,14 +88,14 @@ def _macro_strategy_hint(fridge_items, daily_goal, recipe_category=None):
 
     parts = []
     if sweet:
-        parts.append("fuer Fruehstueck, Nachspeise oder Snack KEIN Fleisch und keinen Fisch; Protein vor allem ueber magere, kcal-arme Quellen wie Joghurt/Quark (150-300g), Eier und Haferflocken (40-70g); fettreiche Zutaten wie Nuesse, Oel, Nutella nur sehr sparsam, sonst wird das kcal-Ziel gesprengt bevor das Protein-Ziel erreicht ist")
+        parts.append("fuer Fruehstueck, Nachspeise oder Snack KEIN Fleisch und keinen Fisch; Protein vor allem ueber magere, kcal-arme Quellen wie Joghurt/Quark (150-300g), Eier und Haferflocken (40-70g), Käse (20-100g); fettreiche Zutaten wie Nuesse, Oel, Nutella nur sehr sparsam, sonst wird das kcal-Ziel gesprengt bevor das Protein-Ziel erreicht ist")
     protein_target = safe_float((daily_goal or {}).get("protein")) or 0.0
     if protein_target >= 50 and not sweet:
-        parts.append("bei Protein-Ziel ab 50g ist 150g Hauptprotein meist zu wenig; fuer Rumpsteak, Haehnchen oder Hack eher ca. 200g verwenden")
+        parts.append("bei Protein-Ziel ab 50g ist 150g Hauptprotein meist zu wenig; fuer Rumpsteak, Haehnchen oder Hack eher ca. 200-300g verwenden")
     if protein_items and not sweet:
-        parts.append(f"Protein eher ueber {names(protein_items)} erreichen, meist 180-260g")
+        parts.append(f"Protein eher ueber {names(protein_items)} erreichen, meist 180-300g")
     if starch_items:
-        parts.append(f"fuer kcal/carbs eher {names(starch_items)} nutzen, bei Reis/Nudeln meist 100-130g trocken; nicht Kartoffeln oder Gemuese allein")
+        parts.append(f"fuer kcal/carbs eher {names(starch_items)} nutzen, bei Reis/Nudeln meist 100-150g trocken; nicht Kartoffeln oder Gemuese allein")
     if fat_items:
         parts.append(f"Fett bei Bedarf ueber 10-20g Oel und passende Fettquellen wie {names(fat_items)} erhoehen")
     else:

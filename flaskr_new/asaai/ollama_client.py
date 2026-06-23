@@ -153,7 +153,7 @@ def generate_from_ollama(
     format_json: bool = False,
     temperature: float = 0.2,
 ) -> str:
-    """Schickt einen Prompt an die lokale Ollama-Instanz und gibt den Text zurueck.
+    """Schickt Prompt an lokale Ollama-Instanz und gibt den Text zurueck.
 
     ``base_url`` faellt auf OLLAMA_BASE_URL bzw. http://127.0.0.1:11434 zurueck,
     das Modell auf das konfigurierte oder erste lokal installierte Modell.

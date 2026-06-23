@@ -30,11 +30,11 @@ def _add_item_from_product_data(product_data, fallback_barcode, author_id):
 
 
 def create_dashboard_item(query, author_id=None):
-    """Look up product by barcode/name and add it to the fridge.
+    """Look up per barcode/name add zu fridge.
 
-    The product metadata and nutrition values are fetched from
-    OpenFoodFacts. The fridge amount is derived from parsed quantity
-    (`total_amount` + `unit`) with a fallback to `100 g`.
+    Produktdatrn und Nährwerte fetched von
+    OpenFoodFacts. Fridge amount von parsed quantity
+    (`total_amount` + `unit`) mit fallback zu `100 g`.
     """
     if not query:
         raise ValueError("query is required")

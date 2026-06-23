@@ -1,6 +1,6 @@
 """KI-Schaetzung der Naehrwerte pro 100g fuer einen Suchbegriff (Add Food).
 
-Liefert ein Result-Dict im selben Format wie die OpenFoodFacts-Suche, damit es
+Liefert ein Result im selben Format wie die OpenFoodFacts-Suche, damit es
 als erster Treffer neben den OFF-Ergebnissen angezeigt werden kann.
 """
 import json
@@ -35,7 +35,7 @@ def estimate_food(query, model=None):
         data = json.loads(raw)
         macros = {k: float(data[k]) for k in ("kcal", "protein", "fat", "carbs")}
     except Exception:
-        return None  # ponytail: bei Ollama-/Parse-Fehler einfach keine KI-Zeile
+        return None  
 
     return {
         "name": (data.get("name") or query).strip() or query,
