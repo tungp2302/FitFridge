@@ -49,14 +49,3 @@ def test_search_matches_name_and_brand(app_context):
     assert len(repo.search_by_name("jogh")) == 1
     assert len(repo.search_by_name("alpen")) == 1
     assert repo.search_by_name("pizza") == []
-
-
-def test_update_product_changes_name_and_brand(app_context):
-    pid = make("Altname", brand="Altmarke")
-
-    assert repo.update_product(pid, "Neuname", "Neumarke") == 1
-    assert repo.update_product(999, "X", "Y") == 0
-
-    updated = repo.get_by_barcode("bc:altname")
-    assert updated["name"] == "Neuname"
-    assert updated["brand"] == "Neumarke"

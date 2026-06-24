@@ -31,14 +31,3 @@ def search_by_name(query, limit=10):
         f"{_PRODUCT_SELECT} WHERE name LIKE ? OR brand LIKE ? ORDER BY name LIMIT ?",
         (q, q, limit),
     ).fetchall()
-
-
-def update_product(product_id, name, brand):
-    """Update name and brand for an existing product."""
-    db = get_db()
-    cursor = db.execute(
-        "UPDATE product SET name = ?, brand = ? WHERE id = ?",
-        (name, brand, product_id),
-    )
-    db.commit()
-    return cursor.rowcount

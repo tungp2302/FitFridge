@@ -55,31 +55,17 @@ def create_dashboard_item_from_data(product_data, author_id=None):
     return _add_item_from_product_data(product_data, fallback_barcode=fallback_barcode, author_id=author_id)
 
 
-def update_dashboard_item(item_id, current_amount=None, name=None, brand=None, user_id=None):
-    """Menge und optional Name/Marke eines Fridge-Items aktualisieren.
+def update_dashboard_item(item_id, current_amount=None, user_id=None):
+    """Menge eines Fridge-Items aktualisieren.
 
     Die Suche ist auf den Nutzer gescoped (``user_id``), damit niemand
     über geratene IDs fremde Items ändert.
     """
-    updated = 0
-
-    current_item = None
-    if current_amount is not None or name is not None or brand is not None:
-        current_item = fridge_repo.get_item(item_id, user_id=user_id)
-        if current_item is None:
-            raise ValueError("No fridge item found for id")
-        current_item = dict(current_item)
-
-    if current_amount is not None:
-        updated += fridge_repo.update_amount(item_id, float(current_amount))
-
-    if name is not None or brand is not None:
-        product_id = current_item["product_id"]
-        current_name = current_item.get("name") or ""
-        current_brand = current_item.get("brand") or ""
-        updated += product_repo.update_product(product_id, name or current_name, brand or current_brand)
-
-    return updated
+    if current_amount is None:
+        return 0
+    if fridge_repo.get_item(item_id, user_id=user_id) is None:
+        raise ValueError("No fridge item found for id")
+    return fridge_repo.update_amount(item_id, float(current_amount))
 
 
 def calculate_total_nutrition(item):

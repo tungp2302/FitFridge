@@ -10,8 +10,10 @@ MACRO_FIELDS = (("kcal", "kcal_per_100g"), ("protein", "protein_per_100g"), ("fa
 MACRO_TOLERANCES = {
     "kcal": lambda x: max(90.0, x * 0.15),
     "protein": lambda x: max(8.0, x * 0.15),
-    "fat": lambda x: max(8.0, x * 0.30),
-    "carbs": lambda x: max(18.0, x * 0.30),
+    # ponytail: kleine absolute Floors, damit per-Mahlzeit Low-Fat/Low-Carb-Ziele
+    # wirklich greifen; bei groesseren Zielen dominiert ohnehin der 0.30-Anteil.
+    "fat": lambda x: max(5.0, x * 0.30),
+    "carbs": lambda x: max(10.0, x * 0.30),
 }
 SUPPLEMENT = ("whey", "protein powder", "proteinpulver", "eiweisspulver", "isolate", "casein", "kasein")
 SWEET = ("banane", "banana", "apfel", "apple", "beere", "berry", "honig", "honey", "marmelade", "jam", "nutella", "schoko", "chocolate", "datteln", "dates", "ahorn", "maple")
@@ -42,7 +44,6 @@ SAVORY_CATS = ("hauptspeise", "abendessen", "mittag", "lunch", "dinner", "main")
 # Kein-Fleisch-Kategorien: hier sind Fleisch/Fisch als Hauptprotein unpassend.
 SWEET_CATS = ("fruehstueck", "frühstück", "breakfast", "nachspeise", "nachtisch", "dessert", "snack")
 MEAT_FISH = tuple(t for label, terms in MAIN_PROTEIN_GROUPS if label != "tofu" for t in terms)
-SWEET_DISH = ("porridge", "haferbrei", "muesli", "smoothie", "shake", "joghurtbowl", "yogurt bowl", "dessert", "nachspeise", "pfannkuchen", "pancake")
 SUPP_BLOCK = VEG + ("reis", "rice", "kartoffel", "potato", "nudel", "noodle", "pasta", "brot", "bread", "huhn", "chicken", "haehnchen", "hähnchen", "rind", "beef", "steak", "fisch", "fish", "lachs", "salmon", "tofu", "tempeh", "pfanne", "brat", "auflauf", "curry", "suppe", "salat", "gemuese", "gemüse")
 SUPP_OK = ("pfannkuchen", "pancake", "porridge", "haferbrei", "shake", "smoothie", "joghurt", "yogurt", "quark", "skyr", "bowl", "gebaeck", "gebäck", "muffin", "waffel", "waffle")
 FILLER = {"mit", "und", "auf", "an", "in", "aus", "der", "die", "das"}
@@ -258,7 +259,7 @@ def _recipe_conflicts(recipe, category, used_names):
         return True
     if any(is_supplement(name) for name in used_names) and (has_term(full_text, SUPP_BLOCK) or not has_term(full_text, SUPP_OK)):
         return True
-    if is_savory_category(category) and any(_sweetish(name) for name in used_names) and (not has_term(text, SAVORY) or has_term(title, SWEET_DISH) and not has_term(text, SAVORY)):
+    if is_savory_category(category) and any(_sweetish(name) for name in used_names) and not has_term(text, SAVORY):
         return True
     if is_sweet_category(category) and any(has_term(name, MEAT_FISH) for name in used_names):
         return True
@@ -282,7 +283,7 @@ def macro_target_ranges(daily_goal):
         if not target:
             continue
         low = max(0.0, target - tolerance(target))
-        high = None if key == "protein" else target * 1.05 if key == "kcal" else target + tolerance(target)
+        high = None if key == "protein" else target * 1.10 if key == "kcal" else target + tolerance(target)
         ranges[key] = (round(low, 1), None if high is None else round(high, 1))
     return ranges
 def format_ranges(ranges):
@@ -298,7 +299,7 @@ def macros_within_targets(macros, daily_goal):
             continue
         value = float(macros.get(key, 0.0) or 0.0)
         if key == "kcal":
-            if value > target * 1.05 or target - value > tolerance(target):
+            if value > target * 1.10 or target - value > tolerance(target):
                 return False
         elif key == "protein":
             if target - value > tolerance(target):
@@ -306,11 +307,6 @@ def macros_within_targets(macros, daily_goal):
         elif abs(value - target) > tolerance(target):
             return False
     return True
-def _macros_fit(recipe, fridge_items, daily_goal):
-    macros = computed_macros(recipe, fridge_items)
-    if not has_macro_targets(daily_goal):
-        return True
-    return macros_within_targets(macros, daily_goal)
 def _scale_fridge_amounts(recipe, factor):
     # Mengen mit Faktor skalieren; Labels leeren -> aus neuer Menge neu aufbauen
     scaled = copy.deepcopy(recipe)
@@ -325,13 +321,71 @@ def _scale_fridge_amounts(recipe, factor):
         raw.pop("g", None)
         raw["label"] = ""
     return scaled
+def _set_fridge_amounts(recipe, amounts):
+    # absolute Mengen je Zutaten-id setzen; Label leeren -> aus neuer Menge neu aufbauen
+    out = copy.deepcopy(recipe)
+    for raw in _raw_fridge(out):
+        if not isinstance(raw, dict):
+            continue
+        try:
+            rid = int(raw.get("id", raw.get("fridge_item_id")))
+        except (TypeError, ValueError):
+            continue
+        if rid in amounts:
+            raw["amount_g"] = amounts[rid]
+            raw.pop("grams", None)
+            raw.pop("g", None)
+            raw["label"] = ""
+    return out
+def _fit_amounts(recipe, fridge_items, daily_goal):
+    # Pro Makro eine Hebel-Zutat (dichteste Protein-/Carb-/Fettquelle) und deren
+    # Menge per Koordinatenabstieg auf das Ziel loesen. Fixt Ratio-Fehler, die
+    # reines kcal-Skalieren nicht kann (z.B. Low-Carb: Staerke runter, Fett rauf).
+    used = structured_fridge_ingredients(recipe, fridge_items)
+    if not used:
+        return None
+    by_id = _by_id(fridge_items)
+    amt = {row["id"]: row["amount_g"] for row in used}
+    fields = ("protein_per_100g", "carbs_per_100g", "fat_per_100g")
+    def dens(item_id, idx):
+        return (safe_float(by_id[item_id].get(fields[idx])) or 0.0) / 100.0
+    levers, taken = {}, set()
+    for key, idx, floor in (("protein", 0, 0.15), ("carbs", 1, 0.15), ("fat", 2, 0.20)):
+        if not safe_float((daily_goal or {}).get(key)):
+            continue
+        cand = [i for i in amt if i not in taken and dens(i, idx) >= floor]
+        if not cand:
+            continue
+        # Fett: reinste Quelle (z.B. Öl) -> hebt Fett ohne viel kcal/Protein mitzuziehen.
+        # Protein/Carbs: groesster realer Beitrag (Menge x Dichte) -> dominante Quelle tunen,
+        # nicht z.B. 10g Zucker statt der Haferflocken.
+        best = max(cand, key=(lambda i: dens(i, idx)) if idx == 2 else (lambda i: amt[i] * dens(i, idx)))
+        levers[key] = (best, idx)
+        taken.add(best)
+    if not levers:
+        return None
+    cap = lambda i: 80.0 if is_supplement(by_id[i]["name"]) else 400.0
+    for _ in range(6):
+        for key, (i, idx) in levers.items():
+            d = dens(i, idx)
+            if d <= 0:
+                continue
+            others = sum(amt[j] * dens(j, idx) for j in amt if j != i)
+            amt[i] = max(5.0, min(cap(i), round((safe_float(daily_goal[key]) - others) / d, 1)))
+    fitted = _set_fridge_amounts(recipe, amt)
+    if _amounts_ok(fitted, fridge_items) and macros_within_targets(computed_macros(fitted, fridge_items), daily_goal):
+        return fitted
+    return None
 def _repair_macros(recipe, fridge_items, daily_goal):
-    # außerhalb der Ziele: Portion aufs kcal-Ziel skalieren, nur wenn danach alles passt
+    # außerhalb der Ziele: erst Mengen pro Makro loesen, sonst Portion aufs kcal-Ziel skalieren
     if not has_macro_targets(daily_goal):
         return recipe
     macros = computed_macros(recipe, fridge_items)
     if not macros or macros_within_targets(macros, daily_goal):
         return recipe
+    fitted = _fit_amounts(recipe, fridge_items, daily_goal)
+    if fitted is not None:
+        return fitted
     target_kcal = safe_float((daily_goal or {}).get("kcal"))
     current_kcal = macros.get("kcal") or 0.0
     if not target_kcal or current_kcal <= 0:
@@ -377,7 +431,7 @@ def _is_valid(recipe, fridge_items, category=None, daily_goal=None):
         and _amounts_ok(recipe, fridge_items)
         and _pantry_amounts_ok(recipe)
         and not _recipe_conflicts(recipe, category, used_names)
-        and _macros_fit(recipe, fridge_items, daily_goal)
+        and macros_within_targets(computed_macros(recipe, fridge_items), daily_goal)
         and len(string_list(recipe.get("instructions"))) >= 3
     )
 def clean_recipe(recipe, fridge_items):

@@ -40,7 +40,7 @@ def resolve_ollama_model(model: Optional[str] = None) -> Optional[str]:
     Accepts either one of the local profile IDs (`desktop`, `laptop`, `fast`)
     or a raw Ollama model tag such as `qwen3:4b`.
     """
-    selected = (model or _stored_ollama_model() or os.getenv("ASAAI_OLLAMA_MODEL") or os.getenv("OLLAMA_MODEL") or "").strip()
+    selected = (model or _stored_ollama_model() or os.getenv("OLLAMA_MODEL") or "").strip()
     if not selected:
         return None
     return _OLLAMA_MODEL_ALIASES.get(selected, selected)
@@ -82,11 +82,6 @@ def _resolve_endpoint(base_url: Optional[str] = None) -> str:
     return (base_url or os.getenv("OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL).rstrip("/")
 
 
-def _post_generate(endpoint: str, payload: dict, timeout: int) -> dict:
-    """POST an /api/generate, JSON zurückgeben."""
-    return _http_json(f"{endpoint}/api/generate", payload, timeout)
-
-
 def test_ollama_model(model: Optional[str] = None, base_url: Optional[str] = None, timeout: int = 20) -> dict:
     """Check whether Ollama can handle the JSON mode used by the recipe planner."""
     endpoint = _resolve_endpoint(base_url)
@@ -103,8 +98,8 @@ def test_ollama_model(model: Optional[str] = None, base_url: Optional[str] = Non
             "error": "Modell ist lokal nicht installiert.",
         }
 
-    data = _post_generate(
-        endpoint,
+    data = _http_json(
+        f"{endpoint}/api/generate",
         {
             "model": selected_model,
             "prompt": (
@@ -175,6 +170,6 @@ def generate_from_ollama(
     if format_json:
         payload["format"] = "json"
 
-    data = _post_generate(endpoint, payload, timeout)
+    data = _http_json(f"{endpoint}/api/generate", payload, timeout)
     text = data.get("response") if isinstance(data, dict) else None
     return text.strip() if isinstance(text, str) else str(data).strip()

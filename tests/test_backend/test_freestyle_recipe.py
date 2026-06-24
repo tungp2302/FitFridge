@@ -1,6 +1,16 @@
 """Headline-Tests für die Freestyle-Rezept-Generierung."""
 import json
 from flaskr_new.asaai.freestyle_recipe import generate_freestyle_recipes
+from flaskr_new.asaai.freestyle_recipe_support import macros_within_targets
+
+
+def test_tolerance_floors_enforce_low_fat_and_low_carb_targets():
+    # Floors fat>=5 / carbs>=10: kleine Per-Mahlzeit-Ziele werden jetzt durchgesetzt.
+    assert not macros_within_targets({"fat": 12}, {"fat": 4})    # 12g Fett für 4g-Ziel -> raus
+    assert not macros_within_targets({"carbs": 33}, {"carbs": 19})  # 33g Carbs für 19g-Ziel -> raus
+    assert macros_within_targets({"fat": 9}, {"fat": 4})         # 9g innerhalb des 5er-Floors -> ok
+    # Wo der 0.30-Anteil > Floor ist, aendert sich nichts.
+    assert macros_within_targets({"fat": 38}, {"fat": 30})       # |38-30|=8 <= 0.30*30=9 -> weiter ok
 
 _patch_llm = lambda mp, f: mp.setattr("flaskr_new.asaai.freestyle_recipe.generate_from_ollama", f)
 _first = lambda r: r["recipes"][0]
@@ -53,6 +63,21 @@ def test_multiple_protein_and_starch_sources_are_rejected(monkeypatch):
     recipe = _first(generate_freestyle_recipes(fridge, recipe_category="hauptspeise", count=1))
     assert recipe.get("warning") is True
     assert recipe["title"] == "Kein valides Rezept"
+
+def test_low_carb_recipe_repaired_by_per_macro_fit(monkeypatch):
+    # Modell liefert ein carb-lastiges Gericht fuer ein Low-Carb-Ziel; reines
+    # kcal-Skalieren kann das nicht retten, der Pro-Makro-Fit schon.
+    fridge = [_item("Huhn", 300, 165, 31, 3.6, 0), _item("Reis", 500, 360, 7, 0.9, 79),
+              _item("Olivenoel", 500, 884, 0, 100, 0), _item("Brokkoli", 300, 34, 2.8, 0.4, 7)]
+    _patch_llm(monkeypatch, lambda **kw: make_recipe("Haehnchen mit Reis", [
+        {"id": 1, "name": "Huhn", "amount": 150}, {"id": 2, "name": "Reis", "amount": 120},
+        {"id": 3, "name": "Olivenoel", "amount": 10}, {"id": 4, "name": "Brokkoli", "amount": 100},
+    ]))
+    goal = {"kcal": 700, "protein": 61, "carbs": 26, "fat": 39}
+    recipe = _first(generate_freestyle_recipes(fridge, daily_goal=goal, recipe_category="hauptspeise", count=1))
+    assert "warning" not in recipe
+    assert 16 <= recipe["estimated_macros"]["carbs"] <= 36   # Carbs jetzt im Low-Carb-Band
+    assert recipe["estimated_macros"]["protein"] >= 51
 
 def test_multiple_recipe_suggestions_from_array(monkeypatch):
     captured = {}

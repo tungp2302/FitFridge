@@ -25,7 +25,6 @@ def _tags(*names):
     return {"models": [{"name": n} for n in names]}
 
 def test_resolve_ollama_model_accepts_profiles_and_raw_tags(monkeypatch):
-    monkeypatch.delenv("ASAAI_OLLAMA_MODEL", raising=False)
     monkeypatch.delenv("OLLAMA_MODEL", raising=False)
     assert resolve_ollama_model("desktop") == "qwen3.5:latest"
     assert resolve_ollama_model("laptop") == "qwen3:4b"

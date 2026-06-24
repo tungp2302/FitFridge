@@ -13,7 +13,7 @@ def get_settings(user_id: int) -> dict:
     return {"llm_model": row["llm_model"] or DEFAULT_LLM_MODEL}
 
 
-def save_settings(user_id: int, *, llm_model: str) -> dict:
+def save_settings(user_id: int, *, llm_model: str) -> None:
     model = (llm_model or DEFAULT_LLM_MODEL).strip() or DEFAULT_LLM_MODEL
     get_db().execute(
         """
@@ -26,4 +26,3 @@ def save_settings(user_id: int, *, llm_model: str) -> dict:
         (user_id, model),
     )
     get_db().commit()
-    return {"llm_model": model}

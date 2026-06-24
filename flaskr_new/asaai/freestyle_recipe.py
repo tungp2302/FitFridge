@@ -85,13 +85,17 @@ def _macro_strategy_hint(fridge_items, daily_goal, recipe_category=None):
         parts.append("für Frühstück, Nachspeise oder Snack KEIN Fleisch und keinen Fisch; Protein vor allem über magere, kcal-arme Quellen wie Joghurt/Quark (150-300g), Eier und Haferflocken (40-70g), Käse (20-100g), Proteinpulver oder Whey (5-60g); " \
         "fettreiche Zutaten wie Nüsse, Öl, Nutella nur sehr sparsam, sonst wird das kcal-Ziel gesprengt bevor das Protein-Ziel erreicht ist")
     protein_target = safe_float((daily_goal or {}).get("protein")) or 0.0
+    carbs_target = safe_float((daily_goal or {}).get("carbs")) or 0.0
+    low_carb = bool(carbs_target) and carbs_target <= 40
     if sweet and protein_target >= 40 and has_supplement:
         parts.append("bei diesem Protein-Ziel ist Whey/Proteinpulver (30-60g) im Shake, Porridge oder Protein-Pfannkuchen die kcal-effizienteste Proteinquelle und sollte priorisiert werden, weil magere Quellen wie Joghurt das kcal-Ziel sprengen, bevor das Protein-Ziel erreicht ist")
     if protein_target >= 50 and not sweet:
         parts.append("bei Protein-Ziel ab 50g ist 150g Hauptprotein meist zu wenig; für Rumpsteak, Hähnchen oder Hack eher ca. 200-300g verwenden")
     if protein_items and not sweet:
         parts.append(f"Protein eher über {names(protein_items)} erreichen, meist 180-300g")
-    if starch_items:
+    if low_carb:
+        parts.append("Kohlenhydrat-Ziel ist niedrig: Stärkebeilagen wie Reis, Nudeln oder Brot stark reduzieren (höchstens ca. 30g trocken) oder weglassen und die Kalorien stattdessen über Protein und Fett (Öl, Käse, fettreicheres Fleisch) decken")
+    elif starch_items:
         parts.append(f"für kcal/carbs eher {names(starch_items)} nutzen, bei Reis/Nudeln meist 100-150g trocken; nicht Kartoffeln oder Gemüse allein")
     if fat_items:
         parts.append(f"Fett bei Bedarf über 10-20g Öl und passende Fettquellen wie {names(fat_items)} erhöhen")
@@ -127,7 +131,7 @@ def build_prompt(fridge_items, daily_goal=None, recipe_category=None, retry_reas
     "Verwende nur Zutaten, die sinnvoll zum gewählten Gericht beitragen. "
     "Verwende weder unnoetig viele noch unnoetig wenige Zutaten. "
     "Wenn Zielwerte angegeben sind, muss die berechnete Summe aus amount_g innerhalb der erlaubten Bereiche liegen. "
-    "Kalorien dürfen das Ziel um höchstens 5% überschreiten. "
+    "Kalorien dürfen das Ziel um höchstens 10% überschreiten. "
     "Protein darf über dem Zielwert liegen, aber nicht deutlich darunter. "
     "Fett und Kohlenhydrate müssen innerhalb der angegebenen Toleranzen bleiben. "
 
@@ -182,7 +186,7 @@ def build_prompt(fridge_items, daily_goal=None, recipe_category=None, retry_reas
     "Rechne vor der Ausgabe mit den angegebenen /100g-Werten nach. "
     "Wenn kcal oder Protein zu niedrig sind, erhöhe zuerst eine passende Proteinquelle und eine passende Stärke. "
     "Wenn Fett zu niedrig ist, erhöhe Öl, Oliven, Käse, Hackfleisch oder andere passende Fettquellen. "
-    "Priorität: kcal höchstens 5% über Ziel, protein mindestens nahe Ziel, fat und carbs innerhalb Toleranz. "
+    "Priorität: kcal höchstens 10% über Ziel, protein mindestens nahe Ziel, fat und carbs innerhalb Toleranz. "
     "estimated_macros nur plausibel füllen und niemals schönrechnen. "
 
     "AUSGABE: "

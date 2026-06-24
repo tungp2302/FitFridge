@@ -31,8 +31,7 @@ def test_app_settings_roundtrip(app_context):
     settings = app_settings_repo.get_settings(1)
     assert settings["llm_model"] == "qwen3.5:latest"
 
-    saved = app_settings_repo.save_settings(1, llm_model="gemma3:1b")
-    assert saved["llm_model"] == "gemma3:1b"
+    app_settings_repo.save_settings(1, llm_model="gemma3:1b")
     assert app_settings_repo.get_settings(1)["llm_model"] == "gemma3:1b"
 
 
