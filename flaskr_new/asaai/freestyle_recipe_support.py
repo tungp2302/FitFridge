@@ -73,11 +73,7 @@ def _by_id(fridge_items):
     return {item["id"]: item for item in numbered_items(fridge_items)}
 def _num(value):
     value = safe_float(value)
-    if value is None:
-        return ""
-    if value.is_integer():
-        return str(int(value))
-    return f"{value:.1f}".rstrip("0").rstrip(".")
+    return "" if value is None else f"{round(value, 1):g}"
 def _grams(amount, name):
     amount = _num(amount)
     return f"{amount}g {name}" if amount else name
@@ -267,22 +263,14 @@ def macro_target_ranges(daily_goal):
 def format_ranges(ranges):
     return [f"{key}>={low}" if high is None else f"{key}={low}-{high}" for key, (low, high) in ranges.items()]
 def macros_within_targets(macros, daily_goal):
-    if not has_macro_targets(daily_goal):
+    ranges = macro_target_ranges(daily_goal)
+    if not ranges:
         return True
     if not macros:
         return False
-    for key, tolerance in MACRO_TOLERANCES.items():
-        target = safe_float(daily_goal.get(key))
-        if not target:
-            continue
+    for key, (low, high) in ranges.items():
         value = float(macros.get(key, 0.0) or 0.0)
-        if key == "kcal":
-            if value > target * 1.10 or target - value > tolerance(target):
-                return False
-        elif key == "protein":
-            if target - value > tolerance(target):
-                return False
-        elif abs(value - target) > tolerance(target):
+        if value < low or (high is not None and value > high):
             return False
     return True
 def _scale_fridge_amounts(recipe, factor):

@@ -1,18 +1,7 @@
+"""Unit-Tests für den Open-Food-Facts-Client (reine Funktionen, kein Netz)."""
 import json
 
-import pytest
-
-from flaskr_new import create_app, db, fridge_repo
 from flaskr_new import openfoodfacts_client as ofc
-from flaskr_new import product_repo
-
-
-@pytest.fixture()
-def app_context(tmp_path):
-    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "test.sqlite")})
-    with app.app_context():
-        db.init_db()
-        yield
 
 
 def product_payload(**overrides):
@@ -29,33 +18,6 @@ def product_payload(**overrides):
     }
     payload.update(overrides)
     return payload
-
-
-def create_product(**overrides):
-    payload = product_payload(**overrides)
-    return product_repo.create_product(
-        payload["name"],
-        payload["brand"],
-        payload["barcode"],
-        payload["kcal_per_100g"],
-        payload["protein_per_100g"],
-        payload["fat_per_100g"],
-        payload["carbs_per_100g"],
-    )
-
-
-def test_product_and_fridge_item_roundtrip(app_context):
-    product_id = create_product()
-    item_id = fridge_repo.add_item(product_id, 400.0, "g")
-
-    assert product_repo.get_by_barcode("3017620422003")["name"] == "Nutella"
-    assert fridge_repo.get_item(item_id)["current_amount"] == 400.0
-
-    assert fridge_repo.update_amount(item_id, 250.0) == 1
-    assert fridge_repo.get_item(item_id)["current_amount"] == 250.0
-
-    assert fridge_repo.delete_item(item_id) == 1
-    assert fridge_repo.get_item(item_id) is None
 
 
 class FakeResponse:
@@ -90,6 +52,37 @@ def test_openfoodfacts_parsing(monkeypatch):
     }
     monkeypatch.setattr(ofc, "urlopen", lambda *args, **kwargs: FakeResponse(payload))
 
-    result = ofc.search_product("3017620422003")
+    assert ofc.search_product("3017620422003") == product_payload()
 
-    assert result == product_payload()
+
+# --- Mengen-Parser: Multiplikatoren, Einheiten-Normalisierung, Fallback ---
+
+def test_parse_total_quantity_handles_multipliers_units_and_fallback():
+    parse = ofc._parse_total_quantity
+    assert parse({"quantity": "2 x 250 g"}) == (500.0, "g")   # Multiplikator
+    assert parse({"quantity": "4x100g"}) == (400.0, "g")      # ohne Leerzeichen
+    assert parse({"quantity": "1,5 kg"}) == (1.5, "kg")       # Komma-Dezimal
+    assert parse({"quantity": "6 x 1 stueck"}) == (6.0, "stk")  # Einheit normalisiert
+    assert parse({"quantity": "", "serving_size": "30 g"}) == (30.0, "g")  # Fallback
+    assert parse({"quantity": ""}) == (None, None)            # nichts angegeben
+
+
+# --- Energie-Normalisierung: kcal bevorzugt, sonst kJ/4.184 ---
+
+def test_kcal_from_nutriments_prefers_kcal_then_kj():
+    kcal = ofc._kcal_from_nutriments
+    assert kcal({"energy-kcal_100g": "250"}) == 250.0
+    assert kcal({"energy-kcal_value": "240"}) == 240.0
+    assert round(kcal({"energy_100g": "2000"}), 1) == round(2000 / 4.184, 1)
+    assert kcal({}) == 0.0
+
+
+# --- Ranking: exakt (60) > Teilstring (35) > Token (15) > nichts (0) ---
+
+def test_off_score_tiers():
+    score = ofc._score_off_product
+    assert score("Apfel", {"name": "Apfel"}) == 60.0              # exakt
+    assert score("Apfel", {"name": "Roter Apfel"}) == 35.0        # Teilstring
+    assert score("Apfel Saft", {"name": "Bananen Saft"}) == 15.0  # nur Token "saft"
+    assert score("Apfel", {"name": "Banane"}) == 0.0              # kein Treffer
+    assert score("", {"name": "Apfel"}) == 0.0                    # leere Anfrage

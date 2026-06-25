@@ -107,14 +107,11 @@ def _parse_total_quantity(product_data):
 
 def _kcal_from_nutriments(nutriments):
     """Normalize energy value from the nutriments dict to kcal per 100g."""
-    if nutriments.get("energy-kcal_100g") is not None:
-        return safe_float(nutriments.get("energy-kcal_100g"), 0.0)
-    if nutriments.get("energy-kcal_value") is not None:
-        return safe_float(nutriments.get("energy-kcal_value"), 0.0)
-    if nutriments.get("energy_100g") is not None:
-        kj = safe_float(nutriments.get("energy_100g"), 0.0)
-        return kj / 4.184 if kj else 0.0
-    return 0.0
+    for key in ("energy-kcal_100g", "energy-kcal_value"):
+        if nutriments.get(key) is not None:
+            return safe_float(nutriments.get(key), 0.0)
+    kj = safe_float(nutriments.get("energy_100g"), 0.0)
+    return kj / 4.184 if kj else 0.0
 
 
 def search_product(barcode):

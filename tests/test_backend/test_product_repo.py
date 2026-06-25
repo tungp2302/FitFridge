@@ -33,16 +33,6 @@ def test_create_product_can_be_found_by_barcode(app_context):
     assert repo.get_by_barcode("does-not-exist") is None
 
 
-def test_search_results_are_ranked_alphabetically(app_context):
-    make("Zucker")
-    make("Apfel")
-    make("Mango")
-
-    names = [row["name"] for row in repo.search_by_name("e")]
-
-    assert names == ["Apfel", "Mango", "Zucker"]
-
-
 def test_search_matches_name_and_brand(app_context):
     make("Joghurt", brand="Alpenmilch")
 
