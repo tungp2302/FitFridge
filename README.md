@@ -3,17 +3,16 @@
 ## Ablauf (so benutzt man die App)
 
 1. Registrieren / Einloggen: Jeder Nutzer hat seinen eigenen Kühlschrank. 
-   Standard sofort mit demo Account angemeldet (demo / demo)
-2. Produkt hinzufügen (`/fridge/add`): Barcode oder Name eingeben → Treffer aus
-   Open Food Facts auswählen → landet mit Nährwerten im Kühlschrank.
-3. Kühlschrank (`/`): Menge ändern und löschen.
-4. Mahlzeiten-Tracker (`/meal-tracker`): Tagesziel setzen und Mahlzeiten loggen
-   (aus einem Kühlschrank-Item oder per Barcode) – die Tagesübersicht zeigt
-   verbraucht vs. übrig.
-5. Rezeptplaner (`/asaai/ui/planner`): Zielwerte wählen und mit **Freestyle-Rezept**
-   per lokalem Ollama-Modell Vorschläge aus dem Kühlschrank erzeugen. Klick auf einen
-   Vorschlag zeigt rechts die Details; **Rezept speichern** legt ihn in der
-   **Gespeichert**-Sektion ab (dort umbenennen/löschen).
+   Standard sofort mit demo Account angemeldet.
+2. Lebensmittel hinzufügen: Barcode oder Name eingeben → Treffer aus
+   Open Food Facts / KI-Schätzung auswählen → landet mit Nährwerten im Kühlschrank.
+3. Kühlschrank: Menge ändern und löschen. Übersicht für Gesamtnährwerte
+4. Mahlzeiten-Tracker: Tagesziel setzen (bearbeiten) und 
+   Mahlzeiten loggen (hinzufügen) aus Kühlschrank oder neue Suche.
+   Tagesübersicht zeigt verbraucht vs. übrig.
+5. Rezeptplaner: Zielwerte wählen und mit **Freestyle-Rezept**
+   per lokalem Ollama-Modell Vorschläge aus dem Kühlschrank erzeugen. 
+   Klick auf einen Vorschlag zeigt rechts die Details; **Rezept speichern** legt ihn in der **Gespeichert**-Sektion ab (dort umbenennen/löschen).
 
 > Die Datenbank wird bei **jedem** Serverstart frisch aus `schema.sql` aufgesetzt
 > und automatisch mit Demo-Daten befüllt. **Login: demo / demo.**
@@ -28,7 +27,7 @@
 
 ## Starten
 
-### macOS / Linux
+### macOS 
 
 ```bash
 cd /pfad/zum/FitFridge
@@ -51,15 +50,13 @@ Dann im Browser öffnen: http://127.0.0.1:5000
 
 ## Ollama 
 
-Rezept-Planer und Nährwert-Schätzung laufen über eine **lokale Ollama-Instanz**.
-
 1. **Installieren:** https://ollama.com/download (macOS, Windows, Linux). Nach der
    Installation läuft Ollama als Dienst unter `http://127.0.0.1:11434`.
-2. **Mindestens ein Modell laden** (die App bietet diese drei in den Einstellungen an):
+2. **Mindestens ein Modell laden** 
 
    ```bash
    ollama pull gemma3:1b        # klein/schnell – zum Testen empfohlen
-   ollama pull qwen3:4b         # Mittelklasse (Laptop)
+   ollama pull qwen3:4b         # Mittel (Laptop)
    ollama pull qwen3.5:latest   # Standard, beste Qualität (Desktop, ~9B)
    ```
 

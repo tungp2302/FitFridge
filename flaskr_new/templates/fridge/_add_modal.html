@@ -43,10 +43,11 @@
     </div>
 
     {% if tab == 'fridge' %}
-      <div class="fridge-panel-scroll">
-        {% if fridge_items %}
-          <form method="post">
-            <input type="hidden" name="action" value="cart_add_fridge">
+      {% if fridge_items %}
+        <form method="post">
+          <input type="hidden" name="action" value="cart_add_fridge">
+          <button type="submit" class="secondary" style="margin-bottom:10px;">zur Mahlzeit</button>
+          <div class="fridge-panel-scroll">
             <div class="fridge-picker-grid">
               {% for item in fridge_items %}
                 <div class="fridge-picker-card">
@@ -60,12 +61,11 @@
                 </div>
               {% endfor %}
             </div>
-            <button type="submit" class="secondary" style="margin-top:10px;">zur Mahlzeit</button>
-          </form>
-        {% else %}
-          <p class="muted">Noch keine Produkte im Kühlschrank.</p>
-        {% endif %}
-      </div>
+          </div>
+        </form>
+      {% else %}
+        <p class="muted">Noch keine Produkte im Kühlschrank.</p>
+      {% endif %}
     {% else %}
       <form method="get" action="{{ url_for('frontend.meal_tracker') }}" id="mt-search-form">
         <input type="hidden" name="modal" value="add">
