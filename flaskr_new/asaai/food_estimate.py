@@ -5,6 +5,7 @@ als erster Treffer neben den OFF-Ergebnissen angezeigt werden kann.
 """
 import json
 
+from ..calculations import safe_float
 from .ollama_client import generate_from_ollama
 
 
@@ -33,7 +34,7 @@ def estimate_food(query, model=None):
             format_json=True,
         )
         data = json.loads(raw)
-        macros = {k: float(data[k]) for k in ("kcal", "protein", "fat", "carbs")}
+        macros = {k: safe_float(data[k], 0.0) for k in ("kcal", "protein", "fat", "carbs")}
     except Exception:
         return None  
 

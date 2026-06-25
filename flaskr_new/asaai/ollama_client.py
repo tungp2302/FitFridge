@@ -74,25 +74,18 @@ def test_ollama_model(model: Optional[str] = None, base_url: Optional[str] = Non
             "error": "Modell ist lokal nicht installiert.",
         }
 
-    data = _http_json(
-        f"{endpoint}/api/generate",
-        {
-            "model": selected_model,
-            "prompt": (
-                "Antworte nur mit einem JSON-Objekt: "
-                '{"ok":true,"title":"Planner Test","estimated_macros":{"protein":60,"fat":25}}'
-            ),
-            "stream": False,
-            "think": False,
-            "format": "json",
-            "options": {
-                "temperature": 0,
-                "num_predict": 120,
-            },
-        },
-        timeout,
+    text = generate_from_ollama(
+        prompt=(
+            "Antworte nur mit einem JSON-Objekt: "
+            '{"ok":true,"title":"Planner Test","estimated_macros":{"protein":60,"fat":25}}'
+        ),
+        model=selected_model,
+        base_url=base_url,
+        timeout=timeout,
+        num_predict=120,
+        format_json=True,
+        temperature=0,
     )
-    text = data.get("response") if isinstance(data, dict) else ""
     parsed = {}
     if isinstance(text, str) and text.strip():
         try:

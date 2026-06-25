@@ -15,7 +15,8 @@ def get_settings(user_id: int) -> dict:
 
 def save_settings(user_id: int, *, llm_model: str) -> None:
     model = (llm_model or DEFAULT_LLM_MODEL).strip() or DEFAULT_LLM_MODEL
-    get_db().execute(
+    db = get_db()
+    db.execute(
         """
         INSERT INTO app_settings (user_id, llm_model, updated)
         VALUES (?, ?, CURRENT_TIMESTAMP)
@@ -25,4 +26,4 @@ def save_settings(user_id: int, *, llm_model: str) -> None:
         """,
         (user_id, model),
     )
-    get_db().commit()
+    db.commit()

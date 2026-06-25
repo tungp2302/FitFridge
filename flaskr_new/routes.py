@@ -85,12 +85,15 @@ def load_logged_in_user():
 @bp.route("/", methods=("GET", "POST"))
 def dashboard():
     if g.user is not None and request.method == "POST":
-        update_dashboard_item(
-            request.form.get("item_id"),
-            current_amount=request.form.get("current_amount"),
-            grams_per_piece=request.form.get("grams_per_piece"),
-            user_id=g.user["id"],
-        )
+        try:
+            update_dashboard_item(
+                request.form.get("item_id"),
+                current_amount=request.form.get("current_amount"),
+                grams_per_piece=request.form.get("grams_per_piece"),
+                user_id=g.user["id"],
+            )
+        except ValueError:
+            flash("Eintrag wurde nicht gefunden.")
         return redirect(url_for("frontend.dashboard"))
 
     posts = [] if g.user is None else [dict(item) for item in list_items(g.user["id"])]
@@ -213,7 +216,10 @@ def meal_tracker():
 
     # Die ganze Seite zeigt einen Tag (Default heute); der Kalender waehlt ihn aus.
     today = _date.today()
-    the_date = request.args.get("date") or today.isoformat()
+    try:
+        the_date = _date.fromisoformat(request.args.get("date") or "").isoformat()
+    except ValueError:
+        the_date = today.isoformat()
     settings = get_settings(user_id)
     recent_meals = get_day_meals(user_id, the_date)
     consumed = get_day_totals(user_id, the_date)
