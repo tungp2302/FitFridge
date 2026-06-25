@@ -67,7 +67,7 @@
         {% endif %}
       </div>
     {% else %}
-      <form method="get" action="{{ url_for('frontend.meal_tracker') }}">
+      <form method="get" action="{{ url_for('frontend.meal_tracker') }}" id="mt-search-form">
         <input type="hidden" name="modal" value="add">
         <input type="hidden" name="tab" value="product">
         <label for="q">Produktname oder Barcode suchen</label>
@@ -75,7 +75,15 @@
           <input name="q" id="q" value="{{ query }}" placeholder="z.B. Nutella" required>
           <button type="submit" class="search-action-button">Suchen</button>
         </div>
+        <button type="button" id="mt-scan-btn" class="search-action-button" style="margin-top:8px;">📷 Scannen</button>
       </form>
+      <script>
+        document.getElementById('mt-scan-btn').addEventListener('click', () =>
+          window.startBarcodeScan((code) => {
+            document.getElementById('q').value = code;
+            document.getElementById('mt-search-form').requestSubmit();
+          }));
+      </script>
 
       {% if results is not none %}
         {% if results %}

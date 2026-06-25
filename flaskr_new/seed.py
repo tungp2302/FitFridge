@@ -6,6 +6,8 @@ verfügbar ist, spielt ``seed_demo_data`` die Daten in die aktuelle DB ein.
 Erwartet einen leeren, frisch initialisierten Datenbestand (siehe ``init_db``).
 """
 
+from datetime import date, timedelta
+
 from werkzeug.security import generate_password_hash
 
 from .db import get_db
@@ -130,6 +132,16 @@ def seed_demo_data():
             user_id, meal["name"], kcal=meal["kcal"], protein_g=meal["protein_g"],
             carbs_g=meal["carbs_g"], fat_g=meal["fat_g"],
             amount=meal["amount"], unit=meal["unit"],
+        )
+
+    # Ein vergangener Tag mit Eintraegen, damit der Kalender-Verlauf testbar ist.
+    past = (date.today() - timedelta(days=3)).strftime("%Y-%m-%d 12:00:00")
+    for meal in _DEMO_MEALS[:2]:
+        db.execute(
+            "INSERT INTO meal_tracker_entry (user_id, meal_name, amount, unit, kcal,"
+            " protein_g, carbs_g, fat_g, eaten_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (user_id, meal["name"], meal["amount"], meal["unit"], meal["kcal"],
+             meal["protein_g"], meal["carbs_g"], meal["fat_g"], past),
         )
 
     db.commit()

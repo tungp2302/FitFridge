@@ -24,6 +24,13 @@ def create_product(name, brand, barcode, kcal_per_100g,
     return cursor.lastrowid
 
 
+def update_grams_per_piece(product_id, grams_per_piece):
+    """Gramm-pro-Stück eines Produkts setzen (für stk-Einheiten)."""
+    db = get_db()
+    db.execute("UPDATE product SET grams_per_piece = ? WHERE id = ?", (grams_per_piece, product_id))
+    db.commit()
+
+
 def search_by_name(query, limit=10):
     """Search local products by name (case-insensitive, simple LIKE)."""
     q = f"%{query}%"

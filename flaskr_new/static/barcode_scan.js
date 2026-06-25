@@ -110,8 +110,7 @@
 
     // Autofokus erzwingen, falls die Kamera ihn anbietet (gegen Unschaerfe).
     const [track] = stream.getVideoTracks();
-    const caps = track.getCapabilities ? track.getCapabilities() : {};
-    if (caps.focusMode && caps.focusMode.includes('continuous')) {
+    if (track.getCapabilities?.().focusMode?.includes('continuous')) {
       track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
     }
 

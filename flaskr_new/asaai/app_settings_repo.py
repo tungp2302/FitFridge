@@ -1,6 +1,6 @@
 """Speichert App-Einstellungen pro Nutzer (aktuell das LLM-Modell)."""
-from .db import get_db
-from .asaai.ollama_client import DEFAULT_OLLAMA_MODEL as DEFAULT_LLM_MODEL
+from ..db import get_db
+from .ollama_client import DEFAULT_OLLAMA_MODEL as DEFAULT_LLM_MODEL
 
 
 def get_settings(user_id: int) -> dict:

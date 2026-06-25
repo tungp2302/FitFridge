@@ -104,15 +104,6 @@ def add_meal_entry(
     return cur.lastrowid
 
 
-def get_today_meals(user_id):
-    db = get_db()
-    rows = db.execute(
-        "SELECT * FROM meal_tracker_entry WHERE user_id = ? AND eaten_at >= ? ORDER BY eaten_at DESC",
-        (user_id, _now().strftime("%Y-%m-%d 00:00:00")),
-    ).fetchall()
-    return [dict(row) for row in rows]
-
-
 def get_today_totals(user_id):
     db = get_db()
     row = db.execute(
@@ -120,5 +111,36 @@ def get_today_totals(user_id):
         " COALESCE(SUM(carbs_g),0) AS carbs_g, COALESCE(SUM(fat_g),0) AS fat_g"
         " FROM meal_tracker_entry WHERE user_id = ? AND eaten_at >= ?",
         (user_id, _now().strftime("%Y-%m-%d 00:00:00")),
+    ).fetchone()
+    return {k: round(float(row[k]), 1) for k in ("kcal", "protein_g", "carbs_g", "fat_g")}
+
+
+def get_tracked_days(user_id, year, month):
+    """Tag-Nummern eines Monats mit mindestens einer Mahlzeit (fuer Kalender-Punkte)."""
+    db = get_db()
+    rows = db.execute(
+        "SELECT DISTINCT CAST(strftime('%d', eaten_at) AS INTEGER) AS d"
+        " FROM meal_tracker_entry WHERE user_id = ? AND strftime('%Y-%m', eaten_at) = ?",
+        (user_id, f"{year:04d}-{month:02d}"),
+    ).fetchall()
+    return {row["d"] for row in rows}
+
+
+def get_day_meals(user_id, date_str):
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM meal_tracker_entry WHERE user_id = ? AND date(eaten_at) = ? ORDER BY eaten_at DESC",
+        (user_id, date_str),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_day_totals(user_id, date_str):
+    db = get_db()
+    row = db.execute(
+        "SELECT COALESCE(SUM(kcal),0) AS kcal, COALESCE(SUM(protein_g),0) AS protein_g,"
+        " COALESCE(SUM(carbs_g),0) AS carbs_g, COALESCE(SUM(fat_g),0) AS fat_g"
+        " FROM meal_tracker_entry WHERE user_id = ? AND date(eaten_at) = ?",
+        (user_id, date_str),
     ).fetchone()
     return {k: round(float(row[k]), 1) for k in ("kcal", "protein_g", "carbs_g", "fat_g")}

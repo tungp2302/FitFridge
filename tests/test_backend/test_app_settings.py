@@ -1,7 +1,7 @@
 import pytest
 
 from flaskr_new import create_app, db
-from flaskr_new import app_settings_repo
+from flaskr_new.asaai import app_settings_repo
 from flaskr_new.asaai.ollama_client import resolve_ollama_model
 
 

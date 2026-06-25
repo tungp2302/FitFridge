@@ -1,7 +1,9 @@
 """Frontend-Routen"""
 
+import calendar as _calendar
 import functools
 import json
+from datetime import date as _date
 
 from flask import (
     Blueprint,
@@ -20,9 +22,10 @@ from .calculations import safe_float
 from .db import get_db
 from .meal_tracker_repo import (
     delete_meal_entry,
-    get_today_meals,
+    get_day_meals,
+    get_day_totals,
     get_settings,
-    get_today_totals,
+    get_tracked_days,
     update_meal_entry_amount,
 )
 from .meal_tracker_service import (
@@ -39,11 +42,21 @@ from .fridge_service import (
 )
 from .openfoodfacts_client import search_product, search_products
 from .product_repo import search_by_name
-from .app_settings_repo import get_settings as get_app_settings, save_settings as save_app_settings
+from .asaai.app_settings_repo import (
+    get_settings as get_app_settings,
+    save_settings as save_app_settings,
+)
 from .asaai.ollama_client import OLLAMA_MODEL_CHOICES, resolve_ollama_model, test_ollama_model
 from .asaai.food_estimate import estimate_food
 
 bp = Blueprint("frontend", __name__, template_folder="templates", static_folder="static")
+
+
+def _form_value(name, cast):
+    try:
+        return cast(request.form[name])
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def login_required(view):
@@ -60,13 +73,13 @@ def login_required(view):
 @bp.before_app_request
 def load_logged_in_user():
     user_id = session.get("user_id")
-
-    if user_id is None:
-        g.user = None
-    else:
-        g.user = get_db().execute(
+    g.user = (
+        None
+        if user_id is None
+        else get_db().execute(
             "SELECT * FROM user WHERE id = ?", (user_id,)
         ).fetchone()
+    )
 
 
 @bp.route("/", methods=("GET", "POST"))
@@ -75,41 +88,33 @@ def dashboard():
         update_dashboard_item(
             request.form.get("item_id"),
             current_amount=request.form.get("current_amount"),
+            grams_per_piece=request.form.get("grams_per_piece"),
             user_id=g.user["id"],
         )
         return redirect(url_for("frontend.dashboard"))
 
-    if g.user is None:
-        posts = []
-    else:
-        posts = list_items(user_id=g.user["id"])
-    posts_with_nutrition = []
-    for post in posts:
-        d = {**dict(post), **calculate_total_nutrition(dict(post))}
-        posts_with_nutrition.append(d)
+    posts = [] if g.user is None else [dict(item) for item in list_items(g.user["id"])]
+    posts = [{**item, **calculate_total_nutrition(item)} for item in posts]
 
-    totals = {key: round(sum(float(item.get(f"total_{key}", 0) or 0) for item in posts_with_nutrition), 1)
+    totals = {key: round(sum(float(item.get(f"total_{key}") or 0) for item in posts), 1)
               for key in ("kcal", "protein", "carbs", "fat")}
-    totals["item_count"] = len(posts_with_nutrition)
-    overview = {"totals": totals}
+    totals["item_count"] = len(posts)
 
-    return render_template("fridge/dashboard.html", posts=posts_with_nutrition, overview=overview)
+    return render_template("fridge/dashboard.html", posts=posts, overview={"totals": totals})
 
 
 @bp.route("/settings", methods=("GET", "POST"))
 @login_required
 def settings():
-    allowed_models = {choice["name"] for choice in OLLAMA_MODEL_CHOICES}
     llm_test = None
 
     if request.method == "POST":
-        action = request.form.get("action")
         selected_model = resolve_ollama_model(request.form.get("llm_model"))
-        if selected_model not in allowed_models:
+        if selected_model not in {choice["name"] for choice in OLLAMA_MODEL_CHOICES}:
             flash("Unbekanntes LLM-Modell.")
         else:
             save_app_settings(g.user["id"], llm_model=selected_model)
-            if action == "test_llm":
+            if request.form.get("action") == "test_llm":
                 try:
                     llm_test = test_ollama_model(selected_model)
                     if llm_test["ok"]:
@@ -126,10 +131,9 @@ def settings():
             else:
                 flash("Einstellungen gespeichert.")
 
-    settings_data = get_app_settings(g.user["id"])
     return render_template(
         "settings.html",
-        settings=settings_data,
+        settings=get_app_settings(g.user["id"]),
         model_choices=OLLAMA_MODEL_CHOICES,
         llm_test=llm_test,
     )
@@ -146,20 +150,16 @@ def meal_tracker():
         tab = request.form.get("tab", "product")
 
         if action == "delete_meal":
-            entry_id_raw = request.form.get("meal_entry_id")
-            try:
-                deleted = delete_meal_entry(int(entry_id_raw), user_id) if entry_id_raw else False
-            except (TypeError, ValueError):
-                deleted = False
+            entry_id = _form_value("meal_entry_id", int)
+            deleted = entry_id is not None and delete_meal_entry(entry_id, user_id)
             flash("Mahlzeit geloescht." if deleted else "Mahlzeit konnte nicht geloescht werden.")
             return redirect(url_for("frontend.meal_tracker"))
         elif action == "edit_meal_amount":
-            entry_id_raw = request.form.get("meal_entry_id")
-            new_amount_raw = request.form.get("new_amount")
-            try:
-                updated = update_meal_entry_amount(int(entry_id_raw), user_id, float(new_amount_raw)) if entry_id_raw and new_amount_raw else False
-            except (TypeError, ValueError):
-                updated = False
+            entry_id = _form_value("meal_entry_id", int)
+            new_amount = _form_value("new_amount", float)
+            updated = None not in (entry_id, new_amount) and update_meal_entry_amount(
+                entry_id, user_id, new_amount
+            )
             flash("Menge aktualisiert." if updated else "Neue Menge konnte nicht gespeichert werden.")
             return redirect(url_for("frontend.meal_tracker"))
         elif action == "save_settings":
@@ -205,18 +205,18 @@ def meal_tracker():
             session["meal_cart"] = cart
             return redirect(url_for("frontend.meal_tracker", modal="add", tab="product"))
         elif action == "cart_remove":
-            try:
-                idx = int(request.form.get("index", "-1"))
-            except ValueError:
-                idx = -1
-            if 0 <= idx < len(cart):
+            idx = _form_value("index", int)
+            if idx is not None and 0 <= idx < len(cart):
                 cart.pop(idx)
             session["meal_cart"] = cart
             return redirect(url_for("frontend.meal_tracker", modal="add", tab=tab))
 
+    # Die ganze Seite zeigt einen Tag (Default heute); der Kalender waehlt ihn aus.
+    today = _date.today()
+    the_date = request.args.get("date") or today.isoformat()
     settings = get_settings(user_id)
-    recent_meals = get_today_meals(user_id)
-    consumed = get_today_totals(user_id)
+    recent_meals = get_day_meals(user_id, the_date)
+    consumed = get_day_totals(user_id, the_date)
     summary = build_daily_summary(settings, consumed)
 
     modal = request.args.get("modal")          # 'add' | 'settings' | None
@@ -224,6 +224,22 @@ def meal_tracker():
     query = request.args.get("q", "").strip()
     results = unified_search(query) if (modal == "add" and tab == "product" and query) else None
     fridge_items = [dict(item) for item in list_items(user_id=user_id)] if modal == "add" else []
+
+    # Kalender-Monatsraster (stdlib), Default = Monat des gewaehlten Tags.
+    try:
+        cy = int(request.args.get("cal_year", the_date[:4]))
+        cm = int(request.args.get("cal_month", the_date[5:7]))
+    except ValueError:
+        cy, cm = today.year, today.month
+    first_weekday, days = _calendar.monthrange(cy, cm)  # Mo=0
+    cal = {
+        "year": cy, "month": cm, "first_weekday": first_weekday, "days": days,
+        "tracked": get_tracked_days(user_id, cy, cm),
+        "today": today.isoformat(), "selected": the_date,
+        "open": bool(request.args.get("date") or request.args.get("cal_month")),
+        "prev": (cy - 1, 12) if cm == 1 else (cy, cm - 1),
+        "next": (cy + 1, 1) if cm == 12 else (cy, cm + 1),
+    }
 
     return render_template(
         "fridge/meal_tracker.html",
@@ -237,6 +253,7 @@ def meal_tracker():
         results=results,
         fridge_items=fridge_items,
         cart=cart,
+        cal=cal,
     )
 
 
@@ -251,12 +268,9 @@ def add_product():
         query = request.form.get("query", "").strip()
         selected_payload_raw = request.form.get("selected_payload", "").strip()
 
-        if action == "search":
-            if query:
-                results = unified_search(query)
-            else:
-                flash("Barcode or product name is required.")
-        elif not query and not selected_payload_raw:
+        if action == "search" and query:
+            results = unified_search(query)
+        elif action == "search" or not (query or selected_payload_raw):
             flash("Barcode or product name is required.")
         else:
             try:
@@ -281,36 +295,27 @@ def unified_search(q):
     if not q:
         return []
 
-    # Barcode (nur Ziffern): direkt die OFF-Barcode-API nutzen.
     if q.isdigit():
         try:
             product = search_product(q)
         except (RuntimeError, ValueError):
-            product = None
-        if not product or not product.get("name"):
             return []
-        return [_to_result(product)]
+        return [_to_result(product)] if product and product.get("name") else []
 
-    # Text-Suche: KI-Schätzung zuerst (Primärquelle), dann lokale DB-Treffer
-    # und die OFF-Textsuche. search_products faengt Netzfehler selbst ab.
-    results = []
-    seen_barcodes = set()
+    results, seen_barcodes = [], set()
 
     def add(item):
-        barcode = item.get("barcode") or ""
-        if barcode and barcode in seen_barcodes:
-            return
-        if barcode:
+        result = _to_result(item)
+        barcode = result["barcode"]
+        if not barcode or barcode not in seen_barcodes:
+            results.append(result)
             seen_barcodes.add(barcode)
-        results.append(_to_result(item))
 
-    estimate = estimate_food(q)  # ponytail: ein Ollama-Call pro Textsuche, bewusst
-    if estimate:
+    if estimate := estimate_food(q):
         results.append(_to_result(estimate))
 
-    for r in search_by_name(q, limit=10):
-        add(dict(r))
-
+    for item in map(dict, search_by_name(q, limit=10)):
+        add(item)
     for item in search_products(q):
         add(item)
 
@@ -318,7 +323,7 @@ def unified_search(q):
 
 
 _RESULT_KEYS = ("name", "brand", "barcode", "kcal_per_100g", "protein_per_100g",
-                 "fat_per_100g", "carbs_per_100g", "total_amount", "unit")
+                 "fat_per_100g", "carbs_per_100g", "total_amount", "unit", "grams_per_piece")
 
 def _to_result(item):
     """Vereinheitlicht ein Produkt-Dict zu den Feldern, die das Frontend nutzt."""
@@ -330,11 +335,8 @@ def _to_result(item):
 @bp.route("/fridge/<int:item_id>/delete", methods=("POST",))
 @login_required
 def delete_product(item_id):
-    post = get_item(item_id, user_id=g.user["id"])
-
-    if post is None:
+    if get_item(item_id, user_id=g.user["id"]) is None:
         abort(404, f"Item id {item_id} doesn't exist.")
-
     delete_dashboard_item(item_id)
     return redirect(url_for("frontend.dashboard"))
 
@@ -374,23 +376,18 @@ def login():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
-        db = get_db()
-        error = None
-        user = db.execute(
+        user = get_db().execute(
             "SELECT * FROM user WHERE username = ?", (username,)
         ).fetchone()
 
         if user is None:
-            error = "Incorrect username."
+            flash("Incorrect username.")
         elif not check_password_hash(user["password"], password):
-            error = "Incorrect password."
-
-        if error is None:
+            flash("Incorrect password.")
+        else:
             session.clear()
             session["user_id"] = user["id"]
             return redirect(url_for("frontend.dashboard"))
-
-        flash(error)
 
     return render_template("auth/login.html")
 

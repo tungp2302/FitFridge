@@ -27,6 +27,7 @@ def _resolve_or_create_product(product_data, fallback_barcode):
             protein_per_100g=float(product_data.get("protein_per_100g") or 0.0),
             fat_per_100g=float(product_data.get("fat_per_100g") or 0.0),
             carbs_per_100g=float(product_data.get("carbs_per_100g") or 0.0),
+            grams_per_piece=safe_float(product_data.get("grams_per_piece")),
         )
     except sqlite3.IntegrityError:
         # Doppelter Barcode (gleiches Item zweimal) -> bestehenden Eintrag nutzen.
@@ -69,20 +70,22 @@ def create_dashboard_item_from_data(product_data, author_id=None):
     return _add_item_from_product_data(product_data, fallback_barcode=fallback_barcode, author_id=author_id)
 
 
-def update_dashboard_item(item_id, current_amount=None, user_id=None):
-    """Menge eines Fridge-Items aktualisieren.
+def update_dashboard_item(item_id, current_amount=None, grams_per_piece=None, user_id=None):
+    """Menge (und für stk: Gramm pro Stück) eines Fridge-Items aktualisieren.
 
     Die Suche ist auf den Nutzer gescoped (``user_id``), damit niemand
     über geratene IDs fremde Items ändert. Eine leere oder ungültige Menge
     ist ein No-op statt eines 500ers.
     """
-    if current_amount is None:
-        return 0
+    item = fridge_repo.get_item(item_id, user_id=user_id)
+    if item is None:
+        raise ValueError("No fridge item found for id")
+    gpp = safe_float(grams_per_piece)
+    if gpp is not None and gpp > 0:
+        product_repo.update_grams_per_piece(item["product_id"], gpp)
     amount = safe_float(current_amount)
     if amount is None or amount < 0:
         return 0
-    if fridge_repo.get_item(item_id, user_id=user_id) is None:
-        raise ValueError("No fridge item found for id")
     return fridge_repo.update_amount(item_id, amount)
 
 

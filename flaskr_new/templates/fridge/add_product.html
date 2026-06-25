@@ -6,12 +6,20 @@
 
 {% block content %}
   <div class="page-card" style="max-width:760px;">
-    <form method="post">
+    <form method="post" id="search-form">
       <input type="hidden" name="action" value="search">
       <label for="query">Barcode oder Produktname</label>
       <input name="query" id="query" value="{{ query }}" placeholder="z.B. 3017620422003 oder Nutella" required>
       <input type="submit" value="Suchen">
+      <button type="button" id="scan-btn" class="secondary">📷 Barcode scannen</button>
     </form>
+    <script>
+      document.getElementById('scan-btn').addEventListener('click', () =>
+        window.startBarcodeScan((code) => {
+          document.getElementById('query').value = code;
+          document.getElementById('search-form').requestSubmit();
+        }));
+    </script>
     <p class="muted">Die Treffer kommen von Open Food Facts. Findet die Suche nichts, kannst du das Produkt mit "Trotzdem anlegen" trotzdem anlegen.</p>
 
     {% if results is not none %}

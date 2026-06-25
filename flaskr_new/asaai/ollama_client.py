@@ -30,7 +30,7 @@ def _stored_ollama_model() -> Optional[str]:
     if user is None:
         return None
     try:
-        from ..app_settings_repo import get_settings
+        from .app_settings_repo import get_settings
 
         return get_settings(user["id"]).get("llm_model")
     except Exception:
