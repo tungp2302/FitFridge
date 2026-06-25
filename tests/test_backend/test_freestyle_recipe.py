@@ -1,7 +1,12 @@
 """Headline-Tests für die Freestyle-Rezept-Generierung."""
 import json
+
+import pytest
+
+from flaskr_new import create_app, db
 from flaskr_new.asaai.freestyle_recipe import generate_freestyle_recipes
 from flaskr_new.asaai.freestyle_recipe_support import macros_within_targets
+from flaskr_new.db import get_db
 
 
 def test_tolerance_floors_enforce_low_fat_and_low_carb_targets():
@@ -120,3 +125,44 @@ def test_unusable_response_returns_warning(monkeypatch):
     recipe = _first(generate_freestyle_recipes(FRIDGE, count=1))
     assert recipe["warning"] is True
     assert recipe["title"] == "Kein valides Rezept"
+
+
+# --- Routen für gespeicherte Rezepte (/asaai/recipes/saved) ---
+
+@pytest.fixture()
+def app(tmp_path):
+    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "saved.sqlite")})
+    with app.app_context():
+        db.init_db()
+        get_db().execute("INSERT INTO user (username, password) VALUES ('u', 'x')")
+        get_db().commit()
+    return app
+
+@pytest.fixture()
+def client(app):
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess["user_id"] = 1
+    return c
+
+def test_saved_requires_login(app):
+    assert app.test_client().get("/asaai/recipes/saved").status_code == 401
+
+def test_save_list_rename_delete_roundtrip(client):
+    saved = client.post("/asaai/recipes/saved", json={"title": "Bowl", "estimated_macros": {"kcal": 500}})
+    recipes = saved.get_json()["recipes"]
+    assert saved.status_code == 200 and recipes[0]["title"] == "Bowl"
+    rid = recipes[0]["id"]
+
+    client.patch(f"/asaai/recipes/saved/{rid}", json={"title": "Neue Bowl"})
+    assert client.get("/asaai/recipes/saved").get_json()["recipes"][0]["title"] == "Neue Bowl"
+
+    assert client.delete(f"/asaai/recipes/saved/{rid}").status_code == 200
+    assert client.get("/asaai/recipes/saved").get_json()["recipes"] == []
+
+def test_save_rejects_non_object_body(client):
+    assert client.post("/asaai/recipes/saved", json=["nope"]).status_code == 400
+
+def test_rename_requires_title(client):
+    rid = client.post("/asaai/recipes/saved", json={"title": "A"}).get_json()["recipes"][0]["id"]
+    assert client.patch(f"/asaai/recipes/saved/{rid}", json={"title": "  "}).status_code == 400

@@ -2,13 +2,18 @@
 
 ## Ablauf (so benutzt man die App)
 
-1. Registrieren / Einloggen: Jeder Nutzer hat seinen eigenen Kühlschrank.
+1. Registrieren / Einloggen: Jeder Nutzer hat seinen eigenen Kühlschrank. 
+   Standard sofort mit demo Account angemeldet (demo / demo)
 2. Produkt hinzufügen (`/fridge/add`): Barcode oder Name eingeben → Treffer aus
    Open Food Facts auswählen → landet mit Nährwerten im Kühlschrank.
 3. Kühlschrank (`/`): Menge ändern und löschen.
 4. Mahlzeiten-Tracker (`/meal-tracker`): Tagesziel setzen und Mahlzeiten loggen
    (aus einem Kühlschrank-Item oder per Barcode) – die Tagesübersicht zeigt
    verbraucht vs. übrig.
+5. Rezeptplaner (`/asaai/ui/planner`): Zielwerte wählen und mit **Freestyle-Rezept**
+   per lokalem Ollama-Modell Vorschläge aus dem Kühlschrank erzeugen. Klick auf einen
+   Vorschlag zeigt rechts die Details; **Rezept speichern** legt ihn in der
+   **Gespeichert**-Sektion ab (dort umbenennen/löschen).
 
 > Die Datenbank wird bei **jedem** Serverstart frisch aus `schema.sql` aufgesetzt
 > und automatisch mit Demo-Daten befüllt. **Login: demo / demo.**
@@ -19,6 +24,7 @@
 - Kühlschrank (Dashboard): http://127.0.0.1:5000/
 - Produkt hinzufügen: http://127.0.0.1:5000/fridge/add
 - Mahlzeiten-Tracker: http://127.0.0.1:5000/meal-tracker
+- Rezeptplaner: http://127.0.0.1:5000/asaai/ui/planner
 
 ## Starten
 
