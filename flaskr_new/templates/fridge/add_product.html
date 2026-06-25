@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Neues Lebensmittel{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <div class="page-card" style="max-width:760px;">
+    <form method="post" id="search-form">
+      <input type="hidden" name="action" value="search">
+      <label for="query">Barcode oder Produktname</label>
+      <input name="query" id="query" value="{{ query }}" placeholder="z.B. 3017620422003 oder Nutella" required>
+      <input type="submit" value="Suchen">
+      <button type="button" id="scan-btn" class="secondary">📷 Barcode scannen</button>
+    </form>
+    <script>
+      document.getElementById('scan-btn').addEventListener('click', () =>
+        window.startBarcodeScan((code) => {
+          document.getElementById('query').value = code;
+          document.getElementById('search-form').requestSubmit();
+        }));
+    </script>
+    <p class="muted">Die Treffer kommen von Open Food Facts. Findet die Suche nichts, kannst du das Produkt mit "Trotzdem anlegen" trotzdem anlegen.</p>
+
+    {% if results is not none %}
+      {% if results %}
+        <div class="search-results-panel" style="margin-top:.5rem;">
+          {% for item in results %}
+            {% set is_ai = item.brand == 'KI-Schätzung' %}
+            <div class="search-item{% if is_ai %} is-ai{% endif %}">
+              <div class="search-item__top">
+                <strong>{{ item.name or '(no name)' }} <span class="badge {{ 'is-ai' if is_ai else 'is-off' }}">{{ 'KI' if is_ai else 'OFF' }}</span></strong>
+                <form method="post" class="flat-form">
+                  <input type="hidden" name="selected_payload" value='{{ item|tojson }}'>
+                  <button type="submit" class="search-action-button">Hinzufügen</button>
+                </form>
+              </div>
+              <div class="search-item__brand muted">{{ item.brand or '' }}</div>
+              <small>Barcode: {{ item.barcode or '' }} · {{ item.kcal_per_100g or '' }} kcal/100g</small>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">Keine Treffer.</p>
+      {% endif %}
+
+      {% if query %}
+        <form method="post" style="margin-top:.5rem;">
+          <input type="hidden" name="query" value="{{ query }}">
+          <button type="submit" class="secondary">Trotzdem anlegen</button>
+        </form>
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

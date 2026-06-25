@@ -1,0 +1,62 @@
+<div class="modal">
+  <a class="modal__backdrop" href="{{ url_for('frontend.meal_tracker') }}" aria-label="Schließen"></a>
+  <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+    <div class="modal__header">
+      <div>
+        <h2 id="settings-modal-title">Einstellungen</h2>
+        <p class="muted">Tagesziel</p>
+      </div>
+      <a class="modal__close" href="{{ url_for('frontend.meal_tracker') }}" aria-label="Schließen">×</a>
+    </div>
+
+    {% set kcal = settings['daily_kcal']|float %}
+    <p class="muted">Die Anteile werden beim Speichern auf 100&nbsp;% normalisiert.</p>
+    <form method="post">
+      <input type="hidden" name="action" value="save_settings">
+
+      <label for="daily_kcal">Zielkalorien</label>
+      <input type="number" step="1" min="0" name="daily_kcal" id="daily_kcal" value="{{ settings['daily_kcal'] }}">
+
+      <label for="protein_pct">Protein – <span data-pct="protein">{{ settings['protein_pct'] }}</span>% / <span data-g="protein">{{ (kcal * (settings['protein_pct']|float) / 100.0 / 4.0)|round(0) }}</span> g</label>
+      <input type="range" min="0" max="100" name="protein_pct" id="protein_pct" value="{{ settings['protein_pct'] }}" data-kcal-per-g="4">
+
+      <label for="carbs_pct">Kohlenhydrate – <span data-pct="carbs">{{ settings['carbs_pct'] }}</span>% / <span data-g="carbs">{{ (kcal * (settings['carbs_pct']|float) / 100.0 / 4.0)|round(0) }}</span> g</label>
+      <input type="range" min="0" max="100" name="carbs_pct" id="carbs_pct" value="{{ settings['carbs_pct'] }}" data-kcal-per-g="4">
+
+      <label for="fat_pct">Fett – <span data-pct="fat">{{ settings['fat_pct'] }}</span>% / <span data-g="fat">{{ (kcal * (settings['fat_pct']|float) / 100.0 / 9.0)|round(0) }}</span> g</label>
+      <input type="range" min="0" max="100" name="fat_pct" id="fat_pct" value="{{ settings['fat_pct'] }}" data-kcal-per-g="9">
+
+      <div class="add-modal__actions" style="margin-top:1rem;">
+        <a class="link-button subtle" href="{{ url_for('frontend.meal_tracker') }}">Abbrechen</a>
+        <input type="submit" value="Speichern">
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Live macro + 3 sliders = 100 % 
+  (function () {
+    var kcal = document.getElementById('daily_kcal');
+    var sl = [].slice.call(document.querySelectorAll('input[type=range][data-kcal-per-g]'));
+    function refresh() {
+      var k = +kcal.value || 0;
+      sl.forEach(function (s) {
+        var key = s.id.replace('_pct', ''), p = +s.value || 0;
+        document.querySelector('[data-pct="' + key + '"]').textContent = Math.round(p);
+        document.querySelector('[data-g="' + key + '"]').textContent = Math.round(k * p / 100 / +s.dataset.kcalPerG);
+      });
+    }
+    sl.forEach(function (c) {
+      c.addEventListener('input', function () {            // exactly 3 sliders -> 2 others
+        c.value = Math.max(0, Math.min(100, Math.round(+c.value || 0)));
+        var o = sl.filter(function (s) { return s !== c; }), rem = 100 - +c.value;
+        var tot = (+o[0].value || 0) + (+o[1].value || 0);
+        o[0].value = tot > 0 ? Math.round(rem * (+o[0].value || 0) / tot) : Math.round(rem / 2);
+        o[1].value = rem - +o[0].value;
+        refresh();
+      });
+    });
+    kcal.addEventListener('input', refresh);
+  })();
+</script>

@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Registrieren{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  {% set submit_label = 'Registrieren' %}
+  {% include 'auth/_form.html' %}
+{% endblock %}

@@ -1,0 +1,3 @@
+# Entwicklungs-Abhaengigkeiten (inkl. Laufzeit).
+-r requirements.txt
+pytest>=9
