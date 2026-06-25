@@ -31,6 +31,7 @@ CREATE TABLE product (
     protein_per_100g REAL NOT NULL,
     fat_per_100g REAL NOT NULL,
     carbs_per_100g REAL NOT NULL,
+    grams_per_piece REAL,
     created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

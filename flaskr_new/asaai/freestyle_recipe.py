@@ -300,16 +300,14 @@ def generate_freestyle_recipes(fridge_items, daily_goal=None, recipe_category=No
         return {"recipes": [warning_recipe("LLM nicht erreichbar", message)], "prompt_used": "", "raw_response": "", "error": result["error"]}
     recipes = _target_fit_recipes(result["recipes"], daily_goal)
     if not recipes:
-        if macro_target_ranges(daily_goal):
-            # Makro-Kombinations-Fehler: Ziel mit diesen Zutaten nicht erreichbar
-            recipes = [invalid_recipe_warning(
-                "Makro-Kombination nicht erreichbar",
-                "Mit dieser Makro-Kombination und deinen Zutaten ließ sich kein passendes Rezept erstellen. "
-                "Passe die Makro-Kombination an, z. B. mehr Kalorien fürs Protein-Ziel oder ein niedrigeres Protein-Ziel.",
-            )]
-        else:
-            recipes = [invalid_recipe_warning(
-                "Kein valides Rezept",
-                "Das Modell hat keinen brauchbaren Rezeptvorschlag erzeugt. Bitte versuche es erneut.",
-            )]
+        # Makro-Ziel gesetzt -> Kombination nicht erreichbar; sonst kein brauchbares Rezept.
+        title, message = (
+            ("Makro-Kombination nicht erreichbar",
+             "Mit dieser Makro-Kombination und deinen Zutaten ließ sich kein passendes Rezept erstellen. "
+             "Passe die Makro-Kombination an, z. B. mehr Kalorien fürs Protein-Ziel oder ein niedrigeres Protein-Ziel.")
+            if macro_target_ranges(daily_goal) else
+            ("Kein valides Rezept",
+             "Das Modell hat keinen brauchbaren Rezeptvorschlag erzeugt. Bitte versuche es erneut.")
+        )
+        recipes = [invalid_recipe_warning(title, message)]
     return {"recipes": recipes, "prompt_used": result["prompt"], "raw_response": result["raw"]}

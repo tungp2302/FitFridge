@@ -3,14 +3,21 @@
 import json
 import logging
 import re
+import ssl
 import unicodedata
 from urllib.parse import quote
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+import certifi
+
 from .calculations import safe_float
 
 logger = logging.getLogger(__name__)
+
+# certifi-CA-Bundle nutzen, damit HTTPS-Verifizierung auch auf macOS und
+# Servern ohne gepflegten System-Truststore funktioniert.
+_SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 
 OFF_API_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
 
@@ -125,7 +132,7 @@ def search_product(barcode):
     )
 
     try:
-        with urlopen(req, timeout=10) as resp:
+        with urlopen(req, timeout=10, context=_SSL_CONTEXT) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
     except HTTPError as e:
         if e.code == 404:
@@ -190,7 +197,7 @@ def search_products(query, limit=10):
     )
 
     try:
-        with urlopen(request, timeout=10) as response:
+        with urlopen(request, timeout=10, context=_SSL_CONTEXT) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except Exception:
         logger.warning("OFF-Textsuche fehlgeschlagen für %r", query, exc_info=True)

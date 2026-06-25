@@ -6,7 +6,7 @@ from .db import get_db
 _FRIDGE_ITEM_SELECT = (
     "SELECT f.id, f.user_id, f.product_id, f.current_amount, f.unit, f.created,"
     " p.name, p.brand, p.barcode,"
-    " p.kcal_per_100g, p.protein_per_100g, p.fat_per_100g, p.carbs_per_100g"
+    " p.kcal_per_100g, p.protein_per_100g, p.fat_per_100g, p.carbs_per_100g, p.grams_per_piece"
     " FROM fridge_item f JOIN product p ON f.product_id = p.id"
 )
 

@@ -20,8 +20,7 @@ SWEET = ("banane", "banana", "apfel", "apple", "beere", "berry", "honig", "honey
 VEG = ("spinat", "spinach", "karotte", "carrot", "brokkoli", "broccoli", "paprika", "tomate", "tomato", "zucchini", "zwiebel", "onion", "champignon", "pilz", "mushroom", "lauch", "sellerie", "gurke", "salat", "kohl", "bohne", "erbse", "spargel", "asparagus")
 STARCH = ("reis", "rice", "kartoffel", "potato", "nudel", "noodle", "pasta", "bulgur", "couscous", "hafer", "oat", "mehl", "flour", "brot", "bread", "bun", "buns", "broetchen", "brötchen", "semmel", "wrap", "tortilla")
 PROTEIN = ("ei", "egg", "eier", "tofu", "tempeh", "huhn", "chicken", "rind", "beef", "steak", "fisch", "fish", "lachs", "salmon", "linsen", "lentil", "bohnen", "beans", "hack", "hackfleisch", "kaese", "cheese", "frischkaese", "joghurt", "yogurt")
-DAIRY = ("milch", "milk", "joghurt", "yogurt", "quark", "skyr")
-FOOD = set(SWEET + VEG + STARCH + PROTEIN + DAIRY)
+FOOD = set(SWEET + VEG + STARCH + PROTEIN + ("milch", "milk", "quark", "skyr"))
 SAVORY = VEG + STARCH + PROTEIN
 # erste passende Gruppe gewinnt; Eier/Käse/Joghurt sind kein Hauptprotein
 MAIN_PROTEIN_GROUPS = (
@@ -47,7 +46,6 @@ MEAT_FISH = tuple(t for label, terms in MAIN_PROTEIN_GROUPS if label != "tofu" f
 SUPP_BLOCK = VEG + ("reis", "rice", "kartoffel", "potato", "nudel", "noodle", "pasta", "brot", "bread", "huhn", "chicken", "haehnchen", "hähnchen", "rind", "beef", "steak", "fisch", "fish", "lachs", "salmon", "tofu", "tempeh", "pfanne", "brat", "auflauf", "curry", "suppe", "salat", "gemuese", "gemüse")
 SUPP_OK = ("pfannkuchen", "pancake", "porridge", "haferbrei", "shake", "smoothie", "joghurt", "yogurt", "quark", "skyr", "bowl", "gebaeck", "gebäck", "muffin", "waffel", "waffle")
 FILLER = {"mit", "und", "auf", "an", "in", "aus", "der", "die", "das"}
-SKIP_TOKENS = {"fitfridge", "demo", "bio", "fresh", "frisch", "local", "farm", "natur", "neutral", "original", "classic", "klassisch", "protein", "powder", "pulver", "pure", "bulk"}
 ALIASES = {"egg": ("ei", "eier"), "eggs": ("ei", "eier"), "ei": ("egg", "eggs", "eier"), "eier": ("egg", "eggs", "ei"), "cheese": ("kaese", "kase", "käse"), "kaese": ("cheese", "käse"), "frischkaese": ("frischkäse", "cream cheese"), "oats": ("hafer", "haferflocken"), "rice": ("reis",), "flour": ("mehl",)}
 def normalize(value):
     text = (value or "").lower()
@@ -71,9 +69,6 @@ def is_sweet_category(category):
     return has_term(category or "", SWEET_CATS)
 def _sweetish(name):
     return has_term(name, SWEET) or is_supplement(name)
-def _tokens(value):
-    words = re.findall(r"[a-zA-ZäöüÄÖÜß]+", normalize(value))
-    return [word for word in words if len(word) >= 3 and word not in SKIP_TOKENS]
 def _by_id(fridge_items):
     return {item["id"]: item for item in numbered_items(fridge_items)}
 def _num(value):
@@ -174,18 +169,6 @@ def _ingredient_text(recipe):
     parts = string_list(recipe.get("ingredients")) + string_list(recipe.get("used_fridge_items"))
     parts += [str(raw.get("label") or raw.get("name") or raw.get("ingredient") or "") for raw in _raw_fridge(recipe) if isinstance(raw, dict)]
     return " ".join(normalize(part) for part in parts if part)
-def _mentions_item(text, name):
-    text = normalize(text)
-    if normalize(name) in text:
-        return True
-    for token in _tokens(name):
-        if token in text or any(normalize(alias) in text for alias in ALIASES.get(token, ())):
-            return True
-        if token.endswith("mehl") and "mehl" in text:
-            return True
-        if token.endswith("kaese") and "kaese" in text:
-            return True
-    return False
 def _used_ids(recipe):
     ids = []
     for raw_id in recipe.get("used_fridge_item_ids") or []:
@@ -234,11 +217,6 @@ def _pantry_amounts_ok(recipe):
         if ("oil" in name or "oel" in name) and amount > 30:
             return False
     return True
-def _legacy_names_ok(recipe, fridge_items):
-    if structured_fridge_ingredients(recipe, fridge_items) or not recipe.get("used_fridge_item_ids"):
-        return True
-    text = _ingredient_text(recipe)
-    return all(_mentions_item(text, name) for name in used_fridge_names(recipe, fridge_items))
 def _distinct_main_groups(used_names, groups):
     found = set()
     for name in used_names:
@@ -427,7 +405,6 @@ def _is_valid(recipe, fridge_items, category=None, daily_goal=None):
     return (
         bool(used_names)
         and _ids_ok(recipe, fridge_items)
-        and _legacy_names_ok(recipe, fridge_items)
         and _amounts_ok(recipe, fridge_items)
         and _pantry_amounts_ok(recipe)
         and not _recipe_conflicts(recipe, category, used_names)

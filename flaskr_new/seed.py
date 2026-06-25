@@ -26,7 +26,7 @@ _DEMO_PRODUCTS = [
      "carbs_per_100g": 3.5, "current_amount": 300, "unit": "g"},
     {"name": "Eggs", "brand": "Local Farm", "barcode": "demo-eggs-001",
      "kcal_per_100g": 143, "protein_per_100g": 12.6, "fat_per_100g": 9.5,
-     "carbs_per_100g": 0.7, "current_amount": 6, "unit": "stk"},
+     "carbs_per_100g": 0.7, "current_amount": 6, "unit": "stk", "grams_per_piece": 60},
     {"name": "Steak", "brand": "FitFridge Demo", "barcode": "demo-steak-001",
      "kcal_per_100g": 217, "protein_per_100g": 26.0, "fat_per_100g": 12.0,
      "carbs_per_100g": 0.0, "current_amount": 250, "unit": "g"},
@@ -67,7 +67,7 @@ _DEMO_PRODUCTS = [
      "carbs_per_100g": 4.8, "current_amount": 1000, "unit": "ml"},
     {"name": "Banane", "brand": "FitFridge Demo", "barcode": "demo-banana-001",
      "kcal_per_100g": 89, "protein_per_100g": 1.1, "fat_per_100g": 0.3,
-     "carbs_per_100g": 23.0, "current_amount": 5, "unit": "stk"},
+     "carbs_per_100g": 23.0, "current_amount": 5, "unit": "stk", "grams_per_piece": 120},
     {"name": "Heidelbeeren", "brand": "FitFridge Demo", "barcode": "demo-berries-001",
      "kcal_per_100g": 57, "protein_per_100g": 0.7, "fat_per_100g": 0.3,
      "carbs_per_100g": 14.0, "current_amount": 200, "unit": "g"},
@@ -82,7 +82,7 @@ _DEMO_PRODUCTS = [
      "carbs_per_100g": 22.0, "current_amount": 200, "unit": "g"},
     {"name": "Apfel", "brand": "FitFridge Demo", "barcode": "demo-apple-001",
      "kcal_per_100g": 52, "protein_per_100g": 0.3, "fat_per_100g": 0.2,
-     "carbs_per_100g": 14.0, "current_amount": 4, "unit": "stk"},
+     "carbs_per_100g": 14.0, "current_amount": 4, "unit": "stk", "grams_per_piece": 180},
     {"name": "Zucker", "brand": "FitFridge Demo", "barcode": "demo-sugar-001",
      "kcal_per_100g": 400, "protein_per_100g": 0.0, "fat_per_100g": 0.0,
      "carbs_per_100g": 100.0, "current_amount": 500, "unit": "g"},
@@ -119,6 +119,7 @@ def seed_demo_data():
             product["name"], product["brand"], product["barcode"],
             product["kcal_per_100g"], product["protein_per_100g"],
             product["fat_per_100g"], product["carbs_per_100g"],
+            product.get("grams_per_piece"),
         )
         add_item(product_id, product["current_amount"], product["unit"], user_id=user_id)
 

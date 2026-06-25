@@ -11,39 +11,16 @@ DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 DEFAULT_OLLAMA_MODEL = "qwen3.5:latest"
 
 OLLAMA_MODEL_CHOICES = [
-    {
-        "id": "desktop",
-        "name": "qwen3.5:latest",
-        "label": "Qwen 3.5 latest (desktop, 9B)",
-    },
-    {
-        "id": "laptop",
-        "name": "qwen3:4b",
-        "label": "Qwen 3 4B (laptop)",
-    },
-    {
-        "id": "fast",
-        "name": "gemma3:1b",
-        "label": "Gemma 3 1B (fast)",
-    },
+    {"name": "qwen3.5:latest", "label": "Qwen 3.5 latest (desktop, 9B)"},
+    {"name": "qwen3:4b", "label": "Qwen 3 4B (laptop)"},
+    {"name": "gemma3:1b", "label": "Gemma 3 1B (fast)"},
 ]
-
-_OLLAMA_MODEL_ALIASES = {
-    choice["id"]: choice["name"]
-    for choice in OLLAMA_MODEL_CHOICES
-}
 
 
 def resolve_ollama_model(model: Optional[str] = None) -> Optional[str]:
-    """Resolve a configured model alias to the Ollama model name.
-
-    Accepts either one of the local profile IDs (`desktop`, `laptop`, `fast`)
-    or a raw Ollama model tag such as `qwen3:4b`.
-    """
-    selected = (model or _stored_ollama_model() or os.getenv("OLLAMA_MODEL") or "").strip()
-    if not selected:
-        return None
-    return _OLLAMA_MODEL_ALIASES.get(selected, selected)
+    """Return the configured Ollama model tag (explicit arg, stored setting,
+    or env OLLAMA_MODEL), or None if nothing is set."""
+    return (model or _stored_ollama_model() or os.getenv("OLLAMA_MODEL") or "").strip() or None
 
 
 def _stored_ollama_model() -> Optional[str]:
@@ -91,7 +68,6 @@ def test_ollama_model(model: Optional[str] = None, base_url: Optional[str] = Non
         return {
             "ok": False,
             "model": selected_model,
-            "base_url": endpoint,
             "installed": False,
             "generated": False,
             "installed_models": names,
@@ -127,7 +103,6 @@ def test_ollama_model(model: Optional[str] = None, base_url: Optional[str] = Non
     return {
         "ok": generated,
         "model": selected_model,
-        "base_url": endpoint,
         "installed": True,
         "generated": generated,
         "installed_models": names,

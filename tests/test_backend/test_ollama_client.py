@@ -24,12 +24,14 @@ def _fake_urlopen(routes):
 def _tags(*names):
     return {"models": [{"name": n} for n in names]}
 
-def test_resolve_ollama_model_accepts_profiles_and_raw_tags(monkeypatch):
+def test_resolve_ollama_model_passthrough_and_env(monkeypatch):
     monkeypatch.delenv("OLLAMA_MODEL", raising=False)
-    assert resolve_ollama_model("desktop") == "qwen3.5:latest"
-    assert resolve_ollama_model("laptop") == "qwen3:4b"
-    assert resolve_ollama_model("fast") == "gemma3:1b"
+    assert resolve_ollama_model("qwen3:4b") == "qwen3:4b"
     assert resolve_ollama_model("custom:latest") == "custom:latest"
+    assert resolve_ollama_model("") is None
+    assert resolve_ollama_model(None) is None
+    monkeypatch.setenv("OLLAMA_MODEL", "gemma3:1b")
+    assert resolve_ollama_model() == "gemma3:1b"
 
 def test_generate_from_ollama_parses_response(monkeypatch):
     def gen(body, timeout):
