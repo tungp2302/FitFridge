@@ -1,5 +1,8 @@
 let requestToken = 0;
 
+const jsonReq = (method, body) =>
+  ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
 function escHtml(value){
   return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -37,8 +40,12 @@ function freestyleMacroLabel(macros){
 }
 
 let currentRecipes = [];
+let savedRecipes = [];
 let selectedIdx = 0;
 let loadingMore = false;
+
+// Vorschläge + gespeicherte Rezepte als eine indizierbare Liste fürs Rail.
+const allRecipes = () => currentRecipes.concat(savedRecipes);
 
 const recipeStateLabel = (recipe) => recipe.warning === true ? 'Warnung' : 'LLM';
 
@@ -75,10 +82,9 @@ function normTitle(title){
   return (title || '').trim().toLowerCase();
 }
 
-// Zeichnet die Vorschlagskarten (plus optional einen "lädt"-Hinweis).
-function renderRail(){
-  const rail = document.getElementById('rail');
-  let html = currentRecipes.map((recipe, idx) => `
+// Eine Rezeptkarte; idx zeigt in die kombinierte Liste allRecipes().
+function cardHtml(recipe, idx){
+  return `
     <article class="recipe-card${idx === selectedIdx ? ' active' : ''}" data-idx="${idx}" style="cursor:pointer;">
       <div class="recipe-meta">
         <strong>${escHtml(recipe.title || 'Freestyle-Rezept')}</strong>
@@ -86,18 +92,51 @@ function renderRail(){
       </div>
       <p class="muted" style="margin:.35rem 0 .5rem;">${freestyleMacroLabel(recipe.estimated_macros)}</p>
       <div>${(recipe.used_fridge_items || []).map(item => `<span class="pill">${escHtml(item)}</span>`).join('') || '<span class="muted">No fridge items used</span>'}</div>
-    </article>
-  `).join('');
-  if(loadingMore){
-    html += '<div class="muted-box" id="more-loading">Weitere Vorschläge werden geladen…</div>';
+      ${recipe.id ? `<div style="margin-top:.4rem;display:flex;gap:.6rem;">
+        <a href="#" data-rename="${recipe.id}" class="muted">Umbenennen</a>
+        <a href="#" data-delete="${recipe.id}" class="muted">Löschen</a>
+      </div>` : ''}
+    </article>`;
+}
+
+function railClick(e){
+  const rename = e.target.closest('[data-rename]');
+  const del = e.target.closest('[data-delete]');
+  if(rename){ e.preventDefault(); renameSaved(Number(rename.dataset.rename)); return; }
+  if(del){ e.preventDefault(); deleteSaved(Number(del.dataset.delete)); return; }
+  const card = e.target.closest('.recipe-card');
+  if(card) selectRecipe(Number(card.getAttribute('data-idx')));
+}
+
+// Zeichnet Vorschläge (#rail) und die eigene Gespeichert-Sektion (#saved-rail).
+function renderRail(){
+  if(currentRecipes.length || loadingMore){
+    const rail = document.getElementById('rail');
+    let html = currentRecipes.map(cardHtml).join('');
+    if(loadingMore) html += '<div class="muted-box" id="more-loading">Weitere Vorschläge werden geladen…</div>';
+    rail.innerHTML = html || '<div class="muted-box">Kein Rezept erhalten.</div>';
+    rail.onclick = railClick;
   }
-  if(!html){
-    html = '<div class="muted-box">Kein Rezept erhalten.</div>';
-  }
-  rail.innerHTML = html;
-  Array.from(rail.querySelectorAll('.recipe-card')).forEach(card => {
-    card.addEventListener('click', () => selectRecipe(Number(card.getAttribute('data-idx'))));
-  });
+
+  document.getElementById('saved-title').style.display = savedRecipes.length ? '' : 'none';
+  const savedRail = document.getElementById('saved-rail');
+  savedRail.innerHTML = savedRecipes.map((r, i) => cardHtml(r, currentRecipes.length + i)).join('');
+  savedRail.onclick = railClick;
+}
+
+async function mutateSaved(url, options){
+  const response = await fetch(url, options);
+  if(!response.ok) return;
+  await loadSavedRecipes(true);
+  selectRecipe(Math.min(selectedIdx, allRecipes().length - 1));
+}
+
+const deleteSaved = (id) =>
+  confirm('Rezept löschen?') && mutateSaved(`/asaai/recipes/saved/${id}`, { method: 'DELETE' });
+
+function renameSaved(id){
+  const title = prompt('Neuer Name:');
+  if(title) mutateSaved(`/asaai/recipes/saved/${id}`, jsonReq('PATCH', { title }));
 }
 
 // Markiert die angetippte Karte und zeigt ihre Details.
@@ -106,15 +145,29 @@ function selectRecipe(idx){
   Array.from(document.querySelectorAll('.recipe-card')).forEach(card => {
     card.classList.toggle('active', Number(card.getAttribute('data-idx')) === idx);
   });
-  if(currentRecipes[idx]) renderDetail(currentRecipes[idx]);
+  const recipe = allRecipes()[idx];
+  if(recipe) renderDetail(recipe);
+  // Speichern nur für frische Vorschläge, nicht für bereits gespeicherte.
+  document.getElementById('save-recipe').style.display =
+    recipe && !recipe.warning && idx < currentRecipes.length ? '' : 'none';
+}
+
+async function loadSavedRecipes(force){
+  try {
+    const response = await fetch('/asaai/recipes/saved');
+    if(!response.ok) return;
+    savedRecipes = (await response.json()).recipes || [];
+    if(force || savedRecipes.length) renderRail();   // sonst den Start-Hinweis stehen lassen
+  } catch(e){ /* ponytail: gespeicherte Rezepte sind optional */ }
+}
+
+function saveCurrentRecipe(){
+  const recipe = currentRecipes[selectedIdx];
+  if(recipe) mutateSaved('/asaai/recipes/saved', jsonReq('POST', recipe));
 }
 
 async function postRecipes(body){
-  const response = await fetch('/asaai/recipes/freestyle', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+  const response = await fetch('/asaai/recipes/freestyle', jsonReq('POST', body));
   const data = await response.json();
   if(!response.ok) throw new Error(data.error || 'Freestyle generation failed');
   return data.recipes || (data.recipe ? [data.recipe] : []);
@@ -179,3 +232,5 @@ async function loadFreestyleRecipe(){
 }
 
 document.getElementById('run-freestyle').addEventListener('click', loadFreestyleRecipe);
+document.getElementById('save-recipe').addEventListener('click', saveCurrentRecipe);
+loadSavedRecipes();

@@ -1,4 +1,5 @@
 DROP TABLE IF EXISTS app_settings;
+DROP TABLE IF EXISTS saved_recipe;
 DROP TABLE IF EXISTS fridge_item;
 DROP TABLE IF EXISTS meal_tracker_entry;
 DROP TABLE IF EXISTS meal_tracker_settings;
@@ -57,6 +58,15 @@ CREATE TABLE meal_tracker_entry (
     carbs_g REAL NOT NULL DEFAULT 0,
     fat_g REAL NOT NULL DEFAULT 0,
     eaten_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user (id)
+);
+
+CREATE TABLE saved_recipe (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    data TEXT NOT NULL,
+    created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user (id)
 );
 
