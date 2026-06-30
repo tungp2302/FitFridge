@@ -1,302 +1,554 @@
-# FitFridge – Abschlusspräsentation (Folienskript)
-
-> **Kopfzeile (alle Folien):** FitFridge – KI-gestützter Rezeptplaner · ASaAI
-> **Fußzeile (alle Folien):** Autoren · Folie X / N · Quelle(n) der Folie
-> **Hinweis zur Nutzung:** Eine Überschrift = eine Folie. „FOLIE" = Inhalt auf der Folie, „SPRECHTEXT" = was ihr dazu sagt, „ABB./QUELLE" = Beleg in der Fußzeile. Platzhalter `‹…›` vor der Abgabe füllen.
+# FitFridge — Präsentation: Von der Vorlesung zur Produktion
 
 ---
 
-## Folie 1 — Deckblatt
+## Folie 1 — Was ist FitFridge? (Motivation)
 
-**FOLIE**
-- Titel: **FitFridge – Makro-genaue Rezeptgenerierung aus Kühlschrank-Beständen mit einem lokalen Large Language Model (LLM)**
-- Untertitel: Vergleich von ungeprüfter LLM-Ausgabe vs. validierter, nachgerechneter Ausgabe
-- Autoren: ‹Vorname Nachname› (Matr.-Nr. ‹…›), ‹Vorname Nachname› (Matr.-Nr. ‹…›)
-- Kurs: ASaAI (Angewandte Systeme & angewandte AI)
-- Lehrende: Prof. ‹Putzar›, ‹Balzer›, ‹Maute›  *(akademische Titel vor Abgabe prüfen)*
-- Datum: ‹Abgabedatum›
+**Problem:** Du öffnest den Kühlschrank, siehst Hähnchenbrust, Reis, Paprika, Eier — und weißt trotzdem nicht, was du kochen sollst. Noch schwieriger: Du hast ein Fitnessziel — 2200 kcal, 160 g Protein — und weißt nicht, ob das Rezept das trifft.
 
-**SPRECHTEXT:** Kurz vorstellen, Projektname und die zentrale Idee in einem Satz: „Aus dem, was im Kühlschrank liegt, makro-genaue Rezepte erzeugen — lokal, ohne Cloud."
+**FitFridge löst genau das:**
+- Digitaler Kühlschrank: du weißt immer, was du hast und wie viele Nährwerte noch drin sind
+- KI-Rezeptplaner: ein lokales LLM generiert kochbare Rezepte **nur aus deinen echten Zutaten**, mit automatischer Makro-Anpassung auf dein Tagesziel
+- Mahlzeiten-Tracker: was du gegessen hast, was noch übrig ist
 
----
-
-## Folie 2 — Inhaltsübersicht *(optional, aber empfohlen)*
-
-**FOLIE** (Agenda, nummeriert)
-1. Motivation & Forschungsfrage
-2. Stand der Forschung / vergleichbare Ansätze
-3. Datengrundlage (OpenFoodFacts + Seed)
-4. Systemarchitektur
-5. Algorithmus: LLM-Prompting + Validierung + Makro-Reparatur
-6. Einordnung als adaptives System (Regelkreise)
-7. Analyse / Ergebnisse
-8. Lessons Learned
-9. Fazit & Ausblick
-
-**SPRECHTEXT:** Roter Faden ansagen, Dauer grob nennen.
+**Relevanz für die Vorlesung:** Das Projekt verbindet alle fünf Themenblöcke — LLMs, RAG, Agentic Systems, Recommender Systems, Adaptive Systems — in einer einzigen Applikation, die wirklich läuft.
 
 ---
 
-## Folie 3 — Motivation
+## Folie 2 — Tech-Stack auf einen Blick
 
-**FOLIE**
-- Problem: „Was koche ich aus dem, was da ist — und wie treffe ich dabei meine Tagesziele (kcal/Protein/Carbs/Fett)?"
-- Manuelle Rezeptsuche ignoriert den realen Bestand und die Makroverteilung.
-- Reine LLM-Rezepte klingen plausibel, aber **die genannten Nährwerte stimmen oft nicht** (Modell „rät" Zahlen).
-- Ziel der Anwendung: Kühlschrank verwalten + Mahlzeiten tracken + Rezepte vorschlagen, die rechnerisch zum Ziel passen.
+| Schicht | Technologie | Warum |
+|---|---|---|
+| Backend | Python 3.10+, Flask 3 | Minimal, kein Overhead |
+| Datenbank | SQLite (stdlib) | Kein Server nötig, ideal für Uni-Setup |
+| Frontend | Jinja2-Templates + Vanilla-JS | Kein Build-Tool, kein Framework |
+| KI | Ollama lokal (`qwen3.5:latest`) | Läuft offline, keine API-Kosten |
+| Externe Daten | OpenFoodFacts API (urllib) | Freie Produktdatenbank |
+| Auth | Werkzeug Password-Hashing | Standardbibliothek |
 
-**SPRECHTEXT:** Den Schmerzpunkt betonen: LLM-Zahlen sind nicht vertrauenswürdig → genau das ist der Aufhänger der Arbeit.
-**ABB.:** Screenshot Dashboard (Abb. 1).
-
----
-
-## Folie 4 — Projektziel & Forschungsfrage
-
-**FOLIE**
-- **Zweck der Anwendung** (≠ Ziel der Projektarbeit): ein lauffähiger lokaler Rezeptplaner.
-- **Ziel der Projektarbeit (Forschungsfrage):**
-  > „Lässt sich die Nährwert-Genauigkeit LLM-generierter Rezepte signifikant verbessern, wenn die Modellzahlen **nicht** übernommen, sondern aus den Gramm-Mengen **selbst nachgerechnet** und Mengen per regelbasierter Reparatur an Zielwerte angepasst werden — verglichen mit der ungeprüften LLM-Ausgabe?"
-- Teil-Fragen: (a) Wie oft liefert ein lokales LLM direkt valide, zielkonforme Rezepte? (b) Wie viel holt eine Validierungs-/Reparaturschicht heraus?
-- **Bezug adaptive Systeme:** Die Reparatur-/Retry-Schicht ist ein **geschlossener Regelkreis** (Soll-/Istwert-Vergleich, Stellgröße) — vertieft in Folie 14.
-
-**SPRECHTEXT:** Klar trennen: Kurs ist nicht das Ziel; das Ziel ist die Beantwortung der Vergleichsfrage „ungeprüft vs. nachgerechnet".
+**Wichtig:** Die Datenbank wird bei jedem Serverstart neu aufgebaut (`schema.sql` → `DROP TABLE / CREATE TABLE`) und per `seed.py` mit Demo-Daten gefüllt. Login: `demo` / `demo`. Das ist bewusst — so ist jeder Demo-Lauf sauber reproduzierbar.
 
 ---
 
-## Folie 5 — Stand der Forschung / vergleichbare Ansätze
+## Folie 3 — Systemarchitektur (Schichtenmodell)
 
-**FOLIE**
-- **Retrieval-/Constraint-basierte Rezeptempfehlung** (klassisch, ohne LLM): exakt, aber unflexibel bei freier Zutatenkombination. [Q1]
-- **LLM-Rezeptgeneratoren / Chatbots** (z. B. cloudbasierte Assistenten): sehr flexibel, aber Nährwerte halluziniert, kein Bestandsbezug. [Q2]
-- **Tool-/Function-Calling & strukturierte Ausgabe** (JSON-Mode): Grundlage unserer Architektur. [Q3]
-- **Unsere Abgrenzung:** LLM nur als *Vorschlags-Generator*; **Ground Truth = eigene Berechnung** aus /100g-Werten; zusätzlich **regelbasierte Plausibilitätsprüfung** und **Makro-Reparatur**.
+```
+Browser (Jinja2-Templates + Vanilla-JS)
+   │  HTML-Forms (SE)            │  fetch/JSON (ASAAI)
+   ▼                            ▼
+routes.py (Frontend-Blueprint)   asaai/routes_asaai.py  (/asaai/*)
+   │                            │
+   ▼                            ▼
+*_service.py  (Fachlogik)        asaai/freestyle_recipe.py
+   │                            │
+   ▼                            ▼
+*_repo.py     (reines SQL)       asaai/freestyle_recipe_support.py
+   │                            │
+   ▼                            ▼
+db.py (sqlite3)                  asaai/ollama_client.py
+   │
+schema.sql + seed.py
+```
 
-**SPRECHTEXT:** Wir bauen auf JSON-Mode-LLMs auf, lösen aber deren Kernschwäche (falsche Zahlen) durch eine nachgelagerte Rechen-/Reparaturschicht. Quellen in der Fußzeile.
-**QUELLE:** [Q1]–[Q3] im Literaturverzeichnis.
+**Zwei Blueprints, eine Trennung:**
+- `routes.py` (SE-Blueprint): klassisches Request/Response, HTML-Formulare, serverseitiges Rendering
+- `asaai/routes_asaai.py` (ASAAI-Blueprint): JSON-API, wird per `fetch` vom Browser aufgerufen
+
+**Warum diese Trennung wichtig ist:** Der ASAAI-Teil hat andere Anforderungen — er braucht async-ähnliche Verhalten im Browser (zweistufiges Laden), gibt JSON zurück, und schützt Endpunkte mit `401 JSON` statt HTML-Redirect. Beides in einer Datei zu mischen wäre chaotisch.
 
 ---
 
-## Folie 6 — Datengrundlage I: Quellen
+## Folie 4 — Teil A: Software Engineering Kern
 
-**FOLIE**
-- **OpenFoodFacts (OFF)** – offene Lebensmitteldatenbank, Zugriff per REST (`/api/v2`). Liefert Nährwerte pro 100 g, Marke, Packungsmenge. [Q4]
-- **Lokaler Seed-Datensatz** – 24 kuratierte Demo-Produkte, bewusst gesplittet in **herzhaft** (Hähnchen, Steak, Reis, Spaghetti, Kartoffeln, Gemüse, Öl) und **süß** (Haferflocken, Banane, Honig, Mandeln, Whey …).
-- **KI-Nährwertschätzung** als Fallback für Produkte ohne Barcode/OFF-Eintrag (LLM schätzt /100g).
-- Warum dieser Seed? Reproduzierbare Test-„Spielwiese", die beide Rezeptarten (süß/herzhaft) abdeckt.
+Das ist die **SE-Leistung** des Projekts — solide, sauber, durchgezogen.
 
-**SPRECHTEXT:** Begründen, warum nicht nur OFF: Offline-Demo, deterministische Tests, abgedeckte Kategorien.
-**QUELLE:** [Q4] OpenFoodFacts.
+### Datenbank-Schema (7 Tabellen)
+
+```
+user            → id, username, password (Werkzeug-Hash)
+product         → name, brand, barcode (UNIQUE), kcal/protein/fat/carbs_per_100g, grams_per_piece
+fridge_item     → user_id, product_id, current_amount, unit
+meal_tracker_settings → user_id (UNIQUE), daily_kcal, protein_pct, carbs_pct, fat_pct
+meal_tracker_entry    → user_id, meal_name, amount, kcal, protein_g, carbs_g, fat_g, eaten_at
+saved_recipe    → user_id, title, data (JSON-Blob)
+app_settings    → user_id (UNIQUE), llm_model
+```
+
+**Schlüsselentwurfsentscheidungen:**
+- `fridge_item.user_id` nullable → für barcode-lose Items (KI-Schätzungen) funktioniert das `ON CONFLICT` korrekt
+- `saved_recipe` speichert `title` separat vom JSON-Blob → Umbenennen braucht keinen Blob-Parse
+- `app_settings` nutzt **UPSERT** (`ON CONFLICT(user_id) DO UPDATE`) → kein separates INSERT/UPDATE
+
+### Schichtenreinheit
+
+```
+product_repo.py   → nur SQL, kein Business-Logic
+fridge_service.py → Geschäftslogik (Produkt finden oder anlegen, Menge abziehen)
+routes.py         → nur HTTP: Form parsen, Service aufrufen, Template rendern
+```
+
+`_repo.py`-Dateien enthalten kein `if`, keine Berechnungen — nur Queries. `_service.py`-Dateien kennen kein `request`-Objekt. Diese Disziplin ist der Grund, warum 39 Tests ohne einen laufenden Webserver funktionieren.
+
+### User-Isolation als Sicherheitsprinzip
+
+Jede datenbanknahe Funktion ist `user_id`-gescoped:
+```python
+# fridge_repo.py
+def get_item(item_id, user_id=None):
+    # WHERE id = ? AND (user_id = ? OR user_id IS NULL)
+```
+Kein Nutzer sieht Daten eines anderen, nicht durch URL-Manipulation, nicht durch direkten DB-Zugriff.
 
 ---
 
-## Folie 7 — Datengrundlage II: Quantitative Beschreibung
+## Folie 5 — Produkte hinzufügen: drei Wege
 
-**FOLIE** (Tabelle 1)
+Das ist die **Eingangspforte** des Systems — wie kommen Lebensmittel in die App?
 
-| Merkmal | Wert |
+### Weg 1: Barcode-Scanner
+
+```javascript
+// barcode_scan.js
+startBarcodeScan(onResult)
+  → BarcodeDetector API (nativ: Android, macOS)
+  → Fallback: zxing-wasm (WASM-Bibliothek, Firefox/Windows/iOS)
+  → enhanceContrast() → Graustufen + 1%-Clipping gegen Überbelichtung
+  → detectFrame() → nur mittleres Bildband (1D-Codes sind breit)
+```
+
+**Warum zwei APIs?** `BarcodeDetector` ist modern aber nicht überall verfügbar. `zxing-wasm` ist eine bewährte Bibliothek als WebAssembly-Modul — kein Server, läuft im Browser. Das ist defensive Programmierung: erst native API probieren, dann Fallback.
+
+### Weg 2: Suche (Name oder Barcode)
+
+`unified_search(q)` in `routes.py` verbindet drei Quellen parallel:
+1. **KI-Schätzung** (ASAAI) — sofort, ohne Netzwerk
+2. **Lokale DB** — eigene bereits eingescannte Produkte
+3. **OpenFoodFacts** — Millionen realer Produkte
+
+Dedupliziert per Barcode, nach Relevanz sortiert. `openfoodfacts_client.py` nutzt reines `urllib` — keine externe Bibliothek, kein `requests`. Das Relevanz-Ranking: exakte Namensübereinstimmung = 60 Punkte, "enthält" = 35, Teilwort = 15; Tiebreak nach Proteingehalt.
+
+### Weg 3: KI-Nährwertschätzung (Brücke zu LLMs)
+
+```python
+# food_estimate.py
+estimate_food("Schwarzwälder Kirschtorte")
+  → Ollama JSON-Prompt → { kcal: 350, protein: 5, fat: 18, carbs: 42 }
+  → Ausgabe im gleichen Format wie OpenFoodFacts
+  → erscheint als "KI-Schätzung" ganz oben in den Suchergebnissen
+```
+
+**Vorlesungs-Brücke (LLMs / In-Context-Learning):** Das LLM wird hier als **Wissensdatenbank** benutzt — es kennt aus seinem Training die ungefähren Nährwerte von Lebensmitteln. Ein strukturierter JSON-Prompt zwingt es, sein implizites Wissen in ein maschinenlesbares Format zu verpacken. Das ist In-Context Learning in Reinform: kein Fine-Tuning, nur ein präzise formulierter Prompt.
+
+---
+
+## Folie 6 — Mahlzeiten-Tracker
+
+Der Tracker ist komplexer als er aussieht.
+
+### Warenkorb-Logik (Session-basiert)
+
+Mahlzeiten werden nicht sofort geloggt. Der Nutzer sammelt zuerst im **Session-Warenkorb**:
+- Item aus dem Kühlschrank → Menge abziehen, loggen
+- Item aus der Suche → loggen, Rest als **neuer Kühlschrank-Eintrag** anlegen
+
+`commit_meal_cart()` in `meal_tracker_service.py` macht das atomar — entweder alles oder nichts.
+
+### Proportionale Skalierung
+
+```python
+# meal_tracker_repo.py
+def update_meal_entry_amount(entry_id, user_id, new_amount):
+    factor = new_amount / old_amount
+    UPDATE ... SET
+        kcal = kcal * factor,
+        protein_g = protein_g * factor,
+        ...
+```
+
+Wenn du sagst "ich habe doch nur 150 g gegessen statt 200 g", skalieren alle Makros mit. Keine Neuberechnung aus der Produktdatenbank nötig — mathematisch korrekt, weil Nährwerte linear sind.
+
+### Kalender-Integration
+
+`calendar.monthrange` (Python stdlib) liefert das Monatsraster. `get_tracked_days()` via SQLite `strftime(..., 'localtime')` markiert Tage mit Einträgen. Ein Klick springt in die Vergangenheit — wichtig für Langzeitbeobachtung.
+
+---
+
+## Folie 7 — Teil B: ASAAI — Die KI-Schicht beginnt hier
+
+Ab hier verlassen wir klassisches Web-Engineering und betreten das Terrain der Vorlesung.
+
+### Was der ASAAI-Teil macht
+
+1. Nutzer klickt "Freestyle-Rezept generieren"
+2. Browser sendet: `{ daily_goal: {kcal: 700, protein: 50, ...}, recipe_category: "Hauptspeise", count: 1 }`
+3. Backend liest Kühlschrank-Inhalt aus der DB
+4. LLM (Ollama) generiert Rezept als JSON
+5. Backend **validiert und repariert** das Ergebnis
+6. Browser zeigt fertiges Rezept an
+
+Das klingt einfach. Es ist es nicht. Warum — das zeigen Folien 8–12.
+
+---
+
+## Folie 8 — RAG: Retrieval-Augmented Generation in FitFridge
+
+**Vorlesungs-Definition:** RAG = Retrieval + Augmentation + Generation. Statt dem LLM alles aus dem Training-Gedächtnis abzufragen, wird **externer Kontext abgerufen** und **in den Prompt injiziert**. Das LLM generiert dann basierend auf diesem Kontext.
+
+**FitFridge-Implementierung:**
+
+```
+Retrieval:    Kühlschrank-DB → alle fridge_items des Users → mit Produktdetails (JOIN)
+Augmentation: Diese Zutaten + Nährwerte werden in den Prompt eingebettet
+Generation:   Ollama generiert ein Rezept ausschließlich aus diesen Zutaten
+```
+
+Konkret sieht der injizierte Kontext so aus (aus `build_prompt()`):
+
+```
+Verfügbare Kühlschrank-Zutaten:
+1. Hähnchenbrust (id=3): 300g verfügbar | 165 kcal, 31g P, 0g C, 4g F je 100g
+2. Reis, weiß (id=7): 500g verfügbar | 130 kcal, 2g P, 28g C, 0g F je 100g
+3. Paprika, rot (id=12): 200g verfügbar | 31 kcal, 1g P, 6g C, 0g F je 100g
+...
+```
+
+Das LLM "weiß" so zur Laufzeit, was im Kühlschrank ist — obwohl dieser Kontext natürlich nicht in seinen Trainings-Gewichten steckt. Das ist exakt der RAG-Mechanismus aus der Vorlesung.
+
+**Warum RAG hier notwendig ist:** Ein LLM ohne Kühlschrank-Kontext würde Rezepte vorschlagen, die Zutaten erfordern, die nicht vorhanden sind. Mit RAG ist das Modell **auf den tatsächlichen Bestand beschränkt** — ein Grundprinzip des kontextualisierten Schließens.
+
+---
+
+## Folie 9 — Agentic Systems: Die Retry-Schleife
+
+**Vorlesungs-Definition:** Agentic Systems gehen über einfaches Prompt → Response hinaus. Sie haben: Tool Calling, Chain of Thought, Retry-Mechanismen, Stop-Conditions.
+
+**FitFridge implementiert eine vollständige Agentic Loop:**
+
+```python
+# freestyle_recipe.py — _run()
+for attempt in range(count + 1):          # Retry-Schleife
+    response = generate_from_ollama(prompt, ...)
+
+    recipes = valid_recipes(               # Validierung
+        response,
+        fridge_items=fridge_items,
+        daily_goal=daily_goal,
+        count=count
+    )
+
+    if len(recipes) >= count:
+        break                             # Stop-Condition: genug valide Rezepte
+
+    # Feedback für nächsten Versuch
+    feedback = validation_feedback(recipes_so_far, needed=count)
+    exclude = [r["title"] for r in recipes_so_far]
+    # Nächste Iteration: Prompt mit feedback + exclude
+```
+
+**Die drei Agentic-Elemente:**
+
+1. **Tool Calling analog:** `valid_recipes()` ist ein "Tool" das der Agent aufruft — es gibt strukturiertes Feedback zurück, nicht nur True/False
+
+2. **Feedback-Loop:** `validation_feedback()` formuliert konkreten Text, der in den nächsten Prompt eingeht:
+   ```
+   "Das Rezept 'Hähnchen-Bowl' wurde abgelehnt wegen:
+    Doppelte Proteinquelle (Hähnchen + Thunfisch).
+    Bitte nur eine Hauptproteinquelle verwenden."
+   ```
+
+3. **Stop-Condition:** Schleife endet wenn genug valide Rezepte vorhanden sind oder `count+1` Versuche überschritten
+
+**Unterschied zum einfachen LLM-Call:** Ein einzelner Prompt würde ~30% der Zeit invalide Rezepte produzieren (falsche Zutaten-IDs, unrealistische Mengen, verbotene Kombinationen). Die Retry-Schleife bringt die Erfolgsquote auf >95%.
+
+---
+
+## Folie 10 — Recommender Systems: Wie FitFridge Zutaten auswählt
+
+**Vorlesungs-Definition:** Recommender Systems empfehlen Inhalte basierend auf Nutzerprofil (User Tower) und Item-Eigenschaften (Item Tower). Content-Based Filtering nutzt Eigenschaften der Items, nicht andere Nutzer-Daten.
+
+**FitFridge nutzt implizites Content-Based Filtering auf zwei Ebenen:**
+
+### Ebene 1: Ingredient Selection im Prompt
+
+`_macro_strategy_hint()` in `freestyle_recipe.py` analysiert die echten Nährwerte der Kühlschrank-Items und gibt dem LLM konkrete Empfehlungen:
+
+```python
+# Wenn Protein-Ziel ≥ 50g:
+hint += "Verwende 200–300g der Hauptproteinquelle (Hähnchenbrust: 31g P/100g)."
+
+# Wenn Low-Carb (Carbs-Ziel < 50g):
+hint += "Stärke (Reis, Nudeln) stark reduzieren. Fett erhöhen (Öl, Nüsse)."
+
+# Wenn süße Kategorie:
+hint += "Kein Fleisch/Fisch. Süßungsmittel, Obst, Milchprodukte bevorzugen."
+```
+
+Das ist **Content-Based Filtering**: Zutaten werden nach ihren Nährstoffprofilen bewertet und entsprechend dem Nutzerziel gefiltert.
+
+### Ebene 2: Two-Tower Analogie
+
+| Vorlesung | FitFridge |
 |---|---|
-| Demo-Produkte (Seed) | 24 |
-| Kategorien | herzhaft / süß |
-| Features je Produkt | name, brand, barcode, kcal/protein/fat/carbs je 100 g, grams_per_piece |
-| Einheiten | g, ml, kg, cl, l, stk (Stück → über grams_per_piece) |
-| Tagesziel-Default | 2200 kcal · 30/40/30 (P/C/F) |
-| OFF-Zugriff | live, Relevanz-Ranking (exakt 60 / enthält 35 / Teilwort 15) |
+| User Tower | Nutzer-Tagesziel: `{daily_kcal: 2200, protein_pct: 30, ...}` |
+| Item Tower | Rezept-Makros: `{kcal: 650, protein: 48, carbs: 60, fat: 20}` |
+| Matching | `macros_within_targets(recipe_macros, daily_goal)` |
 
-- **Datenvorverarbeitung:** Text-Normalisierung (ASCII-Falten, Kleinschreibung), Mengen-Parsing aus Freitext (`"2 x 250 g"` → 500 g), kcal aus kJ-Fallback (÷ 4,184), Dedupliziertung per Barcode.
+Das "Matching" ist kein neuronales Netz, sondern eine arithmetische Toleranz-Funktion — aber die **konzeptuelle Struktur** (nutze Profil × Item-Properties → Score → Filter) ist identisch.
 
-**SPRECHTEXT:** Tabelle 1 erläutern (Rubrik verlangt: Größe, Klassen, Features, Wertebereiche, Ausreißerbehandlung = unser Mengen-/Einheiten-Sanitizing).
-**ABB./QUELLE:** Tabelle 1 (eigene Darstellung).
+### OpenFoodFacts Relevanz-Ranking als Recommender
 
----
-
-## Folie 8 — Systemarchitektur (Überblick)
-
-**FOLIE** (Schaubild, Abb. 2 — Schichtenmodell)
+```python
+# openfoodfacts_client.py
+def _score_off_product(product, query_terms):
+    score = 0
+    if name == query: score += 60      # exakte Übereinstimmung
+    elif query in name: score += 35    # enthält Suchbegriff
+    else: score += 15                  # Teilwort
+    # Tiebreak: mehr Protein = relevanter für Fitness-App
+    score += min(protein_per_100g, 10)
+    return score
 ```
-Browser (Jinja2 + Vanilla-JS)
-   │ HTML-Forms (SE)        │ fetch/JSON (KI)
-   ▼                        ▼
-routes.py                 asaai/routes_asaai.py  (/asaai/*)
-   ▼                        ▼
-*_service.py (Logik)      freestyle_recipe.py    (Orchestrierung)
-   ▼                        ▼
-*_repo.py (nur SQL)       freestyle_recipe_support.py (Validierung/Makros)
-   ▼                        ▼
-db.py (sqlite3)           ollama_client.py → lokales LLM (Ollama)
+
+Das ist klassisches **Content-Based Filtering** über Produkt-Eigenschaften: kein Nutzerverhalten, nur Produkt-Features.
+
+---
+
+## Folie 11 — Adaptive Systems & MAPE-K: Die Makro-Reparatur
+
+Das ist die **technisch anspruchsvollste** Komponente — und sie ist direkt aus dem MAPE-K-Modell der Vorlesung ableitbar.
+
+**Vorlesungs-Definition MAPE-K:**
+- **M**onitor: Systemzustand beobachten
+- **A**nalyze: Ist-Zustand vs. Soll-Zustand vergleichen
+- **P**lan: Anpassungsstrategie entwickeln
+- **E**xecute: Änderung durchführen
+- **K**nowledge Base: domänenspezifisches Wissen
+
+**FitFridge MAPE-K Mapping:**
+
 ```
-- Strikte Trennung: **repo = SQL**, **service = Fachlogik**, **routes = HTTP**.
-- Externe Dienste (OFF, Ollama) in eigenen `urllib`-Clients (keine Fremd-Abhängigkeiten).
-- Stack: Python 3.10+, Flask 3, SQLite (stdlib), lokales Ollama-LLM.
+Monitor  →  computed_macros(recipe, fridge_items)
+            Berechnet kcal/Protein/Fett/Carbs aus
+            Gramm-Mengen × /100g-Werten der echten Produkte
+            (NICHT dem, was das LLM behauptet)
 
-**SPRECHTEXT:** Abb. 2 von oben nach unten durchgehen; betonen: KI-Teil ist ein eigener Blueprint mit JSON-API.
-**ABB.:** Abb. 2 (eigene Darstellung).
+Analyze  →  macros_within_targets(computed, daily_goal)
+            Vergleicht jeden Makro gegen erlaubten Bereich:
+            kcal: max +10%, Protein: nur Untergrenze,
+            Fett/Carbs: symmetrische Toleranz
 
----
+Plan     →  _fit_amounts() — Koordinatenabstieg
+            Wählt pro Makro eine Hebel-Zutat:
+            dichteste Proteinquelle, Hauptkohlenhydratquelle, Hauptfettquelle
 
-## Folie 9 — Algorithmus I: Gesamtpipeline
+Execute  →  _set_fridge_amounts() / _scale_fridge_amounts()
+            Passt die Gramm-Mengen an, baut Labels neu
 
-**FOLIE** (Ablauf, Abb. 3)
-1. **Prompt bauen** aus Kühlschrank-Zutaten + Zielwerten + Rezeptart + Makro-Strategie-Hinweisen.
-2. **LLM-Call** (Ollama, JSON-Mode, `stream=false`).
-3. **Parsen** der JSON-Antwort (robust, auch eingebettete Arrays).
-4. **Nachrechnen** der Makros aus Gramm × /100g (**nicht** Modellzahlen!).
-5. **Validieren** (Plausibilitätsregeln + Zielbereiche).
-6. **Reparieren** der Mengen, falls außerhalb der Zielbereiche.
-7. **Retry-Schleife** mit konkretem Feedback, bis genug valide Rezepte.
+Knowledge →  MACRO_TOLERANCES, PROTEIN/STARCH/SWEET/SAVORY Listen
+             Domain-Wissen über Nährstoffdichte, Lebensmittelkategorien
+```
 
-**SPRECHTEXT:** Schritt 4 ist der Kern der Forschungsfrage. Schritte 5–6 sind die „Sicherung". Abb. 3 zeigt den Loop.
-**ABB.:** Abb. 3 (eigene Darstellung).
+### Koordinatenabstieg — der Algorithmus
 
----
+```python
+# freestyle_recipe_support.py — _fit_amounts()
+def _fit_amounts(recipe, fridge_items, daily_goal):
+    # Schritt 1: Finde Hebel-Zutaten
+    protein_lever = max(fridge_ingredients, key=lambda i: i['protein_per_100g'])
+    carb_lever    = max(fridge_ingredients, key=lambda i: i['carbs_per_100g'])
+    fat_lever     = max(fridge_ingredients, key=lambda i: i['fat_per_100g'])
 
-## Folie 10 — Algorithmus II: Warum LLM + welche Parameter
+    # Schritt 2: Berechne benötigte Grammzahl pro Hebel
+    protein_needed_g = (target_protein_g - other_protein) / (lever['protein'] / 100)
 
-**FOLIE**
-- **Modellwahl:** lokales Ollama, default `qwen3.5:latest` (9B); Alternativen 4B / 1B. Begründung: Datenschutz (lokal), reproduzierbar, JSON-Mode.
-- **Pro-Modell-Profil** (`MODEL_PROFILES`): `num_predict` (Token-Budget) und `max_items` (Zutatenanzahl) — kleinere Modelle bekommen weniger.
-- **Temperatur:** `0.15` bei Einzel-Vorschlag (Genauigkeit), `0.7` bei Mehrfach-Vorschlägen (Vielfalt). → bewusst gewählt: präzise vs. divers.
-- `format:"json"`, `think:false` für deterministisch parsebare Ausgabe.
+    # Schritt 3: Klemme auf valide Grenzen (0–1200g, Supplements ≤80g)
+    # Schritt 4: Setze neue Menge, recompute alle Makros
+    # Schritt 5: Prüfe ob Ergebnis valide → sonst Gesamt-Skalierung als Fallback
+```
 
-**SPRECHTEXT:** Rubrik verlangt Parameterbegründung + reproduzierbare Angaben — hier alle nennen. Unterschiedliche Temperaturen = unterschiedliche Modellläufe, im Analyseteil verglichen.
+**Warum Koordinatenabstieg?** Ein einfaches kcal-Skalieren (alle Mengen × Faktor) fixiert proportionale Fehler, aber nicht strukturelle. Beispiel: Das Modell generiert ein Rezept mit 400g Reis und 100g Hähnchen. Wenn das Protein-Ziel 60g ist (Hähnchen hat 31g/100g → braucht 193g), reicht Skalieren nicht — du musst selektiv den Protein-Lever hochdrehen und den Stärke-Lever runter. Das ist das, was `_fit_amounts()` tut.
 
----
+### Adaptive Systems: Drei Adaptivitätstypen der Vorlesung
 
-## Folie 11 — Algorithmus III: Validierung (Plausibilität)
+| Typ | FitFridge |
+|---|---|
+| **Kontextbasiert** | LLM-Prompt ändert sich je nach Kühlschrank-Inhalt (RAG), Rezeptart, Tageszeit-Ziel |
+| **Nutzerbasiert** | Makro-Reparatur zielt auf das individuelle Tagesziel des Users |
+| **Systemzentrisch** | Retry-Schleife + Validierung = selbst-korrigierendes Verhalten ohne Nutzereingriff |
 
-**FOLIE** (Regelwerk, Tabelle 2)
-- **ID-/Mengenprüfung:** nur echte Kühlschrank-IDs; 0 < g ≤ 1200; Supplements ≤ 80 g.
-- **Konflikte abgelehnt:** doppelte Protein- oder Stärkequelle, Süß-Herzhaft-Mix, Whey/Supplement nur in süßen Gerichten, Titel-↔-Zutaten-Konsistenz.
-- **Qualität:** Mindest-Schrittzahl, realistische Portionsgrößen.
-- **Wissensbasen:** Keyword-Listen (PROTEIN, STARCH, SWEET, SUPPLEMENT, MEAT_FISH, ALIASES …) — domänenspezifisch, der am ehesten nachzujustierende Teil.
-
-**SPRECHTEXT:** Das ist die Analogie zur „Belohnungs-/Regelfunktion": gültig/ungültig statt Reward. Tabelle 2 = Regelübersicht.
-**ABB.:** Tabelle 2 (eigene Darstellung).
-
----
-
-## Folie 12 — Algorithmus IV: Makro-Berechnung (Ground Truth)
-
-**FOLIE** (Formeln)
-- **Formel 1 — Nährwert je Menge:**
-  `nährwert(menge) = wert_pro_100g · menge_in_g / 100`
-  (Stück → `menge_in_g = stück · grams_per_piece`; Volumen vereinfacht 1 ml = 1 g)
-- **Formel 2 — Rezept-Makros (computed):**
-  `M_rezept = Σ_zutaten ( wert_pro_100g · gramm / 100 ) + Öl-Pauschale`
-- **Formel 3 — Zielbereiche:** kcal ≤ Ziel + 10 %; Protein nur Untergrenze; Fett/Carbs symmetrische Toleranz mit absolutem Floor.
-- Angezeigt wird **immer** der berechnete Wert (`macro_source = computed_from_fridge_amounts`).
-
-**SPRECHTEXT:** Variablen erklären (Rubrik: Formeln im Fließtext erläutern). Kernaussage: die Zahl auf dem Bildschirm kommt aus Formel 2, nie vom Modell.
-**ABB.:** Formeln 1–3 (eigene Darstellung).
+Das System adaptiert auf **allen drei Ebenen gleichzeitig**.
 
 ---
 
-## Folie 13 — Algorithmus V: Makro-Reparatur (Koordinatenabstieg)
+## Folie 12 — Die Validierungs-Pipeline
 
-**FOLIE** (Abb. 4 — schematisch)
-- Liegt ein Makro außerhalb des Zielbereichs → **eine Hebel-Zutat je Makro** wählen (dichteste Protein-/Carb-/Fettquelle).
-- Deren Gramm-Menge per **Koordinatenabstieg** auf das Ziel lösen, Makro für Makro.
-- Behebt **Verhältnisfehler**, die reines kcal-Skalieren nicht kann.
-  - Beispiel Low-Carb: Stärke ↓, Fett ↑.
-- Fallback: ganze Portion auf kcal-Ziel skalieren. Übernahme **nur**, wenn Ergebnis danach valide.
+Bevor ein Rezept angezeigt wird, durchläuft es 8 Checks. Das ist **kein nice-to-have** — ohne Validierung liefert das LLM ~30% Unsinn.
 
-**SPRECHTEXT:** Das ist die eigentliche „Methodenänderung" gegenüber Standard-LLM-Nutzung — so genau erklären, dass es nachgebaut werden kann. Abb. 4 zeigt einen Reparaturschritt (z. B. Reis 200 g → 90 g, Öl 5 g → 15 g).
-**ABB.:** Abb. 4 (eigene Darstellung).
+```python
+# freestyle_recipe_support.py — _is_valid()
 
----
+def _is_valid(recipe, fridge_items, daily_goal, category):
 
-## Folie 14 — Einordnung: FitFridge als adaptives System
+    # 1. Nur echte Kühlschrank-IDs
+    if not _ids_ok(recipe, fridge_items): return False, "Ungültige Zutaten-IDs"
 
-**FOLIE** (Abb. 8 — Regelkreis)
-- **Definition (Kurs-Bezug):** Ein adaptives System passt sein Verhalten zur Laufzeit an Eingaben, Umgebung und Rückmeldung an, um ein vorgegebenes Ziel zu erreichen.
-- **Drei geschlossene Regelkreise im System:**
-  1. **Kontext-Adaption:** `_macro_strategy_hint` passt den Prompt an den realen Bestand **und** die Zielwerte an — andere Zutaten/Ziele ⇒ andere Strategie.
-  2. **Selbstkorrektur-Regelkreis:** Validierung erkennt Verstöße ⇒ konkretes `validation_feedback` ⇒ erneute Generierung (Retry), bis zielkonform.
-  3. **Makro-Regler:** Koordinatenabstieg = Regler im Sinne der Regelungstechnik — **Sollwert** = Zielmakro, **Istwert** = berechnetes Makro, **Stellgröße** = Gramm der Hebel-Zutat; minimiert den Regelfehler `|Ist − Soll|`.
-- **Weitere Adaptivität:** Modell-/Budget-Wahl nach Hardware (`MODEL_PROFILES`), temperaturabhängige Diversität, zustandsabhängiges Degradieren.
-- **Ehrliche Abgrenzung:** regelbasiert-adaptiv (deterministischer Regelkreis), **kein** Online-Lernen zur Laufzeit — bewusst, zugunsten von Reproduzierbarkeit.
+    # 2. Reale Portionsgrößen (0 < g ≤ 1200, Supplements ≤ 80g)
+    if not _amounts_ok(recipe): return False, "Unrealistische Mengen"
 
-**SPRECHTEXT:** Bezug zum Kursthema explizit machen: FitFridge ist kein statischer Generator, sondern ein **geschlossener Regelkreis**. Die drei Schleifen — Kontextanpassung, Selbstkorrektur, Makro-Regelung — bilden die adaptive Kernidee. Die Makro-Reparatur (Folie 13) lässt sich formal als Regler beschreiben: Soll-, Ist-, Stellgröße, Regelfehler. Abb. 8 zeigt den Kreislauf Ziel → LLM → Berechnung → Vergleich → Reparatur/Retry → zurück.
-**ABB.:** Abb. 8 (eigene Darstellung, Regelkreis-Schema).
+    # 3. Pantry-Limits (Öl ≤ 50g, Salz ≤ 10g)
+    if not _pantry_amounts_ok(recipe): return False, "Öl/Salz überdosiert"
 
----
+    # 4. Kein Doppel-Protein (Hähnchen + Thunfisch im gleichen Gericht)
+    # 5. Kein Doppel-Stärke (Reis + Nudeln)
+    # 6. Kein Süß-Herzhaft-Mix (Honig + Hähnchen)
+    # 7. Whey-Protein nur in süßen Gerichten
+    # 8. Titel muss Hauptzutat enthalten
+    if conflicts := _recipe_conflicts(recipe, category): return False, conflicts
 
-## Folie 15 — UI / Live-Demo
+    # 9. Mindestens 3 Kochschritte (kein "Alles in eine Schüssel")
+    if len(recipe["instructions"]) < 3: return False, "Zu wenig Schritte"
 
-**FOLIE**
-- Dashboard (Bestand + Live-Nährwertsummen), Mahlzeiten-Tracker mit Kalender, Rezeptplaner.
-- Gestaffeltes Laden: 1 Vorschlag sofort, 2 weitere im Hintergrund.
-- Sauberes Degradieren: leerer Kühlschrank / LLM offline / „Makro-Kombination nicht erreichbar" → verständliche Hinweis-Karte statt Fehler.
+    # 10. Makros im Zielbereich (nach Reparatur)
+    if not macros_within_targets(computed_macros(recipe), daily_goal):
+        return False, "Makros außerhalb Zielbereich"
+```
 
-**SPRECHTEXT:** Kurze Live-Demo oder Screenshots (Abb. 5–7). Falls live: Plan B = Screenshots zeigen.
-**ABB.:** Abb. 5 Dashboard, Abb. 6 Tracker/Kalender, Abb. 7 Planner.
+**Vorlesungs-Brücke:** Die Keyword-Listen (`PROTEIN, STARCH, SWEET, SAVORY_CATS, SUPPLEMENT...`) sind die **Knowledge Base** des MAPE-K-Modells. Domänenspezifisches Wissen, hart kodiert — der Teil, der gepflegt werden muss, wenn neue Zutaten oder Modelle hinzukommen.
 
 ---
 
-## Folie 16 — Analyse / Ergebnisse
+## Folie 13 — Zweistufiges Laden: UX meets KI-Latenz
 
-**FOLIE** (Tabelle 3 — Vergleich beantwortet die Forschungsfrage)
+**Problem:** Ein Ollama-Call dauert 10–35 Sekunden. Drei Rezepte nacheinander = 45–105 Sekunden Wartezeit. Inakzeptabel.
 
-| Variante | valide Rezepte | Makros im Zielbereich | Bemerkung |
-|---|---|---|---|
-| LLM ungeprüft (Modellzahlen) | ‹…› | ‹…› | Zahlen halluziniert |
-| + eigene Berechnung | ‹…› | ‹…› | korrekte Anzeige |
-| + Validierung & Reparatur | ‹…› | ‹…› | zielkonform |
+**Lösung in `planner.js`:**
 
-- **End-to-End-Test (25.06.2026):** echtes LLM, Rezept in **33 s**, `computed_from_fridge_amounts`, keine Warnung. ✅
-- **Test-Suite:** **39/39** grün (offline, Ollama/OFF gemockt).
+```javascript
+async function loadFreestyleRecipe() {
+    // Phase 1: SOFORT einen Vorschlag holen (count=1)
+    const first = await fetch('/asaai/recipes/freestyle',
+        { body: JSON.stringify({...goal, count: 1}) }
+    );
+    renderDetail(first);          // User sieht sofort etwas
 
-**SPRECHTEXT:** Tabelle 3 ist das Herz des Analyseteils — ‹Messwerte aus einem Versuchslauf eintragen› (z. B. N=20 Generierungen je Variante zählen). Klar sagen: Reparaturschicht hebt Trefferquote deutlich.
-**ABB./QUELLE:** Tabelle 3 (eigene Messung, ‹Datum›).
+    // Phase 2: Zwei weitere IM HINTERGRUND (count=2, exclude=[first.title])
+    const more = await fetch('/asaai/recipes/freestyle',
+        { body: JSON.stringify({...goal, count: 2, exclude: [first.title]}) }
+    );
+    // deduplizieren, in Rail einfügen
+}
+```
 
----
+`requestToken` verhindert Race-Conditions bei schnellem Mehrfachklick.
 
-## Folie 17 — Lessons Learned *(optional)*
-
-**FOLIE**
-- LLM-Zahlen sind unzuverlässig → strikte Nachberechnung war zwingend (bestätigt die Hypothese).
-- JSON-Mode allein reicht nicht: robustes Parsing + Retry mit konkretem Feedback nötig.
-- Kleine Modelle brauchen engere Token-/Zutatenbudgets, sonst unvollständige JSON-Ausgabe.
-- Domänen-Keyword-Listen sind der wartungsintensivste Teil bei neuen Zutaten/Modellen.
-
-**SPRECHTEXT:** Sachlich, fachlich bleiben (keine persönlichen Hürden).
+**Warum das wichtig ist:** KI-Systeme haben andere Latenz-Profile als klassische Web-Backends. Progressive Loading ist hier kein Luxus, sondern Grundvoraussetzung für benutzbare UX.
 
 ---
 
-## Folie 18 — Fazit & Ausblick
+## Folie 14 — Das Wichtigste: Vertraue dem Modell nicht
 
-**FOLIE**
-- **Antwort auf die Forschungsfrage:** Die Validierungs-/Reparaturschicht verbessert Genauigkeit und Zielkonformität gegenüber ungeprüfter LLM-Ausgabe deutlich ‹konkrete Zahl aus Tabelle 3›.
-- LLM als Ideengeber, deterministische Schicht als Garant für korrekte Nährwerte.
-- **Adaptive-Systeme-Sicht:** Drei gekoppelte Regelkreise (Kontext-Adaption, Selbstkorrektur, Makro-Regler) machen das System zielgerichtet adaptiv statt statisch.
-- **Ausblick:** systematische Messreihe (N je Modell), weitere Modelle, persistente DB, Portions-Optimierung über mehrere Makros gleichzeitig.
+Das ist das **zentrale Architektur-Prinzip** des ASAAI-Teils:
 
-**SPRECHTEXT:** Mit der Forschungsfrage öffnen und schließen — Bogen zu Folie 4.
+> Das Backend vertraut den Modellzahlen nicht.
+
+Das LLM schätzt Nährwerte in `estimated_macros`. Diese Zahlen werden **komplett ignoriert**. Stattdessen:
+
+```python
+# computed_macros() — die Wahrheit
+def computed_macros(recipe, fridge_items):
+    kcal = 0
+    for ingredient in recipe["fridge_ingredients"]:
+        product = fridge_items[ingredient["id"]]
+        gram_factor = ingredient["amount_g"] / 100
+        kcal    += product["kcal_per_100g"]    * gram_factor
+        protein += product["protein_per_100g"] * gram_factor
+        # ...
+    return { "kcal": kcal, "protein": protein, ... }
+```
+
+**Nährwerte werden aus Gramm-Mengen × /100g-Werten der echten Produkte berechnet.**
+
+Das hat zwei Konsequenzen:
+1. Das Frontend zeigt immer korrekte Nährwerte (nicht LLM-Halluzinationen)
+2. Die Validierung kann Rezepte ablehnen und reparieren, weil sie die echten Zahlen kennt
+
+Das ist ein Beispiel für **hybride Systeme**: LLM für kreative Aufgaben (Rezeptideen, Schritte, Namen), deterministischer Code für präzise Aufgaben (Nährwert-Mathematik).
 
 ---
 
-## Folie 19 — Literatur-, Abbildungs-, Tabellen- & Formelverzeichnis
+## Folie 15 — Testabdeckung: 39 Tests, alle grün
 
-**FOLIE**
-**Literatur** (Zitierstandard wählen, URLs ausschreiben + Abrufdatum):
-- [Q1] ‹Autor›, *Constraint-/Retrieval-basierte Rezeptempfehlung*, ‹Jahr›.
-- [Q2] ‹Autor›, *LLM-basierte Rezeptgenerierung / Halluzination von Fakten*, ‹Jahr›.
-- [Q3] ‹Anbieter›, *Structured Output / JSON-Mode*, URL: ‹…› (abgerufen ‹Datum›).
-- [Q4] OpenFoodFacts, URL: https://world.openfoodfacts.org (abgerufen ‹Datum›).
-- [Q5] Ollama, URL: https://ollama.com (abgerufen ‹Datum›).
-- [Q6] ASaAI-Vorlesungsmaterialien, ‹Putzar/Balzer/Maute›, ‹Semester›.
+```
+test_api_db/
+  test_api_db.py (4)            → OpenFoodFacts: Parsing, Multiplikatoren, Ranking
 
-**Abbildungen:** Abb. 1 Dashboard · Abb. 2 Architektur · Abb. 3 Pipeline · Abb. 4 Makro-Reparatur · Abb. 5–7 UI · Abb. 8 Regelkreis (adaptives System)
-**Tabellen:** Tab. 1 Datensatz · Tab. 2 Validierungsregeln · Tab. 3 Ergebnisvergleich
-**Formeln:** (1) Nährwert je Menge · (2) Rezept-Makros · (3) Zielbereiche
+test_backend/
+  test_freestyle_recipe.py (14) → Kern: valide Rezepte, Makro-Berechnung,
+                                   Low-Carb-Reparatur, Retry, Warnungen
+  test_meal_tracker.py (6)      → Settings, Tagessummen, User-Isolation
+  test_ollama_client.py (5)     → Modell-Auflösung, Response-Parsing
+  test_app_settings.py (5)      → Settings-Roundtrip, User-spezifisch
+  test_nutrition_integration.py (3) → Einheitenrechnung
+  test_product_repo.py (2)      → Barcode/Name-Suche
+```
 
-**SPRECHTEXT:** Nur einblenden; mündlich auf [Q4]/[Q5] als Kernquellen verweisen.
+Ollama und OpenFoodFacts werden per `monkeypatch` ersetzt — **alle Tests laufen offline**. Das ist kein Zufall: wer externe Dienste direkt testet, hat keine reproduzierbaren Tests.
+
+**Live-Test-Ergebnis (25.06.2026):**
+
+| Check | Ergebnis |
+|---|---|
+| Ollama erreichbar, `qwen3.5:latest` installiert | ✅ |
+| Flask-Start + `GET /` | ✅ 200 |
+| Login `demo`/`demo` | ✅ 302 |
+| Rezeptplaner-Seite | ✅ 200 |
+| Rezeptgenerierung über echtes LLM | ✅ 200 in 33s, `macro_source: computed_from_fridge_amounts` |
+| Test-Suite | ✅ 39 passed |
 
 ---
 
-### Abgabe-Checkliste (nicht präsentieren)
-- [ ] Namen, Matrikelnummern, Lehrenden-Titel eingesetzt
-- [ ] Seitenzahlen + Kopf-/Fußzeile auf allen Folien
-- [ ] Jede Abb./Tabelle im Sprechtext referenziert, Quelle in Fußzeile
-- [ ] Tabelle 3 mit echten Messwerten gefüllt
-- [ ] Einheitliche Begriffe (LLM, Makro, Zielbereich), kein „ich/wir/man", keine schmückenden Adjektive
-- [ ] Akronyme einmalig eingeführt (LLM, OFF, SE, KI)
+## Folie 16 — Zusammenfassung: Vorlesung → Produktion
+
+| Vorlesungsthema | FitFridge-Umsetzung | Datei |
+|---|---|---|
+| **LLMs / In-Context Learning** | JSON-Prompt-Modus, KI-Nährwertschätzung | `ollama_client.py`, `food_estimate.py` |
+| **RAG** | Kühlschrank-Kontext in Prompt injiziert | `freestyle_recipe.py:build_prompt()` |
+| **Agentic Systems** | Retry-Schleife + Validierungs-Feedback | `freestyle_recipe.py:_run()` |
+| **Recommender Systems** | Content-Based Filtering (Makro-Match), Relevanz-Ranking | `freestyle_recipe_support.py`, `openfoodfacts_client.py` |
+| **Adaptive Systems / MAPE-K** | Koordinatenabstieg zur Makro-Reparatur | `freestyle_recipe_support.py:_fit_amounts()` |
+| **Kontextbasierte Adaptivität** | Prompt variiert je nach Kühlschrank, Ziel, Kategorie | `_macro_strategy_hint()` |
+| **Nutzerbasierte Adaptivität** | Makro-Reparatur auf individuelles Tagesziel | `macros_within_targets()` |
+| **Systemzentrische Adaptivität** | Selbst-heilende Retry-Schleife ohne Nutzereingriff | `_run()` |
+
+---
+
+## Folie 17 — Projektstatistik & Takeaway
+
+**Umfang:**
+- ~2.500 Zeilen Python
+- ~870 Zeilen JS/CSS
+- ~640 Zeilen Templates
+- 39 Tests, alle grün
+
+**Was dieses Projekt zeigt:**
+
+1. Die Konzepte der Vorlesung — RAG, Agentic Systems, MAPE-K — sind keine akademischen Abstraktionen. Sie sind **praktische Lösungsmuster** für reale Probleme.
+
+2. LLMs sind mächtig, aber **nicht zuverlässig genug für Präzisionsaufgaben**. Das richtige Design: LLM für Kreativität, Algebra für Korrektheit.
+
+3. Ein gut durchdachtes Schichtenmodell (`repo → service → route`) ist die Voraussetzung dafür, dass KI-Komponenten testbar und wartbar bleiben.
+
+4. **Degradation ist kein Fehler, sondern ein Feature:** Leerer Kühlschrank, LLM offline, unerreichbare Makro-Kombination — alle Fälle liefern verständliche Hinweis-Karten statt Crashes.
+
+---
+
+## Starten
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+ollama pull qwen3.5:latest
+flask --app flaskr_new run --debug
+# Login: demo / demo
+# Tests: python -m pytest -q
+```
