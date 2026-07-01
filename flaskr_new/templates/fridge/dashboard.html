@@ -46,7 +46,7 @@
       <header>
           <div>
             <h1>{{ post['name'] }}</h1>
-            <div class="about">{{ post['brand'] }} • {{ post['barcode'] }} • {{ post['created'].strftime('%Y-%m-%d') }}</div>
+            <div class="about">{{ post['brand'] }} • {{ post['barcode'] }} • {{ post['created'].strftime('%d.%m.%y') }}</div>
           </div>
           {% if g.user %}
             <div class="header-actions">

@@ -17,7 +17,7 @@
 
   <section class="page-card today-dashboard" style="margin-bottom:1rem;">
     {% set months_de = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'] %}
-    {% set day_label = 'Heute' if cal.selected == cal.today else cal.selected %}
+    {% set day_label = 'Heute' if cal.selected == cal.today else cal.selected[8:10] ~ '.' ~ cal.selected[5:7] ~ '.' ~ cal.selected[2:4] %}
     <div class="today-dashboard__header">
       <details class="cal" {{ 'open' if cal.open }}>
         <summary><h2 style="display:inline;">{{ day_label }}</h2></summary>
