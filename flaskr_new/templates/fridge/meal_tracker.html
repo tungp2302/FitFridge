@@ -16,10 +16,26 @@
   ] %}
 
   <section class="page-card today-dashboard" style="margin-bottom:1rem;">
+    {% set months_de = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'] %}
+    {% set day_label = 'Heute' if cal.selected == cal.today else cal.selected %}
     <div class="today-dashboard__header">
-      <div>
-        <h2>Heute</h2>
-      </div>
+      <details class="cal" {{ 'open' if cal.open }}>
+        <summary><h2 style="display:inline;">{{ day_label }}</h2></summary>
+        <div class="cal-nav">
+          <a class="today-text-button" href="{{ url_for('frontend.meal_tracker', cal_year=cal.prev[0], cal_month=cal.prev[1], date=cal.selected) }}">‹</a>
+          <span>{{ months_de[cal.month - 1] }} {{ cal.year }}</span>
+          <a class="today-text-button" href="{{ url_for('frontend.meal_tracker', cal_year=cal.next[0], cal_month=cal.next[1], date=cal.selected) }}">›</a>
+        </div>
+        <div class="cal-grid">
+          {% for d in ['Mo','Di','Mi','Do','Fr','Sa','So'] %}<div class="cal-weekday">{{ d }}</div>{% endfor %}
+          {% for _ in range(cal.first_weekday) %}<div class="cal-day is-empty"></div>{% endfor %}
+          {% for day in range(1, cal.days + 1) %}
+            {% set date_str = '%04d-%02d-%02d'|format(cal.year, cal.month, day) %}
+            {% set classes = 'cal-day' + (' is-tracked' if day in cal.tracked else '') + (' is-today' if date_str == cal.today else '') + (' is-selected' if date_str == cal.selected else '') %}
+            <a class="{{ classes }}" href="{{ url_for('frontend.meal_tracker', cal_year=cal.year, cal_month=cal.month, date=date_str) }}">{{ day }}</a>
+          {% endfor %}
+        </div>
+      </details>
       <div class="today-dashboard__actions">
         <a class="today-text-button" href="{{ url_for('frontend.meal_tracker', modal='settings') }}">bearbeiten</a>
         <a class="today-text-button" href="{{ url_for('frontend.meal_tracker', modal='add', tab='product') }}">hinzufügen</a>
@@ -60,7 +76,7 @@
   <section>
     <article class="insight-card">
       <div class="card-header">
-        <h2>Heutige Mahlzeiten</h2>
+        <h2>Mahlzeiten · {{ day_label }}</h2>
       </div>
       {% if recent_meals %}
         <div class="today-foods-list">
@@ -89,7 +105,7 @@
           {% endfor %}
         </div>
       {% else %}
-        <p class="muted">Noch keine Mahlzeiten für heute eingetragen.</p>
+        <p class="muted">Keine Mahlzeiten an diesem Tag eingetragen.</p>
       {% endif %}
     </article>
   </section>

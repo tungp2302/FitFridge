@@ -9,9 +9,7 @@ from .meal_tracker_repo import (
     DEFAULT_SETTINGS,
     add_meal_entry,
     delete_meal_entry,
-    get_today_meals,
     get_settings,
-    get_today_totals,
     save_settings,
     update_meal_entry_amount,
 )
@@ -58,7 +56,7 @@ def build_daily_summary(settings, consumed):
     return {"targets": targets, "remaining": remaining}
 
 
-def log_meal_from_product(user_id, product, amount, unit, fridge_item_id=None):
+def log_meal_from_product(user_id, product, amount, unit, fridge_item_id=None, eaten_at=None):
     """Loggt eine Mahlzeit und zieht die Menge optional vom Fridge-Item ab."""
     nutrition = calculate_for_amount(product, amount, unit)
     meal_name = product.get("name") or "Meal"
@@ -71,6 +69,7 @@ def log_meal_from_product(user_id, product, amount, unit, fridge_item_id=None):
         protein_g=nutrition["protein"],
         carbs_g=nutrition["carbs"],
         fat_g=nutrition["fat"],
+        eaten_at=eaten_at,
     )
 
     deducted = False
@@ -159,9 +158,9 @@ def edit_meal_amount_action(user_id, entry_id_raw, new_amount_raw):
     return "Menge aktualisiert." if updated else "Neue Menge konnte nicht gespeichert werden."
 
 
-def commit_meal_cart(user_id, cart):
+def commit_meal_cart(user_id, cart, eaten_at=None):
     """Loggt alle Eintraege des Warenkorbs: Fridge-Items werden abgezogen,
-    Produkt-Reste landen im Kuehlschrank."""
+    Produkt-Reste landen im Kuehlschrank. eaten_at = gewaehlter Kalendertag."""
     logged = 0
     fridge_saved = 0
     for item in cart:
@@ -177,13 +176,13 @@ def commit_meal_cart(user_id, cart):
                 continue
             log_meal_from_product(
                 user_id, dict(fridge_item), amount, fridge_item["unit"],
-                fridge_item_id=fridge_item["id"],
+                fridge_item_id=fridge_item["id"], eaten_at=eaten_at,
             )
             logged += 1
         else:
             unit = item.get("unit") or "g"
             product = _product_from_payload_item(item)
-            log_meal_from_product(user_id, product, amount, unit, fridge_item_id=None)
+            log_meal_from_product(user_id, product, amount, unit, fridge_item_id=None, eaten_at=eaten_at)
             remaining = _safe_float(item.get("remaining_amount"), 0.0)
             if remaining > 0:
                 create_dashboard_item_from_data(

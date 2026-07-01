@@ -46,7 +46,8 @@ def test_daily_totals_and_remaining_values(app_context):
     repo.add_meal_entry(1, "Breakfast", 550, 35, 50, 18)
     repo.add_meal_entry(1, "Lunch", 700, 40, 80, 20)
 
-    consumed = repo.get_today_totals(1)
+    from datetime import date
+    consumed = repo.get_day_totals(1, date.today().isoformat())
     summary = service.build_daily_summary(repo.get_settings(1), consumed)
 
     assert consumed["kcal"] == 1250.0

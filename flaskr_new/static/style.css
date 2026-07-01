@@ -403,3 +403,69 @@ button.secondary{background:var(--chip);color:var(--ink)}
   .today-food-card{grid-template-columns:1fr}
   .today-food-card__side{align-items:flex-start}
 }
+
+/* Barcode-Scanner (Kamera-Overlay) */
+.barcode-scanner{
+  position:fixed;
+  inset:0;
+  z-index:1000;
+  background:rgba(0,0,0,.9);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:18px;
+  padding:24px;
+}
+.barcode-scanner__frame{
+  position:relative;
+  width:min(90vw, 480px);
+  aspect-ratio:4 / 3;
+  border-radius:16px;
+  overflow:hidden;
+  background:#000;
+}
+.barcode-scanner__video{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+.barcode-scanner__reticle{
+  position:absolute;
+  left:10%;
+  right:10%;
+  top:50%;
+  height:2px;
+  transform:translateY(-50%);
+  background:#16a34a;
+}
+.barcode-scanner__hint{
+  color:var(--surface);
+  margin:0;
+  font-size:.95rem;
+}
+.barcode-scanner__close{
+  height:46px;
+  padding:0 22px;
+  border:none;
+  border-radius:12px;
+  background:var(--surface);
+  color:#111;
+  font-weight:600;
+  cursor:pointer;
+}
+
+/* Mahlzeiten-Kalender (serverseitig gerendert) */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:.5rem;}
+.cal-weekday{text-align:center;font-size:.8rem;color:var(--muted,#6b7280);padding:4px 0;}
+.cal-day{display:flex;align-items:center;justify-content:center;aspect-ratio:1;border-radius:10px;
+  background:rgba(0,0,0,.04);text-decoration:none;color:inherit;position:relative;}
+.cal-day.is-empty{background:none;}
+.cal-day.is-tracked{border:2px solid #16a34a;border-radius:50%;}
+.cal-day.is-today{outline:2px solid #16a34a;}
+.cal-day.is-selected{background:#16a34a;color:#fff;}
+.cal > summary{cursor:pointer;list-style:none;}
+.cal > summary::-webkit-details-marker{display:none;}
+.cal > summary::after{content:' ▾';font-size:.7em;color:var(--muted,#6b7280);}
+.cal[open] > summary::after{content:' ▴';}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:.5rem 0;font-weight:600;}

@@ -1,7 +1,9 @@
 """Frontend-Routen"""
 
+import calendar as _calendar
 import functools
 import json
+from datetime import date as _date
 
 from flask import (
     Blueprint,
@@ -22,11 +24,10 @@ from .meal_tracker_service import (
     commit_meal_cart,
     delete_meal_action,
     edit_meal_amount_action,
-    get_today_meals,
     get_settings,
-    get_today_totals,
     save_settings_action,
 )
+from .meal_tracker_repo import get_day_meals, get_day_totals, get_tracked_days
 from .fridge_repo import delete_item as delete_dashboard_item, get_item, list_items
 from .fridge_service import (
     calculate_total_nutrition,
@@ -96,6 +97,15 @@ def meal_tracker():
     user_id = g.user["id"]
     cart = session.get("meal_cart", [])
 
+    # Aktiver Kalendertag: aus ?date=, sonst zuletzt gewaehlter, sonst heute.
+    # ponytail: sticky in der Session, damit POST-Redirects (ohne date) den Tag behalten.
+    today = _date.today()
+    try:
+        the_date = _date.fromisoformat(request.args.get("date") or session.get("mt_date") or "").isoformat()
+    except ValueError:
+        the_date = today.isoformat()
+    session["mt_date"] = the_date
+
     if request.method == "POST":
         action = request.form.get("action")
         tab = request.form.get("tab", "product")
@@ -110,7 +120,9 @@ def meal_tracker():
             flash(save_settings_action(user_id, request.form))
             return redirect(url_for("frontend.meal_tracker"))
         elif action == "cart_commit":
-            flash(commit_meal_cart(user_id, cart))
+            # Auf dem gewaehlten Tag verbuchen (heute -> Default-Zeitstempel).
+            eaten_at = None if the_date == today.isoformat() else f"{the_date} 12:00:00"
+            flash(commit_meal_cart(user_id, cart, eaten_at=eaten_at))
             session["meal_cart"] = []
             return redirect(url_for("frontend.meal_tracker"))
         elif action == "cart_add_fridge":
@@ -159,8 +171,8 @@ def meal_tracker():
             return redirect(url_for("frontend.meal_tracker", modal="add", tab=tab))
 
     settings = get_settings(user_id)
-    recent_meals = get_today_meals(user_id)
-    consumed = get_today_totals(user_id)
+    recent_meals = get_day_meals(user_id, the_date)
+    consumed = get_day_totals(user_id, the_date)
     summary = build_daily_summary(settings, consumed)
 
     modal = request.args.get("modal")          # 'add' | 'settings' | None
@@ -168,6 +180,22 @@ def meal_tracker():
     query = request.args.get("q", "").strip()
     results = unified_search(query) if (modal == "add" and tab == "product" and query) else None
     fridge_items = [dict(item) for item in list_items(user_id=user_id)] if modal == "add" else []
+
+    # Kalender-Monatsraster (stdlib), Default = Monat des gewaehlten Tags.
+    try:
+        cy = int(request.args.get("cal_year", the_date[:4]))
+        cm = int(request.args.get("cal_month", the_date[5:7]))
+    except ValueError:
+        cy, cm = today.year, today.month
+    first_weekday, days = _calendar.monthrange(cy, cm)  # Mo=0
+    cal = {
+        "year": cy, "month": cm, "first_weekday": first_weekday, "days": days,
+        "tracked": get_tracked_days(user_id, cy, cm),
+        "today": today.isoformat(), "selected": the_date,
+        "open": the_date != today.isoformat() or bool(request.args.get("cal_month")),
+        "prev": (cy - 1, 12) if cm == 1 else (cy, cm - 1),
+        "next": (cy + 1, 1) if cm == 12 else (cy, cm + 1),
+    }
 
     return render_template(
         "fridge/meal_tracker.html",
@@ -181,6 +209,7 @@ def meal_tracker():
         results=results,
         fridge_items=fridge_items,
         cart=cart,
+        cal=cal,
     )
 
 

@@ -1,7 +1,5 @@
 """Repository Meal Tracker (Tagesziele + Mahlzeiten)."""
 
-from datetime import datetime
-
 from .db import get_db, _iso, _now
 
 
@@ -11,11 +9,6 @@ DEFAULT_SETTINGS = {
     "carbs_pct": 40.0,
     "fat_pct": 30.0,
 }
-
-
-def _start_of_today():
-    now = _now()
-    return datetime(now.year, now.month, now.day)
 
 
 def get_settings(user_id):
@@ -92,10 +85,14 @@ def add_meal_entry(
     fat_g=0.0,
     amount=None,
     unit=None,
+    eaten_at=None,
 ):
     db = get_db()
+    # eaten_at optional: sonst greift der CURRENT_TIMESTAMP-Default (heute).
     cur = db.execute(
-        "INSERT INTO meal_tracker_entry (user_id, meal_name, amount, unit, kcal, protein_g, carbs_g, fat_g) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO meal_tracker_entry (user_id, meal_name, amount, unit, kcal, protein_g, carbs_g, fat_g"
+        + (", eaten_at" if eaten_at else "")
+        + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?" + (", ?" if eaten_at else "") + ")",
         (
             user_id,
             meal_name,
@@ -105,27 +102,40 @@ def add_meal_entry(
             float(protein_g),
             float(carbs_g),
             float(fat_g),
-        ),
+        ) + ((eaten_at,) if eaten_at else ()),
     )
     db.commit()
     return cur.lastrowid
 
 
-def get_today_meals(user_id):
+
+
+def get_tracked_days(user_id, year, month):
+    """Tag-Nummern eines Monats mit mindestens einer Mahlzeit (fuer Kalender-Punkte)."""
     db = get_db()
     rows = db.execute(
-        "SELECT * FROM meal_tracker_entry WHERE user_id = ? AND eaten_at >= ? ORDER BY eaten_at DESC",
-        (user_id, _iso(_start_of_today())),
+        "SELECT DISTINCT CAST(strftime('%d', eaten_at, 'localtime') AS INTEGER) AS d"
+        " FROM meal_tracker_entry WHERE user_id = ? AND strftime('%Y-%m', eaten_at, 'localtime') = ?",
+        (user_id, f"{year:04d}-{month:02d}"),
+    ).fetchall()
+    return {row["d"] for row in rows}
+
+
+def get_day_meals(user_id, date_str):
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM meal_tracker_entry WHERE user_id = ? AND date(eaten_at, 'localtime') = ? ORDER BY eaten_at DESC",
+        (user_id, date_str),
     ).fetchall()
     return [dict(row) for row in rows]
 
 
-def get_today_totals(user_id):
+def get_day_totals(user_id, date_str):
     db = get_db()
     row = db.execute(
         "SELECT COALESCE(SUM(kcal),0) AS kcal, COALESCE(SUM(protein_g),0) AS protein_g,"
         " COALESCE(SUM(carbs_g),0) AS carbs_g, COALESCE(SUM(fat_g),0) AS fat_g"
-        " FROM meal_tracker_entry WHERE user_id = ? AND eaten_at >= ?",
-        (user_id, _iso(_start_of_today())),
+        " FROM meal_tracker_entry WHERE user_id = ? AND date(eaten_at, 'localtime') = ?",
+        (user_id, date_str),
     ).fetchone()
     return {k: round(float(row[k]), 1) for k in ("kcal", "protein_g", "carbs_g", "fat_g")}

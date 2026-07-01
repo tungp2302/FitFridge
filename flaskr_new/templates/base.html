@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}FitFridge{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('frontend.static', filename='style.css') }}">
+  <script defer src="{{ url_for('frontend.static', filename='barcode_scan.js') }}"></script>
 </head>
 <body>
   <div class="app-shell">
