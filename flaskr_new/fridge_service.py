@@ -22,11 +22,14 @@ def _resolve_or_create_product(product_data, fallback_barcode):
     )
 
 
-def _add_item_from_product_data(product_data, fallback_barcode, author_id):
+def _add_item_from_product_data(product_data, fallback_barcode, author_id, grams_per_piece=None):
     product_id = _resolve_or_create_product(product_data, fallback_barcode)
     current_amount = float(product_data.get("total_amount") or 100.0)
     unit = product_data.get("unit") or "g"
-    return fridge_repo.add_item(product_id, current_amount, unit, user_id=author_id)
+    # Stueck-Produkte (z.B. 6 Eier) bleiben in "stk"; das Gewicht pro Stueck
+    # wird gespeichert, damit die Naehrwerte korrekt gerechnet werden koennen.
+    gpp = float(grams_per_piece) if (unit == "stk" and grams_per_piece) else None
+    return fridge_repo.add_item(product_id, current_amount, unit, user_id=author_id, grams_per_piece=gpp)
 
 
 def create_dashboard_item(query, author_id=None):
@@ -46,17 +49,20 @@ def create_dashboard_item(query, author_id=None):
     return _add_item_from_product_data(product_data, fallback_barcode=query, author_id=author_id)
 
 
-def create_dashboard_item_from_data(product_data, author_id=None):
+def create_dashboard_item_from_data(product_data, author_id=None, grams_per_piece=None):
     """Create a fridge item directly from an already selected product payload."""
     if not product_data:
         raise ValueError("product_data is required")
 
     fallback_barcode = product_data.get("name") or "selected-product"
-    return _add_item_from_product_data(product_data, fallback_barcode=fallback_barcode, author_id=author_id)
+    return _add_item_from_product_data(
+        product_data, fallback_barcode=fallback_barcode, author_id=author_id,
+        grams_per_piece=grams_per_piece,
+    )
 
 
-def update_dashboard_item(item_id, current_amount=None, name=None, brand=None, user_id=None):
-    """Menge und optional Name/Marke eines Fridge-Items aktualisieren.
+def update_dashboard_item(item_id, current_amount=None, unit=None, grams_per_piece=None, name=None, brand=None, user_id=None):
+    """Menge, Einheit und optional Name/Marke eines Fridge-Items aktualisieren.
 
     Die Suche ist auf den Nutzer gescoped (``user_id``), damit niemand
     ueber geratene IDs fremde Items aendert.
@@ -71,7 +77,11 @@ def update_dashboard_item(item_id, current_amount=None, name=None, brand=None, u
         current_item = dict(current_item)
 
     if current_amount is not None:
-        updated += fridge_repo.update_amount(item_id, float(current_amount))
+        amount = float(current_amount)
+        new_unit = unit or None
+        # Stueck bleibt Stueck; Gewicht/Stueck wird mitgespeichert (sonst NULL).
+        gpp = float(grams_per_piece) if (new_unit == "stk" and grams_per_piece) else None
+        updated += fridge_repo.update_amount(item_id, amount, new_unit, gpp)
 
     if name is not None or brand is not None:
         product_id = current_item["product_id"]

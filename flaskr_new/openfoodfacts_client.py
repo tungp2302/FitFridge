@@ -86,7 +86,8 @@ def _parse_total_quantity(product_data):
     raw = raw.replace(",", ".").lower().strip()
 
     # Pattern: multiplicator e.g. "4 x 100 g" or "4x100g"
-    m = re.search(r"(?:(\d+(?:\.\d+)?)\s*[x×]\s*)?(\d+(?:\.\d+)?)(?:\s*)(mg|g|gramm|grams|ml|l|liter|litre|stk|stueck|piece|pieces)?", raw)
+    # kg/l vor g/... damit sie nicht als g/l verkuerzt gematcht werden
+    m = re.search(r"(?:(\d+(?:\.\d+)?)\s*[x×]\s*)?(\d+(?:\.\d+)?)(?:\s*)(kg|mg|g|gramm|grams|ml|cl|dl|l|liter|litre|stk|stueck|piece|pieces)?", raw)
     if not m:
         return None, None
 
@@ -94,17 +95,18 @@ def _parse_total_quantity(product_data):
     amount = float(m.group(2))
     unit = (m.group(3) or "").strip()
 
-    # Normalisierung
+    # Normalisierung auf g / ml / stk (mit Umrechnung von kg, l, cl, dl)
     unit_map = {
-        "gramm": "g", "grams": "g", "g": "g",
-        "ml": "ml",
-        "l": "l", "liter": "l", "litre": "l",
-        "mg": "mg",
-        "stk": "stk", "stueck": "stk", "piece": "stk", "pieces": "stk",
+        "kg": ("g", 1000.0),
+        "gramm": ("g", 1.0), "grams": ("g", 1.0), "g": ("g", 1.0),
+        "mg": ("g", 0.001),
+        "l": ("ml", 1000.0), "liter": ("ml", 1000.0), "litre": ("ml", 1000.0),
+        "dl": ("ml", 100.0), "cl": ("ml", 10.0), "ml": ("ml", 1.0),
+        "stk": ("stk", 1.0), "stueck": ("stk", 1.0), "piece": ("stk", 1.0), "pieces": ("stk", 1.0),
     }
-    unit_norm = unit_map.get(unit, unit) if unit else None
+    unit_norm, factor = unit_map.get(unit, (unit or None, 1.0))
 
-    return mult * amount, unit_norm
+    return mult * amount * factor, unit_norm
 
 
 def _kJ_to_kcal(kj):

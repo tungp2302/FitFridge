@@ -11,9 +11,21 @@ def calculate_for_amount(product, amount, unit):
     Gibt bei ungueltiger Menge/Einheit Nullen zurueck.
     """
     empty = {"kcal": 0.0, "protein": 0.0, "fat": 0.0, "carbs": 0.0}
-    if amount is None or amount <= 0 or unit not in _TO_BASE:
+    if amount is None or amount <= 0:
         return empty
-    amount_in_g = amount * _TO_BASE[unit]
+    if unit == "stk":
+        # Stueck: nur rechenbar, wenn ein Gewicht pro Stueck bekannt ist.
+        try:
+            gpp = product["grams_per_piece"]
+        except (KeyError, IndexError, TypeError):
+            gpp = None
+        if not gpp:
+            return empty
+        amount_in_g = amount * float(gpp)
+    elif unit in _TO_BASE:
+        amount_in_g = amount * _TO_BASE[unit]
+    else:
+        return empty
     m = amount_in_g / 100.0
     return {
         "kcal": round(product["kcal_per_100g"] * m, 1),

@@ -70,6 +70,8 @@ def dashboard():
         update_dashboard_item(
             request.form.get("item_id"),
             current_amount=request.form.get("current_amount"),
+            unit=request.form.get("unit"),
+            grams_per_piece=request.form.get("grams_per_piece", "").strip() or None,
             user_id=g.user["id"],
         )
         return redirect(url_for("frontend.dashboard"))
@@ -234,6 +236,7 @@ def add_product():
         action = request.form.get("action")
         query = request.form.get("query", "").strip()
         selected_payload_raw = request.form.get("selected_payload", "").strip()
+        grams_per_piece = request.form.get("grams_per_piece", "").strip() or None
 
         if action == "search":
             if query:
@@ -245,7 +248,7 @@ def add_product():
         else:
             try:
                 if selected_payload_raw:
-                    create_dashboard_item_from_data(json.loads(selected_payload_raw), g.user["id"])
+                    create_dashboard_item_from_data(json.loads(selected_payload_raw), g.user["id"], grams_per_piece=grams_per_piece)
                 else:
                     create_dashboard_item(query, g.user["id"])
                 return redirect(url_for("frontend.dashboard"))

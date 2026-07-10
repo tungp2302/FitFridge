@@ -4,7 +4,7 @@ from .db import get_db
 
 
 _FRIDGE_ITEM_SELECT = (
-    "SELECT f.id, f.user_id, f.product_id, f.current_amount, f.unit, f.created,"
+    "SELECT f.id, f.user_id, f.product_id, f.current_amount, f.unit, f.grams_per_piece, f.created,"
     " p.name, p.brand, p.barcode,"
     " p.kcal_per_100g, p.protein_per_100g, p.fat_per_100g, p.carbs_per_100g"
     " FROM fridge_item f JOIN product p ON f.product_id = p.id"
@@ -35,25 +35,35 @@ def get_item(item_id, user_id=None):
     ).fetchone()
 
 
-def add_item(product_id, current_amount, unit, user_id=None):
+def add_item(product_id, current_amount, unit, user_id=None, grams_per_piece=None):
     """Ein neues FridgeItem zur Datenbank hinzufügen."""
     db = get_db()
     cursor = db.execute(
-        "INSERT INTO fridge_item (user_id, product_id, current_amount, unit)"
-        " VALUES (?, ?, ?, ?)",
-        (user_id, product_id, current_amount, unit),
+        "INSERT INTO fridge_item (user_id, product_id, current_amount, unit, grams_per_piece)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (user_id, product_id, current_amount, unit, grams_per_piece),
     )
     db.commit()
     return cursor.lastrowid
 
 
-def update_amount(item_id, current_amount):
-    """Die Menge eines FridgeItems aktualisieren."""
+def update_amount(item_id, current_amount, unit=None, grams_per_piece=None):
+    """Menge und optional Einheit + Gewicht/Stueck eines FridgeItems aktualisieren.
+
+    ``unit is None`` -> nur die Menge (z.B. Abzug beim Mahlzeit-Loggen),
+    Einheit und grams_per_piece bleiben unangetastet.
+    """
     db = get_db()
-    cursor = db.execute(
-        "UPDATE fridge_item SET current_amount = ? WHERE id = ?",
-        (current_amount, item_id),
-    )
+    if unit is None:
+        cursor = db.execute(
+            "UPDATE fridge_item SET current_amount = ? WHERE id = ?",
+            (current_amount, item_id),
+        )
+    else:
+        cursor = db.execute(
+            "UPDATE fridge_item SET current_amount = ?, unit = ?, grams_per_piece = ? WHERE id = ?",
+            (current_amount, unit, grams_per_piece, item_id),
+        )
     db.commit()
     return cursor.rowcount
 

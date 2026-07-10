@@ -24,6 +24,11 @@
                 <strong>{{ item.name or '(no name)' }}</strong>
                 <form method="post" class="flat-form">
                   <input type="hidden" name="selected_payload" value='{{ item|tojson }}'>
+                  {% if item.unit == 'stk' %}
+                    <input type="number" name="grams_per_piece" min="0" step="any"
+                           placeholder="g pro Stück"
+                           title="Gewicht pro Stück in Gramm – ergibt Stück × g = Gesamtgramm">
+                  {% endif %}
                   <button type="submit" class="search-action-button">Hinzufügen</button>
                 </form>
               </div>

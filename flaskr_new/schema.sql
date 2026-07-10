@@ -39,6 +39,7 @@ CREATE TABLE fridge_item (
     product_id INTEGER NOT NULL,
     current_amount REAL NOT NULL,
     unit TEXT NOT NULL,
+    grams_per_piece REAL,
     created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user (id),
     FOREIGN KEY (product_id) REFERENCES product (id)
