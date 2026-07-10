@@ -55,17 +55,17 @@ python3 -m pytest -q
 
 Im Projektordner ein Terminal öffnen.
 
-powershell
-1. Virtuelle Umgebung anlegen und aktivieren
+```powershell
+# 1. Virtuelle Umgebung anlegen und aktivieren
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-2. Abhängigkeiten installieren
+# 2. Abhängigkeiten installieren
 pip install -r requirements.txt
 
-3. Dev-Server starten
+# 3. Dev-Server starten
 flask --app flaskr_new run --debug
-
+```
 
 Dann im Browser öffnen: http://127.0.0.1:5000
 
@@ -77,7 +77,7 @@ Mahlzeiten-Tracker http://127.0.0.1:5000/meal-tracker
 
 ## Tests (Windows)
 
-powershell
+```powershell
 pip install -r requirements-dev.txt
 python -m pytest -q
 python -m pytest tests/test_backend/test_meal_tracker.py
@@ -88,3 +88,4 @@ python -m pytest tests/test_backend/test_meal_tracker.py
 
 # Or call it directly without activating:
 .\.venv\Scripts\python.exe -m pytest tests/test_backend/test_meal_tracker.py
+```
