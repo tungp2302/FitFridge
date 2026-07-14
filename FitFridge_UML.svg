@@ -1,0 +1,241 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1340" height="1120" viewBox="0 0 1340 1120" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="dep" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+      <path d="M1,1 L10,6 L1,11" fill="none" stroke="#14532d" stroke-width="1.6"/>
+    </marker>
+  </defs>
+  <style>
+    .box    { fill: #ffffff; stroke: #14532d; stroke-width: 1.4; }
+    .nfill  { fill: #e9f6ee; }
+    .sep    { stroke: #14532d; stroke-width: 1.1; }
+    .stereo { font-size: 13.5px; font-style: italic; fill: #1a7a44; text-anchor: middle; }
+    .cname  { font-size: 17px; font-weight: 700; fill: #14532d; text-anchor: middle; }
+    .mem    { font-size: 15px; fill: #1f2937; }
+    .dep    { stroke: #14532d; stroke-width: 1.4; stroke-dasharray: 6 4; fill: none; marker-end: url(#dep); }
+    .ext    { fill: #ffffff; stroke: #14532d; stroke-width: 1.4; stroke-dasharray: 7 4; }
+    .legend { font-size: 15px; fill: #4b5563; }
+  </style>
+
+  <rect width="1340" height="1120" fill="#ffffff"/>
+  <text x="670" y="36" text-anchor="middle" font-size="27" font-weight="700" fill="#14532d">FitFridge — UML-Klassendiagramm</text>
+
+  <!-- ===== Reihe 1 ===== -->
+  <!-- Jinja2-Templates «view» -->
+  <g>
+    <rect class="box nfill" x="90" y="76" width="250" height="46"/>
+    <rect class="box" x="90" y="122" width="250" height="74"/>
+    <rect class="box" x="90" y="196" width="250" height="12"/>
+    <text class="stereo" x="215" y="94">«view»</text>
+    <text class="cname" x="215" y="114">Jinja2-Templates</text>
+    <text class="mem" x="102" y="142">dashboard.html</text>
+    <text class="mem" x="102" y="164">meal_tracker.html</text>
+    <text class="mem" x="102" y="186">planner.html</text>
+  </g>
+  <!-- barcode_scan.js -->
+  <g>
+    <rect class="box nfill" x="370" y="76" width="230" height="30"/>
+    <rect class="box" x="370" y="106" width="230" height="12"/>
+    <rect class="box" x="370" y="118" width="230" height="52"/>
+    <text class="cname" x="485" y="97">barcode_scan.js</text>
+    <text class="mem" x="382" y="138">+ startBarcodeScan()</text>
+    <text class="mem" x="382" y="160">− detectFrame()</text>
+  </g>
+  <!-- planner.js -->
+  <g>
+    <rect class="box nfill" x="950" y="76" width="250" height="30"/>
+    <rect class="box" x="950" y="106" width="250" height="12"/>
+    <rect class="box" x="950" y="118" width="250" height="74"/>
+    <text class="cname" x="1075" y="97">planner.js</text>
+    <text class="mem" x="962" y="138">+ loadFreestyleRecipe()</text>
+    <text class="mem" x="962" y="160">+ saveCurrentRecipe()</text>
+    <text class="mem" x="962" y="182">+ renderDetail(recipe)</text>
+  </g>
+
+  <!-- ===== Reihe 2 ===== -->
+  <!-- routes.py -->
+  <g>
+    <rect class="box nfill" x="170" y="262" width="290" height="46"/>
+    <rect class="box" x="170" y="308" width="290" height="30"/>
+    <rect class="box" x="170" y="338" width="290" height="96"/>
+    <text class="stereo" x="315" y="280">«Blueprint /»</text>
+    <text class="cname" x="315" y="300">routes.py</text>
+    <text class="mem" x="182" y="328">− login_required : Decorator</text>
+    <text class="mem" x="182" y="358">+ dashboard()</text>
+    <text class="mem" x="182" y="380">+ meal_tracker()</text>
+    <text class="mem" x="182" y="402">+ add_product()</text>
+    <text class="mem" x="182" y="424">+ unified_search(q)</text>
+  </g>
+  <!-- routes_asaai.py -->
+  <g>
+    <rect class="box nfill" x="880" y="262" width="310" height="46"/>
+    <rect class="box" x="880" y="308" width="310" height="30"/>
+    <rect class="box" x="880" y="338" width="310" height="74"/>
+    <text class="stereo" x="1035" y="280">«Blueprint /asaai»</text>
+    <text class="cname" x="1035" y="300">routes_asaai.py</text>
+    <text class="mem" x="892" y="328">− require_user : Decorator</text>
+    <text class="mem" x="892" y="358">+ freestyle()</text>
+    <text class="mem" x="892" y="380">+ saved_list()</text>
+    <text class="mem" x="892" y="402">+ saved_save()</text>
+  </g>
+
+  <!-- ===== Reihe 3 ===== -->
+  <!-- fridge_service.py -->
+  <g>
+    <rect class="box nfill" x="60" y="490" width="260" height="30"/>
+    <rect class="box" x="60" y="520" width="260" height="12"/>
+    <rect class="box" x="60" y="532" width="260" height="74"/>
+    <text class="cname" x="190" y="511">fridge_service.py</text>
+    <text class="mem" x="72" y="552">+ create_dashboard_item()</text>
+    <text class="mem" x="72" y="574">+ update_dashboard_item()</text>
+    <text class="mem" x="72" y="596">+ calculate_total_nutrition()</text>
+  </g>
+  <!-- meal_tracker_service.py -->
+  <g>
+    <rect class="box nfill" x="345" y="490" width="265" height="30"/>
+    <rect class="box" x="345" y="520" width="265" height="12"/>
+    <rect class="box" x="345" y="532" width="265" height="74"/>
+    <text class="cname" x="477" y="511">meal_tracker_service.py</text>
+    <text class="mem" x="357" y="552">+ build_daily_summary()</text>
+    <text class="mem" x="357" y="574">+ commit_meal_cart()</text>
+    <text class="mem" x="357" y="596">+ normalize_macro_pct()</text>
+  </g>
+  <!-- freestyle_recipe.py -->
+  <g>
+    <rect class="box nfill" x="755" y="490" width="265" height="30"/>
+    <rect class="box" x="755" y="520" width="265" height="52"/>
+    <rect class="box" x="755" y="572" width="265" height="52"/>
+    <text class="cname" x="887" y="511">freestyle_recipe.py</text>
+    <text class="mem" x="767" y="540">− MODEL_PROFILES : dict</text>
+    <text class="mem" x="767" y="562">− _SCHEMA : JSON</text>
+    <text class="mem" x="767" y="592">+ build_prompt()</text>
+    <text class="mem" x="767" y="614">+ generate_freestyle_recipes()</text>
+  </g>
+  <!-- freestyle_recipe_support.py -->
+  <g>
+    <rect class="box nfill" x="1045" y="490" width="270" height="30"/>
+    <rect class="box" x="1045" y="520" width="270" height="30"/>
+    <rect class="box" x="1045" y="550" width="270" height="96"/>
+    <text class="cname" x="1180" y="511">freestyle_recipe_support.py</text>
+    <text class="mem" x="1057" y="540">− MACRO_TOLERANCES : dict</text>
+    <text class="mem" x="1057" y="570">+ valid_recipes()</text>
+    <text class="mem" x="1057" y="592">+ computed_macros()</text>
+    <text class="mem" x="1057" y="614">− _repair_macros()</text>
+    <text class="mem" x="1057" y="636">− _fit_amounts()</text>
+  </g>
+
+  <!-- ===== Reihe 4 ===== -->
+  <!-- product_repo.py -->
+  <g>
+    <rect class="box nfill" x="60" y="700" width="200" height="30"/>
+    <rect class="box" x="60" y="730" width="200" height="12"/>
+    <rect class="box" x="60" y="742" width="200" height="52"/>
+    <text class="cname" x="160" y="721" font-size="16">product_repo.py</text>
+    <text class="mem" x="72" y="762">+ get_by_barcode()</text>
+    <text class="mem" x="72" y="784">+ search_by_name()</text>
+  </g>
+  <!-- fridge_repo.py -->
+  <g>
+    <rect class="box nfill" x="280" y="700" width="200" height="30"/>
+    <rect class="box" x="280" y="730" width="200" height="12"/>
+    <rect class="box" x="280" y="742" width="200" height="52"/>
+    <text class="cname" x="380" y="721" font-size="16">fridge_repo.py</text>
+    <text class="mem" x="292" y="762">+ list_items(user_id)</text>
+    <text class="mem" x="292" y="784">+ add_item()</text>
+  </g>
+  <!-- meal_tracker_repo.py -->
+  <g>
+    <rect class="box nfill" x="500" y="700" width="215" height="30"/>
+    <rect class="box" x="500" y="730" width="215" height="12"/>
+    <rect class="box" x="500" y="742" width="215" height="52"/>
+    <text class="cname" x="607" y="721" font-size="16">meal_tracker_repo.py</text>
+    <text class="mem" x="512" y="762">+ get_day_totals()</text>
+    <text class="mem" x="512" y="784">+ add_meal_entry()</text>
+  </g>
+  <!-- app_settings_repo.py -->
+  <g>
+    <rect class="box nfill" x="870" y="700" width="215" height="30"/>
+    <rect class="box" x="870" y="730" width="215" height="12"/>
+    <rect class="box" x="870" y="742" width="215" height="52"/>
+    <text class="cname" x="977" y="721" font-size="16">app_settings_repo.py</text>
+    <text class="mem" x="882" y="762">+ get_settings()</text>
+    <text class="mem" x="882" y="784">+ save_settings()</text>
+  </g>
+  <!-- food_estimate.py -->
+  <g>
+    <rect class="box nfill" x="1105" y="700" width="210" height="30"/>
+    <rect class="box" x="1105" y="730" width="210" height="12"/>
+    <rect class="box" x="1105" y="742" width="210" height="30"/>
+    <text class="cname" x="1210" y="721" font-size="16">food_estimate.py</text>
+    <text class="mem" x="1117" y="762">+ estimate_food(query)</text>
+  </g>
+
+  <!-- ===== Reihe 5 ===== -->
+  <!-- db.py -->
+  <g>
+    <rect class="box nfill" x="300" y="852" width="190" height="30"/>
+    <rect class="box" x="300" y="882" width="190" height="12"/>
+    <rect class="box" x="300" y="894" width="190" height="52"/>
+    <text class="cname" x="395" y="873">db.py</text>
+    <text class="mem" x="312" y="914">+ get_db() : sqlite3</text>
+    <text class="mem" x="312" y="936">+ init_db()</text>
+  </g>
+  <!-- openfoodfacts_client.py -->
+  <g>
+    <rect class="box nfill" x="520" y="852" width="225" height="30"/>
+    <rect class="box" x="520" y="882" width="225" height="12"/>
+    <rect class="box" x="520" y="894" width="225" height="52"/>
+    <text class="cname" x="632" y="873" font-size="16">openfoodfacts_client.py</text>
+    <text class="mem" x="532" y="914">+ lookup_product()</text>
+    <text class="mem" x="532" y="936">+ search_products()</text>
+  </g>
+  <!-- ollama_client.py -->
+  <g>
+    <rect class="box nfill" x="790" y="852" width="250" height="30"/>
+    <rect class="box" x="790" y="882" width="250" height="30"/>
+    <rect class="box" x="790" y="912" width="250" height="52"/>
+    <text class="cname" x="915" y="873">ollama_client.py</text>
+    <text class="mem" x="802" y="902">− MODEL_CHOICES : list</text>
+    <text class="mem" x="802" y="932">+ generate_from_ollama()</text>
+    <text class="mem" x="802" y="954">+ resolve_ollama_model()</text>
+  </g>
+
+  <!-- ===== Reihe 6: Externe Systeme ===== -->
+  <g>
+    <rect class="ext" x="520" y="1010" width="225" height="52" rx="4"/>
+    <text class="stereo" x="632" y="1030">«system»</text>
+    <text class="cname" x="632" y="1050" font-size="16">OpenFoodFacts API</text>
+    <rect class="ext" x="790" y="1010" width="250" height="52" rx="4"/>
+    <text class="stereo" x="915" y="1030">«system»</text>
+    <text class="cname" x="915" y="1050" font-size="16">Ollama · 127.0.0.1:11434</text>
+  </g>
+
+  <!-- ===== Abhängigkeiten ===== -->
+  <line class="dep" x1="215" y1="208" x2="215" y2="259"/>
+  <path class="dep" d="M485,170 L485,225 L400,225 L400,259"/>
+  <line class="dep" x1="1075" y1="192" x2="1075" y2="259"/>
+  <line class="dep" x1="230" y1="434" x2="230" y2="487"/>
+  <line class="dep" x1="400" y1="434" x2="400" y2="487"/>
+  <line class="dep" x1="940" y1="412" x2="940" y2="487"/>
+  <path class="dep" d="M460,360 L730,360 L730,668 L1150,668 L1150,697"/>
+  <line class="dep" x1="1022" y1="530" x2="1042" y2="530"/>
+  <line class="dep" x1="190" y1="606" x2="190" y2="697"/>
+  <line class="dep" x1="300" y1="606" x2="300" y2="697"/>
+  <path class="dep" d="M270,606 L270,820 L590,820 L590,849"/>
+  <line class="dep" x1="555" y1="606" x2="555" y2="697"/>
+  <line class="dep" x1="390" y1="794" x2="390" y2="849"/>
+  <line class="dep" x1="820" y1="624" x2="820" y2="849"/>
+  <line class="dep" x1="960" y1="852" x2="960" y2="797"/>
+  <path class="dep" d="M1210,772 L1210,820 L1030,820 L1030,849"/>
+  <line class="dep" x1="632" y1="946" x2="632" y2="1007"/>
+  <line class="dep" x1="915" y1="964" x2="915" y2="1007"/>
+
+  <!-- Legende -->
+  <g class="legend">
+    <line x1="60" y1="1092" x2="115" y2="1092" stroke="#14532d" stroke-width="1.4" stroke-dasharray="6 4" marker-end="url(#dep)"/>
+    <text x="125" y="1097">Abhängigkeit «uses»</text>
+    <text x="330" y="1097">Klassenbox: Name | Attribute | Methoden</text>
+    <text x="680" y="1097">+ öffentlich · − privat</text>
+    <rect x="880" y="1083" width="34" height="18" class="ext"/>
+    <text x="924" y="1097">externes System</text>
+  </g>
+</svg>

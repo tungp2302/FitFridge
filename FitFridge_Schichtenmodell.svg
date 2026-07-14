@@ -1,0 +1,201 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="1050" viewBox="0 0 1300 1050" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#14532d"/>
+    </marker>
+  </defs>
+  <style>
+    .band-label { font-size: 18px; font-weight: 700; fill: #1a7a44; letter-spacing: 1.5px; }
+    .col-label  { font-size: 18px; font-weight: 600; fill: #6b7280; }
+    .cls        { fill: #ffffff; stroke: #9fd4b3; stroke-width: 1.2; }
+    .hdr-se     { fill: #3fae68; }
+    .hdr-ai     { fill: #14532d; }
+    .cname      { font-size: 18px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+    .cname-s    { font-size: 16px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+    .stereo     { font-style: italic; font-weight: 400; }
+    .meth       { font-size: 16.5px; fill: #1f2937; text-anchor: middle; }
+    .dep        { stroke: #14532d; stroke-width: 1.6; stroke-dasharray: 6 4; fill: none; marker-end: url(#arr); }
+    .ext        { fill: #ffffff; stroke: #14532d; stroke-width: 1.4; stroke-dasharray: 7 4; }
+    .extname    { font-size: 16.5px; font-weight: 700; fill: #14532d; text-anchor: middle; }
+    .extsub     { font-size: 14px; fill: #4b5563; text-anchor: middle; }
+    .legend     { font-size: 15px; fill: #4b5563; }
+  </style>
+
+  <rect width="1300" height="1050" fill="#ffffff"/>
+  <text x="650" y="36" text-anchor="middle" font-size="27" font-weight="700" fill="#14532d">FitFridge — Schichtenmodell (UML-Klassendiagramm)</text>
+  <text x="375" y="64" text-anchor="middle" class="col-label">Teil A · Software Engineering</text>
+  <text x="990" y="64" text-anchor="middle" class="col-label">Teil B · ASaAI</text>
+
+  <!-- Schicht-Bänder -->
+  <rect x="30" y="74"  width="1240" height="150" rx="10" fill="#f2faf5" stroke="#d3ead9"/>
+  <rect x="30" y="234" width="1240" height="140" rx="10" fill="#e8f5ee" stroke="#cfe8d8"/>
+  <rect x="30" y="384" width="1240" height="220" rx="10" fill="#f2faf5" stroke="#d3ead9"/>
+  <rect x="30" y="614" width="1240" height="140" rx="10" fill="#e8f5ee" stroke="#cfe8d8"/>
+  <rect x="30" y="764" width="1240" height="140" rx="10" fill="#f2faf5" stroke="#d3ead9"/>
+  <text x="48" y="99"  class="band-label">1 · PRÄSENTATION — BROWSER</text>
+  <text x="48" y="259" class="band-label">2 · ROUTEN — HTTP</text>
+  <text x="48" y="409" class="band-label">3 · SERVICES — FACHLOGIK</text>
+  <text x="48" y="639" class="band-label">4 · REPOSITORIES — SQL</text>
+  <text x="48" y="789" class="band-label">5 · INFRASTRUKTUR</text>
+
+  <!-- Spaltentrenner -->
+  <line x1="700" y1="80" x2="700" y2="898" stroke="#c9dccf" stroke-width="1.2" stroke-dasharray="3 5"/>
+
+  <!-- ===== Schicht 1 ===== -->
+  <g>
+    <rect class="cls" x="60" y="108" width="280" height="84" rx="6"/>
+    <rect class="hdr-se" x="60" y="108" width="280" height="32" rx="6"/><rect class="hdr-se" x="60" y="130" width="280" height="10"/>
+    <text class="cname" x="200" y="130">Jinja2-Templates <tspan class="stereo">«view»</tspan></text>
+    <text class="meth" x="200" y="160">dashboard · tracker · planner</text>
+    <text class="meth" x="200" y="182">HTML-Formulare</text>
+
+    <rect class="cls" x="365" y="108" width="245" height="84" rx="6"/>
+    <rect class="hdr-se" x="365" y="108" width="245" height="32" rx="6"/><rect class="hdr-se" x="365" y="130" width="245" height="10"/>
+    <text class="cname" x="487" y="130">barcode_scan.js</text>
+    <text class="meth" x="487" y="160">startBarcodeScan()</text>
+    <text class="meth" x="487" y="182">BarcodeDetector / zxing</text>
+
+    <rect class="cls" x="760" y="108" width="300" height="84" rx="6"/>
+    <rect class="hdr-ai" x="760" y="108" width="300" height="32" rx="6"/><rect class="hdr-ai" x="760" y="130" width="300" height="10"/>
+    <text class="cname" x="910" y="130">planner.js</text>
+    <text class="meth" x="910" y="160">loadFreestyleRecipe()</text>
+    <text class="meth" x="910" y="182">fetch / JSON</text>
+  </g>
+
+  <!-- ===== Schicht 2 ===== -->
+  <g>
+    <rect class="cls" x="60" y="268" width="340" height="84" rx="6"/>
+    <rect class="hdr-se" x="60" y="268" width="340" height="32" rx="6"/><rect class="hdr-se" x="60" y="290" width="340" height="10"/>
+    <text class="cname" x="230" y="290">routes.py <tspan class="stereo">«Blueprint /»</tspan></text>
+    <text class="meth" x="230" y="320">dashboard() · meal_tracker()</text>
+    <text class="meth" x="230" y="342">unified_search(q)</text>
+
+    <rect class="cls" x="760" y="268" width="360" height="84" rx="6"/>
+    <rect class="hdr-ai" x="760" y="268" width="360" height="32" rx="6"/><rect class="hdr-ai" x="760" y="290" width="360" height="10"/>
+    <text class="cname" x="940" y="290">routes_asaai.py <tspan class="stereo">«Blueprint /asaai»</tspan></text>
+    <text class="meth" x="940" y="320">freestyle()</text>
+    <text class="meth" x="940" y="342">saved_list() · saved_save()</text>
+  </g>
+
+  <!-- ===== Schicht 3 ===== -->
+  <g>
+    <rect class="cls" x="60" y="418" width="290" height="84" rx="6"/>
+    <rect class="hdr-se" x="60" y="418" width="290" height="32" rx="6"/><rect class="hdr-se" x="60" y="440" width="290" height="10"/>
+    <text class="cname" x="205" y="440">fridge_service.py</text>
+    <text class="meth" x="205" y="470">create_dashboard_item()</text>
+    <text class="meth" x="205" y="492">calculate_total_nutrition()</text>
+
+    <rect class="cls" x="370" y="418" width="290" height="84" rx="6"/>
+    <rect class="hdr-se" x="370" y="418" width="290" height="32" rx="6"/><rect class="hdr-se" x="370" y="440" width="290" height="10"/>
+    <text class="cname" x="515" y="440">meal_tracker_service.py</text>
+    <text class="meth" x="515" y="470">build_daily_summary()</text>
+    <text class="meth" x="515" y="492">commit_meal_cart()</text>
+
+    <rect class="cls" x="730" y="418" width="245" height="84" rx="6"/>
+    <rect class="hdr-ai" x="730" y="418" width="245" height="32" rx="6"/><rect class="hdr-ai" x="730" y="440" width="245" height="10"/>
+    <text class="cname" x="852" y="440">freestyle_recipe.py</text>
+    <text class="meth" x="852" y="470">build_prompt()</text>
+    <text class="meth" x="852" y="492" font-size="15.5">generate_freestyle_recipes()</text>
+
+    <rect class="cls" x="1005" y="418" width="255" height="84" rx="6"/>
+    <rect class="hdr-ai" x="1005" y="418" width="255" height="32" rx="6"/><rect class="hdr-ai" x="1005" y="440" width="255" height="10"/>
+    <text class="cname-s" x="1132" y="440">freestyle_recipe_support.py</text>
+    <text class="meth" x="1132" y="470">valid_recipes() · 7 Checks</text>
+    <text class="meth" x="1132" y="492">_repair_macros() · MAPE-K</text>
+
+    <rect class="cls" x="1005" y="512" width="255" height="62" rx="6"/>
+    <rect class="hdr-ai" x="1005" y="512" width="255" height="32" rx="6"/><rect class="hdr-ai" x="1005" y="534" width="255" height="10"/>
+    <text class="cname" x="1132" y="534">food_estimate.py</text>
+    <text class="meth" x="1132" y="564">estimate_food() → KI-Schätzung</text>
+  </g>
+
+  <!-- ===== Schicht 4 ===== -->
+  <g>
+    <rect class="cls" x="60" y="648" width="185" height="84" rx="6"/>
+    <rect class="hdr-se" x="60" y="648" width="185" height="32" rx="6"/><rect class="hdr-se" x="60" y="670" width="185" height="10"/>
+    <text class="cname-s" x="152" y="670">product_repo.py</text>
+    <text class="meth" x="152" y="700">get_by_barcode()</text>
+    <text class="meth" x="152" y="722">search_by_name()</text>
+
+    <rect class="cls" x="262" y="648" width="185" height="84" rx="6"/>
+    <rect class="hdr-se" x="262" y="648" width="185" height="32" rx="6"/><rect class="hdr-se" x="262" y="670" width="185" height="10"/>
+    <text class="cname-s" x="354" y="670">fridge_repo.py</text>
+    <text class="meth" x="354" y="700">list_items(user_id)</text>
+    <text class="meth" x="354" y="722">update_amount()</text>
+
+    <rect class="cls" x="464" y="648" width="205" height="84" rx="6"/>
+    <rect class="hdr-se" x="464" y="648" width="205" height="32" rx="6"/><rect class="hdr-se" x="464" y="670" width="205" height="10"/>
+    <text class="cname-s" x="566" y="670">meal_tracker_repo.py</text>
+    <text class="meth" x="566" y="700">get_day_totals()</text>
+    <text class="meth" x="566" y="722">save_settings()</text>
+
+    <rect class="cls" x="1020" y="648" width="240" height="84" rx="6"/>
+    <rect class="hdr-ai" x="1020" y="648" width="240" height="32" rx="6"/><rect class="hdr-ai" x="1020" y="670" width="240" height="10"/>
+    <text class="cname-s" x="1140" y="670">app_settings_repo.py</text>
+    <text class="meth" x="1140" y="700">get_settings()</text>
+    <text class="meth" x="1140" y="722">LLM-Modellwahl je Nutzer</text>
+  </g>
+
+  <!-- ===== Schicht 5 ===== -->
+  <g>
+    <rect class="cls" x="60" y="798" width="215" height="84" rx="6"/>
+    <rect class="hdr-se" x="60" y="798" width="215" height="32" rx="6"/><rect class="hdr-se" x="60" y="820" width="215" height="10"/>
+    <text class="cname" x="167" y="820">calculations.py</text>
+    <text class="meth" x="167" y="850">calculate_for_amount()</text>
+    <text class="meth" x="167" y="872">safe_float()</text>
+
+    <rect class="cls" x="292" y="798" width="195" height="84" rx="6"/>
+    <rect class="hdr-se" x="292" y="798" width="195" height="32" rx="6"/><rect class="hdr-se" x="292" y="820" width="195" height="10"/>
+    <text class="cname" x="389" y="820">db.py</text>
+    <text class="meth" x="389" y="850">get_db() · sqlite3</text>
+    <text class="meth" x="389" y="872">init_db() → schema.sql</text>
+
+    <rect class="cls" x="504" y="798" width="215" height="84" rx="6"/>
+    <rect class="hdr-se" x="504" y="798" width="215" height="32" rx="6"/><rect class="hdr-se" x="504" y="820" width="215" height="10"/>
+    <text class="cname-s" x="611" y="820">openfoodfacts_client.py</text>
+    <text class="meth" x="611" y="850">search_products()</text>
+    <text class="meth" x="611" y="872">urllib + certifi</text>
+
+    <rect class="cls" x="760" y="798" width="260" height="84" rx="6"/>
+    <rect class="hdr-ai" x="760" y="798" width="260" height="32" rx="6"/><rect class="hdr-ai" x="760" y="820" width="260" height="10"/>
+    <text class="cname" x="890" y="820">ollama_client.py</text>
+    <text class="meth" x="890" y="850">generate_from_ollama()</text>
+    <text class="meth" x="890" y="872">resolve_ollama_model()</text>
+  </g>
+
+  <!-- ===== Externe Systeme ===== -->
+  <g>
+    <rect class="ext" x="504" y="930" width="215" height="56" rx="6"/>
+    <text class="extname" x="611" y="953">OpenFoodFacts API <tspan class="stereo">«system»</tspan></text>
+    <text class="extsub" x="611" y="974">api/v2 · Produktdaten</text>
+
+    <rect class="ext" x="760" y="930" width="260" height="56" rx="6"/>
+    <text class="extname" x="890" y="953">Ollama <tspan class="stereo">«system»</tspan></text>
+    <text class="extsub" x="890" y="974">127.0.0.1:11434 · /api/generate</text>
+  </g>
+
+  <!-- ===== Abhängigkeiten ===== -->
+  <line class="dep" x1="330" y1="192" x2="330" y2="266"/>
+  <path class="dep" d="M450,192 L450,232 L370,232 L370,266"/>
+  <line class="dep" x1="910" y1="192" x2="910" y2="266"/>
+  <line class="dep" x1="390" y1="352" x2="390" y2="416"/>
+  <line class="dep" x1="860" y1="352" x2="860" y2="416"/>
+  <line class="dep" x1="977" y1="460" x2="1003" y2="460"/>
+  <line class="dep" x1="520" y1="502" x2="520" y2="646"/>
+  <line class="dep" x1="860" y1="502" x2="860" y2="796"/>
+  <line class="dep" x1="380" y1="732" x2="380" y2="796"/>
+  <line class="dep" x1="611" y1="882" x2="611" y2="928"/>
+  <line class="dep" x1="890" y1="882" x2="890" y2="928"/>
+
+  <!-- Legende -->
+  <g class="legend">
+    <line x1="48" y1="948" x2="98" y2="948" stroke="#14532d" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arr)"/>
+    <text x="108" y="953">«uses» — A hängt von B ab (Pfeile zeigen nur nach unten)</text>
+    <rect x="48" y="968" width="34" height="18" class="ext"/>
+    <text x="92" y="982">externes System</text>
+    <rect x="240" y="968" width="18" height="18" fill="#3fae68"/>
+    <text x="266" y="982">Teil A (SE)</text>
+    <rect x="360" y="968" width="18" height="18" fill="#14532d"/>
+    <text x="386" y="982">Teil B (ASaAI)</text>
+  </g>
+</svg>
